@@ -1,0 +1,116 @@
+{{define "content"}}
+<section class="hero compact">
+  <div>
+    <h1>{{t "oauth_openai_heading"}}</h1>
+    <p>{{t "oauth_openai_summary"}}</p>
+  </div>
+  <div class="hero-actions">
+    <a class="button-link ghost-link" href="{{if .OAuthReturnURL}}{{.OAuthReturnURL}}{{else}}/admin/connect/openai{{end}}">{{if .OAuthAccountID}}{{t "edit_account"}}{{else}}{{t "nav_connect_openai"}}{{end}}</a>
+  </div>
+</section>
+
+<section class="panel narrow oauth-panel">
+  <div class="panel-head">
+    <div class="cell-stack">
+      <h2>{{t "oauth_authorization_details"}}</h2>
+      <span class="panel-note">{{tf "oauth_expires_at" (.Start.ExpiresAt.Local.Format "2006-01-02 15:04:05")}}</span>
+    </div>
+    <span class="pill tone-warn" id="oauth-status">{{t "oauth_waiting"}}</span>
+  </div>
+
+  <form class="grid-form" id="oauth-form" method="post" action="/admin/connect/openai/oauth/poll">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+    <input type="hidden" name="device_code" value="{{.Start.DeviceCode}}">
+    {{if .OAuthAccountID}}<input type="hidden" name="account_id" value="{{.OAuthAccountID}}">{{end}}
+
+    <label class="full-span">
+      <span>{{t "oauth_next_step"}}</span>
+      <span class="panel-note">{{t "oauth_openai_completion_summary"}}</span>
+    </label>
+
+    <label class="full-span">
+      <span>{{t "oauth_user_code"}}</span>
+      <span class="oauth-code-wrap">
+        <code class="oauth-code">{{.Start.UserCode}}</code>
+        <button
+          type="button"
+          class="icon-button copy-secret-button oauth-code-copy"
+          data-copy-secret
+          data-copy-value="{{.Start.UserCode}}"
+          data-copy-label="{{t "copy_code"}}"
+          data-copy-success="{{t "copied"}}"
+          data-copy-failed="{{t "copy_failed"}}"
+          aria-label="{{t "copy_code"}}"
+          title="{{t "copy_code"}}"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="8" y="3" width="8" height="4" rx="1"></rect>
+            <path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"></path>
+          </svg>
+        </button>
+      </span>
+    </label>
+
+    <div class="full-span action-row">
+      <a class="button-link primary-link" href="{{.Start.VerificationURI}}" target="_blank" rel="noreferrer">{{t "oauth_open_authorization"}}</a>
+      <button class="ghost" type="submit">{{t "oauth_check_now"}}</button>
+    </div>
+  </form>
+</section>
+
+<script>
+(() => {
+  const form = document.getElementById("oauth-form");
+  const status = document.getElementById("oauth-status");
+  const interval = Math.max(Number("{{.Start.Interval}}") || 5, 5) * 1000;
+  const csrf = form.querySelector('input[name="csrf_token"]').value;
+  let stopped = false;
+
+  async function poll(event) {
+    if (event) {
+      event.preventDefault();
+    }
+    if (stopped) {
+      return;
+    }
+    status.textContent = "{{t "oauth_waiting"}}";
+    status.className = "pill tone-warn";
+    try {
+      const body = new URLSearchParams(new FormData(form));
+      const response = await fetch(form.action, {
+        method: "POST",
+        body,
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+          "X-CSRF-Token": csrf
+        },
+        credentials: "same-origin"
+      });
+      const contentType = response.headers.get("content-type") || "";
+      const data = contentType.includes("application/json")
+        ? await response.json()
+        : { status: "error", message: await response.text() };
+      if (response.status === 202 || data.status === "pending") {
+        return;
+      }
+      if (response.ok && data.status === "ok") {
+        stopped = true;
+        status.textContent = "{{t "oauth_success"}}";
+        status.className = "pill tone-good";
+        window.location.href = data.redirect || "/";
+        return;
+      }
+      stopped = true;
+      status.textContent = data.message || "{{t "oauth_error"}}";
+      status.className = "pill tone-bad";
+    } catch (error) {
+      status.textContent = error.message || "{{t "oauth_error"}}";
+      status.className = "pill tone-bad";
+    }
+  }
+
+  form.addEventListener("submit", poll);
+  window.setInterval(poll, interval);
+})();
+</script>
+{{end}}

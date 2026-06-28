@@ -1,0 +1,103 @@
+/* Canonical theme layer. Loaded after components.css so component rules resolve
+   through one token bridge. */
+:root,
+:root[data-theme="dark-neutral"] {
+  color-scheme: dark;
+
+  --theme-bg: #050505;
+  --theme-bg-elevated: #070707;
+  --theme-surface: #0a0a0b;
+  --theme-surface-raised: #101011;
+  --theme-surface-strong: #161617;
+  --theme-surface-soft: rgba(10, 10, 11, 0.72);
+  --theme-surface-hover: rgba(16, 16, 17, 0.88);
+  --theme-field: #070707;
+  --theme-field-hover: #0b0b0c;
+  --theme-field-focus: #0b0b0c;
+
+  --theme-text: #f2f2f3;
+  --theme-text-soft: #d6d7d9;
+  --theme-text-muted: #9b9da1;
+  --theme-text-faint: #6f7278;
+  --theme-text-inverse: #06110d;
+
+  --theme-line: #29292c;
+  --theme-line-soft: rgba(41, 41, 44, 0.62);
+  --theme-line-strong: #3d3d42;
+  --theme-line-focus: #2fc991;
+
+  --theme-accent: #2fc991;
+  --theme-accent-hover: #2fc991;
+  --theme-accent-soft: rgba(47, 201, 145, 0.08);
+  --theme-accent-line: rgba(47, 201, 145, 0.38);
+  --theme-good: #2fc991;
+  --theme-good-bg: rgba(47, 201, 145, 0.08);
+  --theme-good-line: rgba(47, 201, 145, 0.32);
+  --theme-warn: #e7c86f;
+  --theme-warn-bg: rgba(251, 191, 36, 0.08);
+  --theme-warn-line: rgba(251, 191, 36, 0.28);
+  --theme-bad: #ff6b81;
+  --theme-bad-bg: rgba(244, 63, 94, 0.08);
+  --theme-bad-line: rgba(244, 63, 94, 0.42);
+  --theme-muted-bg: rgba(18, 18, 19, 0.9);
+  --theme-muted-line: rgba(61, 61, 66, 0.9);
+
+  --theme-radius-xs: 2px;
+  --theme-radius-sm: 4px;
+  --theme-radius-md: 6px;
+  --theme-radius-round: 999px;
+  --theme-shadow-popover: 0 18px 48px rgba(0, 0, 0, 0.45);
+  --theme-shadow-dialog: 0 22px 56px rgba(0, 0, 0, 0.48);
+  --theme-focus-ring: 0 0 0 1px rgba(47, 201, 145, 0.14);
+
+  --bg: var(--theme-bg);
+  --surface: var(--theme-surface);
+  --surface-2: var(--theme-surface-raised);
+  --surface-3: var(--theme-surface-strong);
+  --field-bg: var(--theme-field);
+  --field-bg-hover: var(--theme-field-hover);
+  --field-bg-focus: var(--theme-field-focus);
+  --field-border: var(--theme-line);
+  --field-border-hover: var(--theme-line-strong);
+  --field-border-focus: var(--theme-line-focus);
+  --field-focus-ring: var(--theme-focus-ring);
+  --text: var(--theme-text);
+  --muted: var(--theme-text-muted);
+  --muted-2: var(--theme-text-faint);
+  --line: var(--theme-line);
+  --line-strong: var(--theme-line-strong);
+  --accent: var(--theme-accent);
+  --accent-strong: var(--theme-accent-hover);
+  --cta: var(--theme-accent);
+  --bad: var(--theme-bad);
+  --warn: var(--theme-warn);
+  --pill-good-fg: var(--theme-good);
+  --pill-good-bg: var(--theme-good-bg);
+  --pill-good-border: var(--theme-good-line);
+  --pill-warn-fg: var(--theme-warn);
+  --pill-warn-bg: var(--theme-warn-bg);
+  --pill-warn-border: var(--theme-warn-line);
+  --pill-bad-fg: var(--theme-bad);
+  --pill-bad-bg: var(--theme-bad-bg);
+  --pill-bad-border: var(--theme-bad-line);
+  --pill-muted-fg: var(--theme-text-soft);
+  --pill-muted-bg: var(--theme-muted-bg);
+  --pill-muted-border: var(--theme-muted-line);
+  --radius: var(--theme-radius-xs);
+  --shadow: none;
+  --field-shadow: none;
+
+  --text-heading: var(--theme-text);
+  --text-body: var(--theme-text-soft);
+  --text-secondary: var(--theme-text-muted);
+  --text-tertiary: var(--theme-text-faint);
+  --text-link: var(--theme-text-soft);
+  --text-link-hover: var(--theme-text);
+  --text-accent: var(--theme-accent-hover);
+  --text-success: var(--theme-good);
+  --text-warning: var(--theme-warn);
+  --text-danger: var(--theme-bad);
+  --text-code: var(--theme-text);
+  --text-placeholder: var(--theme-text-faint);
+  --text-on-accent: var(--theme-text-inverse);
+}

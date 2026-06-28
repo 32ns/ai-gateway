@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 32" width="340" height="200">
+  <style>
+    .brand-mark-letter-primary,
+    .brand-mark-letter-secondary {
+      font-family: "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Source Han Sans SC", "Segoe UI", Arial, sans-serif;
+      font-size: 24px;
+      font-weight: 750;
+      letter-spacing: 0;
+      stroke: none;
+    }
+    .brand-mark-letter-primary { fill: #f2f2f3; }
+    .brand-mark-letter-secondary { fill: #9b9da1; }
+    .brand-mark-accent-stroke {
+      fill: #2fc991;
+      stroke: none;
+    }
+  </style>
+  <text class="brand-mark-letter-primary" x="3.5" y="25.2">A</text>
+  <polygon class="brand-mark-accent-stroke" points="13.1,7.05 15.5,7.05 21.2,25.2 18.8,25.2" />
+  <text class="brand-mark-letter-secondary" x="19.5" y="25.2">G</text>
+</svg>

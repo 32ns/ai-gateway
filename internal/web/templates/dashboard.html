@@ -1,0 +1,358 @@
+{{define "content"}}
+{{if and .CurrentUser (not (isAdminUser .CurrentUser))}}
+<section class="hero compact">
+  <div>
+    <h1>{{t "user_dashboard_heading"}}</h1>
+    <p>{{t "user_dashboard_summary"}}</p>
+  </div>
+  <div class="hero-actions">
+    <a class="button-link primary-link" href="/clients/new">{{t "create_client"}}</a>
+    {{if or .Payment.WeChatPay.Enabled .Payment.Alipay.Enabled .Payment.PersonalPay.Enabled}}
+    <button type="button" class="recharge-action-button" data-group-settings-open="payment-recharge">
+      {{t "payment_recharge"}}
+    </button>
+    {{end}}
+  </div>
+</section>
+
+{{if or .Payment.WeChatPay.Enabled .Payment.Alipay.Enabled .Payment.PersonalPay.Enabled}}
+<div class="settings-overlay" id="payment-recharge" role="dialog" aria-modal="true" aria-labelledby="payment-recharge-title" hidden>
+  <div class="settings-dialog payment-dialog">
+    <div class="settings-header">
+      <div>
+        <h3 id="payment-recharge-title">{{t "payment_recharge"}}</h3>
+        <p>{{t "payment_recharge_hint"}}</p>
+      </div>
+      <button type="button" class="icon-button settings-close" data-group-settings-close aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M18 6 6 18"></path>
+          <path d="m6 6 12 12"></path>
+        </svg>
+      </button>
+    </div>
+    <form class="settings-form" method="post" action="/payments/create" data-payment-form data-payment-mode="{{.Payment.RechargeInputMode}}">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <div data-payment-create-fields>
+      <label>
+        <span>{{if eq .Payment.RechargeInputMode "payment_cny"}}{{t "recharge_payment_amount_cny"}}{{else}}{{t "recharge_amount_usd"}}{{end}}</span>
+        <input name="amount_usd" inputmode="decimal" value="10.00" placeholder="10.00" required>
+        {{if and .Payment.MinRechargeNanoUSD .Payment.MaxRechargeNanoUSD}}
+        <p class="field-note">{{tf "payment_recharge_limit_range_hint" (formatUSD .Payment.MinRechargeNanoUSD) (formatUSD .Payment.MaxRechargeNanoUSD)}}</p>
+        {{else if .Payment.MinRechargeNanoUSD}}
+        <p class="field-note">{{tf "payment_recharge_limit_min_hint" (formatUSD .Payment.MinRechargeNanoUSD)}}</p>
+        {{else if .Payment.MaxRechargeNanoUSD}}
+        <p class="field-note">{{tf "payment_recharge_limit_max_hint" (formatUSD .Payment.MaxRechargeNanoUSD)}}</p>
+        {{end}}
+      </label>
+      <div class="payment-method-field">
+        <div class="payment-method-grid" data-payment-provider-group>
+          {{if .Payment.PersonalPay.Enabled}}
+          <label class="payment-method-option">
+            <input type="radio" name="provider" value="personalpay" checked required>
+            <span class="payment-method-card">
+              <img class="payment-brand-logo wechat" src="/static/wechat-pay-logo.png" alt="{{t "personalpay_wechat"}}">
+            </span>
+          </label>
+          {{end}}
+          {{if .Payment.WeChatPay.Enabled}}
+          <label class="payment-method-option">
+            <input type="radio" name="provider" value="wechatpay" {{if not .Payment.PersonalPay.Enabled}}checked{{end}} required>
+            <span class="payment-method-card">
+              <img class="payment-brand-logo wechat" src="/static/wechat-pay-logo.png" alt="{{t "wechat_pay"}}">
+            </span>
+          </label>
+          {{end}}
+          {{if .Payment.Alipay.Enabled}}
+          <label class="payment-method-option">
+            <input type="radio" name="provider" value="alipay" {{if and (not .Payment.PersonalPay.Enabled) (not .Payment.WeChatPay.Enabled)}}checked{{end}} required>
+            <span class="payment-method-card">
+              <img class="payment-brand-logo alipay" src="/static/alipay-logo.png" alt="{{t "alipay"}}">
+            </span>
+          </label>
+          {{end}}
+        </div>
+      </div>
+      </div>
+      <div class="payment-loading" data-payment-loading hidden>
+        <span class="payment-loading-spinner" aria-hidden="true"></span>
+        <span>{{t "payment_qr_generating"}}</span>
+      </div>
+      <p class="form-error" data-payment-error hidden></p>
+      <div class="payment-result" data-payment-result hidden>
+        <div class="payment-result-summary" data-payment-summary hidden>
+          <div>
+            <span>{{t "payment_method"}}</span>
+            <strong data-payment-summary-provider></strong>
+          </div>
+          <div>
+            <span>{{t "payment_amount"}}</span>
+            <strong data-payment-summary-paid></strong>
+          </div>
+          <div>
+            <span>{{t "payment_received_amount"}}</span>
+            <strong data-payment-summary-received></strong>
+          </div>
+        </div>
+        <a class="button-link primary-link" href="#" target="_blank" rel="noopener" data-payment-url hidden>{{t "open_payment_url"}}</a>
+        <div class="payment-code" data-payment-code-wrap hidden>
+          <strong data-payment-status-text data-waiting-text="{{t "payment_waiting"}}" data-paying-text="{{t "payment_paying"}}" data-canceled-text="{{t "payment_canceled"}}" data-success-text="{{t "payment_success"}}" data-expired-text="{{t "payment_expired"}}" hidden></strong>
+          <img data-payment-qr hidden alt="{{t "show_qr_code"}}">
+        </div>
+      </div>
+      <div class="settings-actions">
+        <button type="button" class="ghost" data-group-settings-close>{{t "cancel"}}</button>
+        <button type="submit" data-payment-submit>{{t "create_payment_order"}}</button>
+      </div>
+    </form>
+  </div>
+</div>
+{{end}}
+
+<section class="status-strip">
+  <div class="metric">
+    <span class="metric-label">{{t "current_balance"}}</span>
+    <strong data-current-balance>{{formatUSD .CurrentUser.BalanceNanoUSD}}</strong>
+  </div>
+  <div class="metric">
+    <span class="metric-label">{{t "historical_spend"}}</span>
+    <strong>{{formatUSD (dashboardHistoricalSpend .CurrentUser .State.Clients)}}</strong>
+  </div>
+  <div class="metric">
+    <span class="metric-label">{{t "managed_clients"}}</span>
+    <strong>{{.State.TotalClients}}</strong>
+  </div>
+  {{if .UserDashboard.CustomPanelEnabled}}
+  <div class="metric user-dashboard-custom-panel">
+    {{userDashboardCustomPanelHTML .UserDashboard}}
+  </div>
+  {{end}}
+</section>
+
+{{if .InviteLink}}
+<section class="panel">
+  <div class="panel-head">
+    <h2>{{t "invitation_link"}}</h2>
+    <span class="panel-note">{{tf "invitation_link_hint" (formatPercentBps .Invitation.InviterRechargeRewardBps) (formatUSD .InviteeReward)}}</span>
+  </div>
+  <div class="copy-secret">
+    <code>{{.InviteLink}}</code>
+    <button
+      type="button"
+      class="icon-button copy-secret-button"
+      data-copy-secret
+      data-copy-value="{{.InviteLink}}"
+      data-copy-label="{{t "copy_key"}}"
+      data-copy-success="{{t "copied"}}"
+      data-copy-failed="{{t "copy_failed"}}"
+      aria-label="{{t "copy_key"}}"
+      title="{{t "copy_key"}}"
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="8" y="3" width="8" height="4" rx="1"></rect>
+        <path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"></path>
+      </svg>
+    </button>
+  </div>
+</section>
+{{end}}
+
+{{if .DashboardStatus.Targets}}
+{{$dashboardStatus := .DashboardStatus}}
+<section class="panel dashboard-status-panel" aria-labelledby="dashboard-status-title">
+  <div class="panel-head dashboard-status-head">
+    <h2 id="dashboard-status-title">{{t "dashboard_model_status"}}</h2>
+    <div class="dashboard-status-summary" aria-label="{{t "status_summary"}}">
+      <span class="pill tone-good">{{t "monitor_status_ok"}} {{$dashboardStatus.Summary.OK}}</span>
+      <span class="pill tone-warn">{{t "monitor_status_degraded"}} {{$dashboardStatus.Summary.Degraded}}</span>
+      <span class="pill tone-bad">{{t "monitor_status_failed"}} {{$dashboardStatus.Summary.Failed}}</span>
+      <a class="button-link ghost-link dashboard-status-link" href="/status">{{t "dashboard_model_status_view_all"}}</a>
+    </div>
+  </div>
+  <div class="dashboard-status-list">
+    {{range $dashboardStatus.Targets}}
+    {{$status := monitorViewStatus .}}
+    <article class="model-status-card dashboard-status-card">
+      <div class="model-status-card-head">
+        <div class="status-monitor-title">
+          <strong>{{.Target.Name}}</strong>
+          <span class="status-monitor-subtitle">{{.Target.AccountGroup}} / {{.Target.Model}}</span>
+        </div>
+        <span class="pill model-status-card-state {{monitorStatusClass $status}}">{{monitorStatusText $status}}</span>
+      </div>
+      <dl class="model-status-metrics">
+        <div>
+          <dt>{{t "monitor_latency"}}</dt>
+          <dd>{{if .HasLatest}}{{.Latest.LatencyMS}}ms{{else}}-{{end}}</dd>
+        </div>
+        <div>
+          <dt>{{t "monitor_availability"}}</dt>
+          <dd class="monitor-availability-value {{monitorAvailabilityClass .}}">{{.Availability}}%</dd>
+        </div>
+        <div>
+          <dt>{{t "monitor_last_check"}}</dt>
+          <dd>{{if .HasLatest}}{{formatTime .Latest.CheckedAt}}{{else}}-{{end}}</dd>
+        </div>
+      </dl>
+      <div class="monitor-timeline model-status-timeline" aria-label="{{t "monitor_history"}}">
+        {{range monitorHistoryBars .History}}
+        <span class="monitor-timeline-bar {{monitorStatusClass .Status}}" title="{{monitorStatusText .Status}} - {{formatTime .CheckedAt}}"></span>
+        {{end}}
+      </div>
+    </article>
+    {{end}}
+  </div>
+</section>
+{{end}}
+
+<section class="panel usage-chart-panel">
+  <div class="panel-head">
+    <div class="cell-stack">
+      <h2>{{t "today_usage_cost"}}</h2>
+    </div>
+    <strong>{{formatUSD .UsageChart.Total}}</strong>
+  </div>
+  <div class="usage-chart" role="img" aria-label="{{t "today_usage_cost"}}">
+    {{range .UsageChart.Points}}
+    <div class="usage-chart-bar" title="{{.Label}} {{formatUSD .NanoUSD}}">
+      <span class="usage-chart-fill" style="height: {{.Percent}}%;"></span>
+    </div>
+    {{end}}
+  </div>
+  <div class="usage-chart-labels" aria-hidden="true">
+    {{range .UsageChart.Points}}
+    <span class="usage-chart-label">{{.Hour}}</span>
+    {{end}}
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-head">
+    <h2>{{t "recent_usage"}}</h2>
+    <a class="button-link ghost-link" href="/logs">{{t "view_all"}}</a>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>{{t "at"}}</th>
+          <th>{{t "client"}}</th>
+          <th>{{t "model"}}</th>
+          <th>{{t "status"}}</th>
+          <th>{{t "input_tokens"}}</th>
+          <th>{{t "output_tokens"}}</th>
+          <th>{{t "cost"}}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Usage.Rows}}
+        <tr>
+          <td>{{.Request.CreatedAt.Local.Format "2006-01-02 15:04:05"}}</td>
+          <td><strong>{{.ClientName}}</strong></td>
+          <td><code>{{usageLogModelText .Request}}</code></td>
+          <td><span class="pill {{usageStatusClass .Request.Status}}">{{usageStatusText .Request.Status}}</span></td>
+          <td>{{.Request.PromptTokens}}</td>
+          <td>{{.Request.CompletionTokens}}</td>
+          <td>{{usageBillingAmountText .Request}}</td>
+        </tr>
+        {{else}}
+        <tr>
+          <td colspan="7" class="empty">{{t "no_requests"}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-head">
+    <h2>{{t "managed_clients"}}</h2>
+    <a class="button-link ghost-link" href="/clients">{{t "view_all"}}</a>
+  </div>
+  <div class="card-grid">
+    {{range .DashboardClients}}
+    {{$spend := clientSpend .}}
+    <article class="resource-card">
+      <div class="card-head">
+        <div class="cell-stack">
+          <h3>{{.Name}}</h3>
+          <span class="muted">{{clientBillingOptionText .}}</span>
+        </div>
+        <span class="pill {{if .Enabled}}tone-good{{else}}tone-muted{{end}}">{{boolStateText .Enabled}}</span>
+      </div>
+      <div class="kv-list">
+        <div class="kv"><span>{{t "spend"}}</span><strong>{{formatUSD $spend.SpendUsedNanoUSD}} / {{if eq $spend.SpendLimitNanoUSD 0}}{{t "unlimited"}}{{else}}{{formatUSD $spend.SpendLimitNanoUSD}}{{end}}</strong></div>
+        <div class="kv"><span>{{t "last_used"}}</span><span>{{formatTime .LastUsedAt}}</span></div>
+      </div>
+    </article>
+    {{else}}
+    <div class="empty">{{t "no_clients"}}</div>
+    {{end}}
+  </div>
+</section>
+{{else}}
+<section class="hero">
+  <div>
+    <h1>{{t "dashboard_heading"}}</h1>
+  </div>
+</section>
+
+<section class="status-strip">
+  <div class="status-card primary">
+    <div class="status-title">
+      <div class="cell-stack">
+        <strong>{{t "health"}}</strong>
+        <span class="muted">{{healthReasonText .State.Stats.Reason}}</span>
+      </div>
+      <span class="pill {{if eq .State.Stats.Status "ok"}}tone-good{{else if eq .State.Stats.Status "degraded"}}tone-warn{{else if eq .State.Stats.Status "setup"}}tone-muted{{else}}tone-bad{{end}}">{{healthStatusText .State.Stats.Status}}</span>
+    </div>
+    <div class="kv-list">
+      <div class="kv"><span>{{t "available_accounts"}}</span><strong>{{.State.Stats.AvailableAccounts}} / {{.State.Stats.TotalAccounts}}</strong></div>
+      <div class="kv"><span>{{t "provider_health"}}</span><strong>{{.State.Stats.HealthyProviderCount}} / {{.State.Stats.DegradedProviderCount}}</strong></div>
+    </div>
+  </div>
+  <div class="metric">
+    <span class="metric-label">{{t "users"}}</span>
+    <strong>{{.State.TotalUsers}}</strong>
+    <small>{{t "managed_clients"}}: {{.State.TotalClients}}</small>
+  </div>
+  <div class="metric">
+    <span class="metric-label">{{t "today_income"}}</span>
+    <strong>{{formatUSD .Finance.Overview.TodayIncomeNanoUSD}}</strong>
+    <small>{{t "today_spend"}}: {{formatUSD .Finance.Overview.TodaySpendNanoUSD}}</small>
+  </div>
+  {{if .Payment.PersonalPay.Enabled}}
+  <div class="metric">
+    <span class="metric-label">PersonalPay</span>
+    <strong>{{.PersonalPay.Summary.AccountCount}}</strong>
+    <small>{{t "personalpay_idle_accounts"}}: {{.PersonalPay.Summary.IdleAccountCount}} · {{t "personalpay_occupied_accounts"}}: {{.PersonalPay.Summary.OccupiedCount}} · {{t "personalpay_devices"}}: {{.PersonalPay.Summary.DeviceCount}}</small>
+  </div>
+  {{end}}
+</section>
+
+<section class="provider-grid">
+  {{range .State.Providers}}
+  <article class="provider-card">
+    <div class="card-head">
+      <div class="cell-stack">
+        <h3>{{.Label}}</h3>
+        <span class="muted">{{t "last_used"}}: {{formatTime .LastUsedAt}}</span>
+      </div>
+      <span class="pill {{if gt .AvailableAccounts 0}}tone-good{{else}}tone-warn{{end}}">{{if gt .AvailableAccounts 0}}{{healthStatusText "ok"}}{{else}}{{healthStatusText "degraded"}}{{end}}</span>
+    </div>
+    <div class="card-meta">
+      <div class="kv"><span>{{t "total_accounts"}}</span><strong>{{.TotalAccounts}}</strong></div>
+      <div class="kv"><span>{{t "available_accounts"}}</span><strong>{{.AvailableAccounts}}</strong></div>
+      <div class="kv"><span>{{t "cooling_accounts"}}</span><strong>{{.CoolingAccounts}}</strong></div>
+      <div class="kv"><span>{{t "blocked_accounts"}}</span><strong>{{.BlockedAccounts}}</strong></div>
+      <div class="kv"><span>{{t "provider_banned_accounts"}}</span><strong>{{.ProviderBannedAccounts}}</strong></div>
+    </div>
+  </article>
+  {{else}}
+  <section class="panel">
+    <div class="empty">{{t "no_accounts_available"}}</div>
+  </section>
+  {{end}}
+</section>
+{{end}}
+{{end}}

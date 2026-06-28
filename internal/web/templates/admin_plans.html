@@ -1,0 +1,693 @@
+{{define "content"}}
+<section class="hero compact">
+  <div>
+    <h1>{{t "plans"}}</h1>
+    <p>{{t "admin_plans_hint"}}</p>
+  </div>
+  {{if eq .AdminPlanTab "plans"}}
+  <div class="hero-actions">
+    <button
+      type="button"
+      class="ghost"
+      data-account-group-create="true"
+      data-prompt-title="{{t "add_plan_group"}}"
+      data-prompt-message="{{t "plan_group_prompt"}}"
+      data-prompt-placeholder="{{t "plan_group_name_placeholder"}}"
+      data-prompt-submit="{{t "add_plan_group"}}"
+      data-prompt-form="plan-group-create-form"
+    >{{t "add_plan_group"}}</button>
+  </div>
+  {{end}}
+</section>
+
+<div class="finance-tabs admin-plan-tabs" role="tablist" aria-label="{{t "admin_plan_navigation"}}">
+  <a class="{{if eq .AdminPlanTab "subscriptions"}}is-active{{end}}" href="{{adminPlanTabURL "subscriptions"}}">{{t "plan_tab_subscriptions"}}</a>
+  <a class="{{if eq .AdminPlanTab "plans"}}is-active{{end}}" href="{{adminPlanTabURL "plans"}}">{{t "plan_tab_config"}}</a>
+</div>
+
+{{if eq .AdminPlanTab "plans"}}
+{{if .BillingPlanGroups}}
+<div class="settings-overlay plan-create-overlay" id="plan-create" role="dialog" aria-modal="true" aria-labelledby="plan-create-title" hidden>
+  <div class="settings-dialog plan-dialog">
+    <div class="settings-header">
+      <div>
+        <h3 id="plan-create-title">{{t "add_plan"}}</h3>
+        <p>{{t "plan_auto_id_note"}}</p>
+      </div>
+      <button type="button" class="icon-button settings-close" data-group-settings-close aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M18 6 6 18"></path>
+          <path d="m6 6 12 12"></path>
+        </svg>
+      </button>
+    </div>
+    <form class="plan-form" method="post" action="/admin/plans" data-plan-ratio-form>
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <input type="hidden" name="current_group" value="{{.ActivePlanGroupKey}}">
+      <div class="plan-form-section">
+        <div class="plan-section-title">
+          <strong>{{t "plan_section_basic"}}</strong>
+        </div>
+        <div class="plan-form-grid">
+          <label>
+            <span>{{t "plan_name"}}</span>
+            <input name="name" placeholder="{{t "plan_name_placeholder"}}" data-modal-autofocus required>
+          </label>
+          <label>
+            <span>{{t "plan_price"}}</span>
+            <div class="plan-price-sync-row">
+              <input name="price_usd" inputmode="decimal" value="10" data-plan-price-input>
+              <button type="button" class="ghost plan-price-sync-button" data-plan-price-sync-button>{{t "plan_price_sync"}}</button>
+            </div>
+          </label>
+        </div>
+      </div>
+      <div class="plan-form-section">
+        <div class="plan-section-title">
+          <strong>{{t "plan_section_rule"}}</strong>
+          <span>{{t "plan_rule_example"}}</span>
+        </div>
+        <div class="plan-rule-grid">
+          <label>
+            <span>{{t "plan_period_quota"}}</span>
+            <input name="period_quota_usd" inputmode="decimal" value="100" data-plan-quota-input>
+          </label>
+          <label>
+            <span>{{t "plan_period_hours"}}</span>
+            <input type="number" min="1" name="period_duration_hours" value="24">
+          </label>
+          <label>
+            <span>{{t "plan_periods"}}</span>
+            <input type="number" min="1" name="period_count" value="1" data-plan-period-count-input>
+          </label>
+        </div>
+      </div>
+      <div class="plan-form-section">
+        <div class="plan-section-title">
+          <strong>{{t "plan_section_display"}}</strong>
+        </div>
+        <div class="plan-form-grid plan-display-grid">
+          <label>
+            <span>{{t "plan_group"}}</span>
+            <select name="group" required data-plan-group-select>
+              {{range .BillingPlanGroups}}
+              <option value="{{.Value}}" data-quota-price-ratio="{{.QuotaPriceRatio}}" {{if eq .Value $.ActivePlanGroupKey}}selected{{end}}>{{.Label}}</option>
+              {{end}}
+            </select>
+          </label>
+          <label>
+            <span>{{t "sort_order"}}</span>
+            <input type="number" name="sort_order" value="0">
+          </label>
+          <label class="checkbox-row plan-enabled-field">
+            <input type="checkbox" name="enabled" checked>
+            <span>{{t "plan_sale_enabled"}}</span>
+          </label>
+        </div>
+        <label>
+          <span>{{t "description"}}</span>
+          <input name="description">
+        </label>
+      </div>
+      <div class="settings-actions">
+        <button type="button" class="ghost" data-group-settings-close>{{t "cancel"}}</button>
+        <button type="submit">{{t "create_plan"}}</button>
+      </div>
+    </form>
+  </div>
+</div>
+{{end}}
+
+<section class="panel accounts-panel plan-admin-panel">
+  <form id="plan-group-create-form" method="post" action="/admin/plan-groups" hidden>
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+    <input type="hidden" name="name" value="">
+    <input type="hidden" name="quota_price_ratio" value="1:1">
+    <input type="hidden" name="sort_order" value="0">
+    <input type="hidden" name="current_group" value="{{.ActivePlanGroupKey}}">
+  </form>
+  {{if .BillingPlanGroups}}
+  <div class="group-bar">
+    <nav class="group-tabs" aria-label="{{t "plan_group_manager"}}">
+      {{range .BillingPlanGroups}}
+      <a
+        class="group-tab {{if eq $.ActivePlanGroupKey .Value}}active{{end}}"
+        href="{{adminPlansGroupHref .Value}}"
+        aria-selected="{{if eq $.ActivePlanGroupKey .Value}}true{{else}}false{{end}}"
+      >{{.Label}}</a>
+      {{end}}
+    </nav>
+    <div class="group-summary">
+      <span class="panel-note">{{tf "plan_group_used_count" .ActivePlanGroup.PlanCount}}</span>
+      <button type="button" class="ghost" data-group-settings-open="plan-create">{{t "add_plan"}}</button>
+      <button
+        type="button"
+        class="icon-button group-settings-trigger"
+        data-group-settings-open="plan-group-settings"
+        aria-label="{{t "group_settings"}}"
+        title="{{t "group_settings"}}"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.09a2 2 0 0 1 1 1.74v.5a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"></path>
+          <circle cx="12" cy="12" r="3"></circle>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="settings-overlay" id="plan-group-settings" role="dialog" aria-modal="true" aria-labelledby="plan-group-settings-title" hidden>
+    <div class="settings-dialog">
+      <div class="settings-header">
+        <div>
+          <h3 id="plan-group-settings-title">{{t "group_settings"}}</h3>
+          <p>{{.ActivePlanGroup.Label}}</p>
+        </div>
+        <button type="button" class="icon-button settings-close" data-group-settings-close aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M18 6 6 18"></path>
+            <path d="m6 6 12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="settings-form">
+        <form method="post" action="{{planGroupActionURL .ActivePlanGroup.Value "update"}}">
+          <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+          <input type="hidden" name="current_group" value="{{$.ActivePlanGroupKey}}">
+          <div class="settings-module-head">
+            <div>
+              <strong>{{.ActivePlanGroup.Label}}</strong>
+              <span>{{t "plan_group_sale_hint"}}</span>
+            </div>
+            <span class="pill {{if .ActivePlanGroup.SaleDisabled}}tone-muted{{else}}tone-good{{end}}">{{if .ActivePlanGroup.SaleDisabled}}{{t "plan_group_sale_disabled"}}{{else}}{{t "plan_group_sale_enabled"}}{{end}}</span>
+          </div>
+          <label>
+            <span>{{t "plan_group_name"}}</span>
+            <input name="name" value="{{.ActivePlanGroup.Label}}" required>
+          </label>
+          <label>
+            <span>{{t "sort_order"}}</span>
+            <input type="number" name="sort_order" value="{{.ActivePlanGroup.SortOrder}}">
+          </label>
+          <label>
+            <span>{{t "plan_group_quota_price_ratio"}}</span>
+            <input name="quota_price_ratio" value="{{.ActivePlanGroup.QuotaPriceRatio}}" placeholder="1:0.8" required>
+          </label>
+          <p class="field-note">{{t "plan_group_quota_price_ratio_hint"}}</p>
+          <label class="switch-row plan-group-sale-switch">
+            <input type="checkbox" name="sale_enabled" {{if not .ActivePlanGroup.SaleDisabled}}checked{{end}}>
+            <span class="switch-track" aria-hidden="true"></span>
+            <span class="switch-copy">
+              <span class="switch-on">{{t "plan_group_sale_enabled"}}</span>
+              <span class="switch-off">{{t "plan_group_sale_disabled"}}</span>
+            </span>
+          </label>
+          <div class="settings-actions">
+            <button type="submit">{{t "save"}}</button>
+            <button type="button" class="ghost" data-group-settings-close>{{t "cancel"}}</button>
+          </div>
+        </form>
+      </div>
+
+      {{if .ActivePlanGroup.CanDelete}}
+      <div class="settings-danger-zone">
+        <div>
+          <strong>{{t "delete_group"}}</strong>
+          <span>{{t "plan_group_delete_hint"}}</span>
+        </div>
+        <form method="post" action="{{planGroupActionURL .ActivePlanGroup.Value "delete"}}" data-confirm="{{tf "confirm_delete_plan_group" .ActivePlanGroup.Label}}">
+          <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+          <input type="hidden" name="current_group" value="{{$.ActivePlanGroupKey}}">
+          <button class="danger" type="submit">{{t "delete_group"}}</button>
+        </form>
+      </div>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
+
+  {{if .BillingPlanGroups}}
+  <div class="table-wrap plan-admin-table-wrap plan-config-table-wrap">
+    <table class="data-table plan-table plan-config-table">
+      <thead>
+        <tr>
+          <th>{{t "plan_id"}}</th>
+          <th>{{t "plan_name"}}</th>
+          <th>{{t "plan_price"}}</th>
+          <th>{{t "plan_period_quota"}}</th>
+          <th>{{t "plan_periods"}}</th>
+          <th>{{t "status"}}</th>
+          <th>{{t "action"}}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range $plan := .ActivePlanGroupPlans}}
+        <tr>
+          <td><code>{{$plan.ID}}</code></td>
+          <td>
+            <div class="cell-stack">
+              <strong>{{$plan.Name}}</strong>
+              {{if $plan.Description}}<span class="muted">{{$plan.Description}}</span>{{end}}
+            </div>
+          </td>
+          <td>${{formatNanoUSD $plan.PriceNanoUSD}}</td>
+          <td>${{formatNanoUSD $plan.PeriodQuotaNanoUSD}}</td>
+          <td>{{$plan.PeriodCount}}</td>
+          <td><span class="pill {{if $plan.Enabled}}tone-good{{else}}tone-muted{{end}}">{{if $plan.Enabled}}{{t "plan_sale_enabled"}}{{else}}{{t "plan_sale_disabled"}}{{end}}</span></td>
+          <td>
+            <div class="action-row plan-row-actions">
+              <button type="button" class="ghost" data-group-settings-open="{{planDialogID $plan.ID}}">{{t "edit"}}</button>
+              <form method="post" action="{{planActionURL $plan.ID "delete"}}" data-confirm="{{tf "confirm_delete_plan" $plan.Name}}">
+                <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                <input type="hidden" name="current_group" value="{{$.ActivePlanGroupKey}}">
+                <button type="submit" class="danger">{{t "delete"}}</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {{else}}
+        <tr>
+          <td colspan="7" class="empty-state">{{t "no_plans"}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else}}
+  <p class="empty-state">{{t "no_plan_groups"}}</p>
+{{end}}
+</section>
+{{else}}
+{{$subscriptions := .PlanSubscriptions}}
+{{if .PlanGrantNotice}}
+<div class="notice success">{{t "plan_grant_success"}}</div>
+{{end}}
+{{if .PlanCancelNotice}}
+<div class="notice success">{{t "plan_cancel_success"}}</div>
+{{end}}
+
+<div class="settings-overlay" id="plan-grant" role="dialog" aria-modal="true" aria-labelledby="plan-grant-title" hidden>
+  <div class="settings-dialog message-dialog">
+    <div class="settings-header">
+      <div>
+        <h3 id="plan-grant-title">{{t "plan_grant"}}</h3>
+        <p>{{t "plan_grant_hint"}}</p>
+      </div>
+      <button type="button" class="icon-button settings-close" data-group-settings-close aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M18 6 6 18"></path>
+          <path d="m6 6 12 12"></path>
+        </svg>
+      </button>
+    </div>
+    <form class="settings-form" method="post" action="/admin/plans/grant">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <label>
+        <span>{{t "plan_name"}}</span>
+        <select name="plan_id" required>
+          {{range .Plans}}
+          {{if .Enabled}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+          {{end}}
+        </select>
+      </label>
+
+      <div class="message-target-fields" data-message-target>
+        <label>
+          <span>{{t "message_target_mode"}}</span>
+          <select name="target_mode" data-message-target-mode>
+            <option value="user" selected>{{t "message_target_user_option"}}</option>
+            <option value="all">{{t "message_target_all_option"}}</option>
+            <option value="paid">{{t "plan_grant_scope_paid"}}</option>
+          </select>
+        </label>
+        <div class="message-target-panel" data-message-target-panel="user">
+          <span>{{t "plan_grant_targets"}}</span>
+          <div class="message-user-picker">
+            <input type="search" data-message-user-search data-message-user-search-url="/messages/users/search" placeholder="{{t "message_user_search_placeholder"}}" autocomplete="off">
+            <button type="button" class="ghost" data-message-user-add>{{t "add"}}</button>
+          </div>
+          <div class="message-user-results" data-message-user-results hidden></div>
+          <div hidden></div>
+          <div class="message-selected-users" data-message-selected-users></div>
+        </div>
+        <p class="field-note">{{t "plan_grant_target_hint"}}</p>
+      </div>
+
+      <label>
+        <span>{{t "note"}}</span>
+        <input name="note" placeholder="{{t "optional_note"}}">
+      </label>
+      <div class="settings-actions">
+        <button type="submit" data-confirm="{{t "confirm_grant_plan"}}">{{t "plan_grant_submit"}}</button>
+        <button type="button" class="ghost" data-group-settings-close>{{t "cancel"}}</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<section class="metric-grid finance-metrics plan-subscription-metrics">
+  <div class="metric"><span class="metric-label">{{t "plan_subscription_total"}}</span><strong>{{$subscriptions.Stats.TotalCount}}</strong></div>
+  <div class="metric"><span class="metric-label">{{t "plan_subscription_active"}}</span><strong>{{$subscriptions.Stats.ActiveCount}}</strong></div>
+  <div class="metric"><span class="metric-label">{{t "plan_subscription_revenue"}}</span><strong>{{formatUSD $subscriptions.Stats.RevenueNanoUSD}}</strong></div>
+  <div class="metric"><span class="metric-label">{{t "plan_subscription_remaining_quota"}}</span><strong>{{formatUSD $subscriptions.Stats.ActiveRemainingNanoUSD}}</strong></div>
+  <div class="metric"><span class="metric-label">{{t "plan_subscription_used_quota"}}</span><strong>{{formatUSD $subscriptions.Stats.ActiveUsedNanoUSD}}</strong></div>
+</section>
+
+<section class="panel plan-subscription-panel">
+  <div class="panel-head">
+    <h2>{{t "plan_subscription_overview"}}</h2>
+    <span class="panel-note">{{t "plan_subscription_overview_hint"}}</span>
+  </div>
+  <div class="table-wrap finance-compact-table">
+    <table class="data-table plan-table">
+      <thead>
+        <tr>
+          <th>{{t "plan_name"}}</th>
+          <th>{{t "plan_group"}}</th>
+          <th>{{t "plan_subscription_purchases"}}</th>
+          <th>{{t "plan_subscription_active"}}</th>
+          <th>{{t "plan_subscription_revenue"}}</th>
+          <th>{{t "plan_subscription_remaining_quota"}}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range $subscriptions.PlanSummaries}}
+        <tr>
+          <td>
+            <strong>{{.PlanName}}</strong>
+          </td>
+          <td>
+            {{if .PlanGroup}}
+            <strong>{{planGroupDisplayName .PlanGroup $.BillingPlanGroups}}</strong>
+            {{else}}-{{end}}
+          </td>
+          <td>{{.PurchaseCount}}</td>
+          <td>{{.ActiveCount}}</td>
+          <td>{{formatUSD .RevenueNanoUSD}}</td>
+          <td>{{formatUSD .ActiveRemainingNanoUSD}}</td>
+        </tr>
+        {{else}}
+        <tr><td colspan="6" class="empty-state">{{t "no_plan_subscriptions"}}</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel plan-subscription-panel">
+  <div class="panel-head">
+    <div>
+      <h2>{{t "plan_subscription_details"}}</h2>
+      <span class="panel-note">{{tf "plan_subscription_count" $subscriptions.Page.Total}}</span>
+    </div>
+    <div class="action-row">
+      <button type="button" class="ghost" data-group-settings-open="plan-grant">{{t "plan_grant_button"}}</button>
+    </div>
+  </div>
+
+  <form class="stack-form" method="get" action="/admin/plans">
+    <input type="hidden" name="tab" value="subscriptions">
+    <div class="filter-grid has-actions plan-subscription-filter-grid">
+      <label>
+        <span>{{t "filter_user"}}</span>
+        <input name="subscription_user_id" value="{{$subscriptions.Filter.UserID}}" placeholder="{{t "user_id"}}">
+      </label>
+      <label>
+        <span>{{t "plan_name"}}</span>
+        <select name="subscription_plan_id">
+          <option value="">{{t "all"}}</option>
+          {{range .Plans}}
+          <option value="{{.ID}}" {{if eq .ID $subscriptions.Filter.PlanID}}selected{{end}}>{{.Name}}</option>
+          {{end}}
+        </select>
+      </label>
+      <label>
+        <span>{{t "status"}}</span>
+        <select name="subscription_status">
+          <option value="">{{t "all"}}</option>
+          <option value="active" {{if eq (printf "%s" $subscriptions.Filter.Status) "active"}}selected{{end}}>{{t "plan_status_active"}}</option>
+          <option value="expired" {{if eq (printf "%s" $subscriptions.Filter.Status) "expired"}}selected{{end}}>{{t "plan_status_expired"}}</option>
+          <option value="cancelled" {{if eq (printf "%s" $subscriptions.Filter.Status) "cancelled"}}selected{{end}}>{{t "plan_status_cancelled"}}</option>
+        </select>
+      </label>
+      <div class="form-actions filter-actions finance-filter-actions">
+        <button type="submit">{{t "filter"}}</button>
+        <a class="button-link ghost-link" href="{{adminPlanTabURL "subscriptions"}}">{{t "clear_filters"}}</a>
+      </div>
+    </div>
+  </form>
+
+  <div class="table-wrap plan-admin-table-wrap plan-subscription-detail-table-wrap">
+    <table class="data-table plan-table plan-subscription-detail-table">
+      <thead>
+        <tr>
+          <th>{{t "user"}}</th>
+          <th>{{t "plan_name"}}</th>
+          <th>{{t "status"}}</th>
+          <th>{{t "plan_current_quota"}}</th>
+          <th>{{t "plan_remaining_periods"}}</th>
+          <th>{{t "plan_subscription_window"}}</th>
+          <th>{{t "plan_subscription_full_period"}}</th>
+          <th>{{t "plan_price"}}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range $subscriptions.Rows}}
+        {{$usageDialogID := planSubscriptionUsageDialogID .Entitlement.ID}}
+        <tr>
+          <td>
+            <div class="cell-stack">
+              <button type="button" class="plan-user-link" data-group-settings-open="{{$usageDialogID}}" title="{{t "plan_subscription_usage_details"}}">{{.Username}}</button>
+            </div>
+          </td>
+          <td>
+            <strong>{{.Entitlement.PlanName}}</strong>
+          </td>
+          <td><span class="pill {{planEntitlementStatusClass .Entitlement.Status}}">{{planEntitlementStatusText .Entitlement.Status}}</span></td>
+          <td>{{formatUSD (planQuotaRemaining .Entitlement)}} / {{formatUSD .Entitlement.PeriodQuotaNanoUSD}}</td>
+          <td>{{.Entitlement.RemainingPeriods}} / {{.Entitlement.TotalPeriods}}</td>
+          <td>
+            <div class="cell-stack plan-period-window">
+              <span>{{formatTime .Entitlement.CurrentPeriodStartedAt}}</span>
+              <span>{{formatTime .Entitlement.CurrentPeriodEndsAt}}</span>
+            </div>
+          </td>
+          <td>
+            <div class="cell-stack plan-period-window">
+              <span>{{formatTime .Entitlement.PurchasedAt}}</span>
+              <span>{{formatTime .Entitlement.ExpiresAt}}</span>
+            </div>
+          </td>
+          <td>{{formatUSD .Entitlement.PriceNanoUSD}}</td>
+        </tr>
+        {{else}}
+        <tr><td colspan="8" class="empty-state">{{t "no_plan_subscriptions"}}</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{if or $subscriptions.Page.HasPrev $subscriptions.Page.HasNext}}
+  <div class="pager">
+    <div class="panel-note">{{tf "plan_subscription_count" $subscriptions.Page.Total}}</div>
+    <div class="action-row">
+      {{if $subscriptions.Page.HasPrev}}<a class="button-link ghost-link" href="{{planSubscriptionPageURL $subscriptions.Filter $subscriptions.Page.PrevPage}}">{{t "previous"}}</a>{{end}}
+      {{if $subscriptions.Page.HasNext}}<a class="button-link ghost-link" href="{{planSubscriptionPageURL $subscriptions.Filter $subscriptions.Page.NextPage}}">{{t "next"}}</a>{{end}}
+    </div>
+  </div>
+  {{end}}
+</section>
+
+{{range $subscriptions.Rows}}
+{{$usageDialogID := planSubscriptionUsageDialogID .Entitlement.ID}}
+<div class="settings-overlay" id="{{$usageDialogID}}" role="dialog" aria-modal="true" aria-labelledby="{{$usageDialogID}}-title" hidden>
+  <div class="settings-dialog plan-usage-dialog">
+    <div class="settings-header">
+      <div>
+        <h3 id="{{$usageDialogID}}-title">{{t "plan_subscription_usage_details"}}</h3>
+        <p>{{t "plan_subscription_usage_details_hint"}}</p>
+      </div>
+      <button type="button" class="icon-button settings-close" data-group-settings-close aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M18 6 6 18"></path>
+          <path d="m6 6 12 12"></path>
+        </svg>
+      </button>
+    </div>
+
+    <div class="plan-usage-subject">
+      <div>
+        <strong>{{.UsageDetails.Username}}</strong>
+        <span>{{.UsageDetails.PlanName}}</span>
+      </div>
+      <span class="panel-note">{{tf "plan_quota_usage_count" (len .UsageDetails.Rows)}}</span>
+    </div>
+
+    <div class="plan-usage-section-heading">
+      <strong>{{t "plan_subscription_current_period"}}</strong>
+      <span>{{formatTime .UsageDetails.CurrentPeriodStartedAt}} - {{formatTime .UsageDetails.CurrentPeriodEndsAt}}</span>
+    </div>
+    <div class="plan-usage-current-stats">
+      <div><span>{{t "plan_current_period_quota"}}</span><strong>{{formatUSD .UsageDetails.CurrentPeriodQuotaNanoUSD}}</strong></div>
+      <div><span>{{t "plan_current_period_used"}}</span><strong>{{formatUSD .UsageDetails.CurrentPeriodUsedNanoUSD}}</strong></div>
+      <div><span>{{t "plan_current_period_remaining"}}</span><strong>{{formatUSD .UsageDetails.CurrentPeriodRemainingNanoUSD}}</strong></div>
+    </div>
+
+    <div class="plan-usage-section-heading">
+      <strong>{{t "plan_quota_usage_history"}}</strong>
+      <span>{{t "plan_quota_usage_history_hint"}}</span>
+    </div>
+    <div class="plan-usage-stats">
+      <div><span>{{t "plan_quota_usage_issued"}}</span><strong>{{formatUSD .UsageDetails.Stats.GrantedNanoUSD}}</strong></div>
+      <div><span>{{t "plan_quota_usage_used"}}</span><strong>{{formatUSD .UsageDetails.Stats.UsedNanoUSD}}</strong></div>
+      <div><span>{{t "plan_quota_usage_returned"}}</span><strong>{{formatUSD .UsageDetails.Stats.ReturnedNanoUSD}}</strong></div>
+      <div><span>{{t "plan_quota_usage_expired"}}</span><strong>{{formatUSD .UsageDetails.Stats.ExpiredNanoUSD}}</strong></div>
+      <div><span>{{t "plan_quota_usage_net"}}</span><strong>{{signedUSD .UsageDetails.Stats.NetNanoUSD}}</strong></div>
+    </div>
+
+    <div class="plan-usage-section-heading table-heading">
+      <strong>{{t "plan_quota_usage_daily"}}</strong>
+      <span>{{t "plan_quota_usage_daily_hint"}}</span>
+    </div>
+
+    <div class="table-wrap plan-usage-table-wrap">
+      <table class="data-table plan-usage-table">
+        <thead>
+          <tr>
+            <th>{{t "plan_quota_usage_period"}}</th>
+            <th>{{t "plan_quota_usage_issued"}}</th>
+            <th>{{t "plan_quota_usage_used"}}</th>
+            <th>{{t "plan_quota_usage_returned"}}</th>
+            <th>{{t "plan_quota_usage_expired"}}</th>
+            <th>{{t "plan_quota_usage_net"}}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .UsageDetails.Rows}}
+          <tr>
+            <td data-label="{{t "plan_quota_usage_period"}}">
+              <div class="cell-stack plan-period-window plan-usage-period">
+                <span>{{formatTime .PeriodStartedAt}}</span>
+                <span>{{formatTime .PeriodEndsAt}}</span>
+              </div>
+            </td>
+            <td class="num" data-label="{{t "plan_quota_usage_issued"}}">{{formatUSD .GrantedNanoUSD}}</td>
+            <td class="num" data-label="{{t "plan_quota_usage_used"}}">{{formatUSD .UsedNanoUSD}}</td>
+            <td class="num" data-label="{{t "plan_quota_usage_returned"}}">{{formatUSD .ReturnedNanoUSD}}</td>
+            <td class="num" data-label="{{t "plan_quota_usage_expired"}}">{{formatUSD .ExpiredNanoUSD}}</td>
+            <td class="num" data-label="{{t "plan_quota_usage_net"}}">{{signedUSD .NetNanoUSD}}</td>
+          </tr>
+          {{else}}
+          <tr><td colspan="6" class="empty-state">{{t "no_plan_quota_usage"}}</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    {{if eq (printf "%s" .Entitlement.Status) "active"}}
+    <div class="settings-actions plan-usage-actions">
+      <form method="post" action="/admin/plans/entitlements/cancel" data-confirm="{{t "confirm_cancel_plan_entitlement"}}" data-confirm-tone="danger">
+        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+        <input type="hidden" name="entitlement_id" value="{{.Entitlement.ID}}">
+        <button type="submit" class="danger">{{t "plan_cancel"}}</button>
+      </form>
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}
+{{end}}
+
+{{if eq .AdminPlanTab "plans"}}
+{{range $index, $plan := .Plans}}
+<div class="settings-overlay plan-edit-overlay" id="{{planDialogID $plan.ID}}" role="dialog" aria-modal="true" aria-labelledby="plan-edit-title-{{$index}}" hidden>
+  <div class="settings-dialog plan-dialog">
+    <div class="settings-header">
+      <div>
+        <h3 id="plan-edit-title-{{$index}}">{{t "edit_plan"}}</h3>
+        <p>{{t "plan_id"}}: {{$plan.ID}}</p>
+      </div>
+      <button type="button" class="icon-button settings-close" data-group-settings-close aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M18 6 6 18"></path>
+          <path d="m6 6 12 12"></path>
+        </svg>
+      </button>
+    </div>
+    <form class="plan-form" method="post" action="/admin/plans" data-plan-ratio-form>
+      <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+      <input type="hidden" name="id" value="{{$plan.ID}}">
+      <input type="hidden" name="current_group" value="{{$.ActivePlanGroupKey}}">
+      <div class="plan-form-section">
+        <div class="plan-section-title">
+          <strong>{{t "plan_section_basic"}}</strong>
+        </div>
+        <div class="plan-form-grid">
+          <label>
+            <span>{{t "plan_name"}}</span>
+            <input name="name" value="{{$plan.Name}}" required>
+          </label>
+          <label>
+            <span>{{t "plan_price"}}</span>
+            <div class="plan-price-sync-row">
+              <input name="price_usd" inputmode="decimal" value="{{formatNanoUSD $plan.PriceNanoUSD}}" data-plan-price-input>
+              <button type="button" class="ghost plan-price-sync-button" data-plan-price-sync-button>{{t "plan_price_sync"}}</button>
+            </div>
+          </label>
+        </div>
+      </div>
+      <div class="plan-form-section">
+        <div class="plan-section-title">
+          <strong>{{t "plan_section_rule"}}</strong>
+          <span>{{t "plan_rule_example"}}</span>
+        </div>
+        <div class="plan-rule-grid">
+          <label>
+            <span>{{t "plan_period_quota"}}</span>
+            <input name="period_quota_usd" inputmode="decimal" value="{{formatNanoUSD $plan.PeriodQuotaNanoUSD}}" data-plan-quota-input>
+          </label>
+          <label>
+            <span>{{t "plan_period_hours"}}</span>
+            <input type="number" min="1" name="period_duration_hours" value="{{planPeriodHours $plan}}">
+          </label>
+          <label>
+            <span>{{t "plan_periods"}}</span>
+            <input type="number" min="1" name="period_count" value="{{$plan.PeriodCount}}" data-plan-period-count-input>
+          </label>
+        </div>
+      </div>
+      <div class="plan-form-section">
+        <div class="plan-section-title">
+          <strong>{{t "plan_section_display"}}</strong>
+        </div>
+        <div class="plan-form-grid plan-display-grid">
+          <label>
+            <span>{{t "plan_group"}}</span>
+            <select name="group" required data-plan-group-select>
+              {{range $.BillingPlanGroups}}
+              <option value="{{.Value}}" data-quota-price-ratio="{{.QuotaPriceRatio}}" {{if eq .Value $plan.Group}}selected{{end}}>{{.Label}}</option>
+              {{end}}
+            </select>
+          </label>
+          <label>
+            <span>{{t "sort_order"}}</span>
+            <input type="number" name="sort_order" value="{{$plan.SortOrder}}">
+          </label>
+          <label class="checkbox-row plan-enabled-field">
+            <input type="checkbox" name="enabled" {{if $plan.Enabled}}checked{{end}}>
+            <span>{{t "plan_sale_enabled"}}</span>
+          </label>
+        </div>
+        <label>
+          <span>{{t "description"}}</span>
+          <input name="description" value="{{$plan.Description}}">
+        </label>
+      </div>
+      <div class="settings-actions">
+        <button type="button" class="ghost" data-group-settings-close>{{t "cancel"}}</button>
+        <button type="submit">{{t "save"}}</button>
+      </div>
+    </form>
+  </div>
+</div>
+{{end}}
+{{end}}
+{{end}}

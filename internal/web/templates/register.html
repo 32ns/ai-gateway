@@ -1,0 +1,147 @@
+{{define "content"}}
+<section class="auth-panel login-screen">
+  <div class="panel auth-card">
+    <div class="panel-head">
+      <div>
+        <h2>{{t "register_heading"}}</h2>
+        <p class="panel-note">{{t "register_summary"}}</p>
+      </div>
+    </div>
+    {{if .Message}}<div class="notice error">{{.Message}}</div>{{end}}
+    <form class="grid-form single-column" method="post" action="/register">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <input type="hidden" name="next" value="{{.Next}}">
+      <input type="hidden" name="invite_code" value="{{.InviteCode}}">
+      <input type="hidden" name="browser_fingerprint" data-browser-fingerprint>
+      <label>
+        <span>{{t "username"}}</span>
+        <input name="username" value="{{.Username}}" autocomplete="username" minlength="{{.RegistrationUsernameMinLength}}" maxlength="64" pattern="[A-Za-z0-9_.-]+" title="{{t "username_allowed_characters_hint"}}" required autofocus>
+      </label>
+      {{if .EmailRequired}}
+      <label>
+        <span>{{t "email"}}</span>
+        {{if .RegistrationEmailDomains}}
+        <input type="hidden" name="email" value="{{.Email}}" data-registration-email>
+        {{if .EmailVerificationRequired}}
+        <span class="inline-action-field">
+          <span class="email-domain-field" data-registration-email-domain-field>
+            <input name="email_local" value="{{.EmailLocal}}" autocomplete="email" placeholder="{{t "email_local_placeholder"}}" required data-registration-email-local>
+            <select name="email_domain" aria-label="{{t "email_domain"}}" data-registration-email-domain>
+              {{range .RegistrationEmailDomains}}
+              <option value="{{.}}" {{if eq $.EmailDomain .}}selected{{end}}>{{.}}</option>
+              {{end}}
+            </select>
+          </span>
+          <button
+            type="button"
+            class="ghost email-code-button"
+            data-email-code-send
+            data-endpoint="/register/email-code/send"
+            data-running="{{t "email_code_sending"}}"
+            data-sent="{{t "email_code_sent_short"}}"
+            data-countdown-suffix="{{t "email_code_countdown_suffix"}}"
+            data-cooldown-seconds="{{.EmailSendCooldownSeconds}}"
+          >{{t "send_email_code"}}</button>
+        </span>
+        {{else}}
+        <span class="email-domain-field" data-registration-email-domain-field>
+          <input name="email_local" value="{{.EmailLocal}}" autocomplete="email" placeholder="{{t "email_local_placeholder"}}" required data-registration-email-local>
+          <select name="email_domain" aria-label="{{t "email_domain"}}" data-registration-email-domain>
+            {{range .RegistrationEmailDomains}}
+            <option value="{{.}}" {{if eq $.EmailDomain .}}selected{{end}}>{{.}}</option>
+            {{end}}
+          </select>
+        </span>
+        {{end}}
+        {{else}}
+        {{if .EmailVerificationRequired}}
+        <span class="inline-action-field">
+          <input type="email" name="email" value="{{.Email}}" autocomplete="email" required>
+          <button
+            type="button"
+            class="ghost email-code-button"
+            data-email-code-send
+            data-endpoint="/register/email-code/send"
+            data-running="{{t "email_code_sending"}}"
+            data-sent="{{t "email_code_sent_short"}}"
+            data-countdown-suffix="{{t "email_code_countdown_suffix"}}"
+            data-cooldown-seconds="{{.EmailSendCooldownSeconds}}"
+          >{{t "send_email_code"}}</button>
+        </span>
+        {{else}}
+        <input type="email" name="email" value="{{.Email}}" autocomplete="email" required>
+        {{end}}
+        {{end}}
+      </label>
+      {{if .EmailVerificationRequired}}
+      <label>
+        <span>{{t "email_code"}}</span>
+        <input name="email_code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required>
+      </label>
+      {{end}}
+      {{end}}
+      <label>
+        <span>{{t "password"}}</span>
+        <input type="password" name="password" autocomplete="new-password" required>
+      </label>
+      <label>
+        <span>{{t "password_confirm"}}</span>
+        <input type="password" name="password_confirm" autocomplete="new-password" required>
+      </label>
+      {{if .TurnstileEnabled}}
+      <div class="full-span captcha-field">
+        <div class="cf-turnstile" data-sitekey="{{.TurnstileSiteKey}}"></div>
+      </div>
+      {{end}}
+      <div class="form-actions full-span auth-actions">
+        <button type="submit">{{t "register"}}</button>
+        <a class="button-link ghost-link" href="/login">{{t "back_login"}}</a>
+      </div>
+    </form>
+    {{if or .GitHubLoginEnabled .GoogleLoginEnabled}}
+    <div class="oauth-login-actions">
+      {{if .GitHubLoginEnabled}}
+      <a class="button-link ghost-link" href="/login/oauth/github?next={{urlquery .Next}}">{{t "login_with_github"}}</a>
+      {{end}}
+      {{if .GoogleLoginEnabled}}
+      <a class="button-link ghost-link" href="/login/oauth/google?next={{urlquery .Next}}">{{t "login_with_google"}}</a>
+      {{end}}
+    </div>
+    {{end}}
+  </div>
+</section>
+<script>
+(() => {
+  const form = document.querySelector('form[action="/register"]');
+  const input = form && form.querySelector('[data-browser-fingerprint]');
+  if (!form || !input) return;
+  const source = [
+    navigator.userAgent || '',
+    (navigator.languages || []).join(','),
+    navigator.platform || '',
+    Intl.DateTimeFormat().resolvedOptions().timeZone || '',
+    String(screen.width || ''),
+    String(screen.height || ''),
+    String(screen.colorDepth || ''),
+    String(window.devicePixelRatio || ''),
+    String(navigator.hardwareConcurrency || ''),
+    String(navigator.deviceMemory || '')
+  ].join('\n');
+  const fallback = () => {
+    let hash = 0;
+    for (let i = 0; i < source.length; i++) hash = ((hash << 5) - hash + source.charCodeAt(i)) | 0;
+    input.value = `fallback-${Math.abs(hash).toString(16)}`;
+  };
+  if (!window.crypto || !crypto.subtle || !window.TextEncoder) {
+    fallback();
+    return;
+  }
+  crypto.subtle.digest('SHA-256', new TextEncoder().encode(source)).then((buffer) => {
+    input.value = Array.from(new Uint8Array(buffer), (byte) => byte.toString(16).padStart(2, '0')).join('');
+  }).catch(fallback);
+})();
+</script>
+{{if .TurnstileEnabled}}
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+{{end}}
+{{end}}

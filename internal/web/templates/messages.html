@@ -1,0 +1,210 @@
+{{define "content"}}
+<div class="messages-page" data-partial="messages-page">
+<section class="hero compact">
+  <div>
+    <h1>{{t "messages"}}</h1>
+    <p>{{t "messages_hint"}}</p>
+  </div>
+  {{if isAdminUser .CurrentUser}}
+  <div class="hero-actions">
+    <button type="button" data-group-settings-open="message-create">{{t "message_new"}}</button>
+  </div>
+  {{end}}
+</section>
+
+{{if isAdminUser .CurrentUser}}
+<div class="settings-overlay" id="message-create" role="dialog" aria-modal="true" aria-labelledby="message-create-title" hidden>
+  <div class="settings-dialog message-dialog">
+    <div class="settings-header">
+      <div>
+        <h3 id="message-create-title">{{t "message_new"}}</h3>
+        <p>{{t "messages_hint"}}</p>
+      </div>
+      <button type="button" class="icon-button settings-close" data-group-settings-close aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M18 6 6 18"></path>
+          <path d="m6 6 12 12"></path>
+        </svg>
+      </button>
+    </div>
+    <form class="settings-form" method="post" action="/messages" data-ajax-form data-ajax-target='[data-partial="messages-page"]'>
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <label>
+        <span>{{t "message_title"}}</span>
+        <input name="title" required>
+      </label>
+      <label>
+        <span>{{t "message_body"}}</span>
+        <textarea name="body" rows="4" required></textarea>
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" name="enabled" checked>
+        <span>{{t "message_enabled"}}</span>
+      </label>
+      {{template "messageTargetFields" dict "Message" nil "Users" .Users "AccountGroups" .AccountGroups}}
+      <label class="checkbox-row" data-message-popup-row>
+        <input type="checkbox" name="popup">
+        <span>{{t "message_popup_enabled"}}</span>
+      </label>
+      <div class="settings-actions">
+        <button type="submit">{{t "message_create"}}</button>
+        <button type="button" class="ghost" data-group-settings-close>{{t "cancel"}}</button>
+      </div>
+    </form>
+  </div>
+</div>
+{{end}}
+
+<section class="panel">
+  <div class="message-list">
+    {{range $index, $delivery := .Messages}}
+    <article class="message-item {{if not $delivery.Read}}unread{{end}}">
+      <div class="message-main">
+        <div class="message-title-row">
+          <div class="message-title-stack">
+            <h2>{{$delivery.Message.Title}}</h2>
+            <div class="message-meta-row">
+              <span>{{formatTime $delivery.Message.CreatedAt}}</span>
+              <span>{{siteMessageTargetText $delivery.Message $.Users}}</span>
+            </div>
+          </div>
+          <div class="message-status-row">
+            {{if not $delivery.Message.PublicPopup}}
+              {{if not $delivery.Read}}<span class="pill tone-warn">{{t "message_unread"}}</span>{{else}}<span class="pill tone-muted">{{t "message_read"}}</span>{{end}}
+            {{end}}
+            {{if $delivery.Message.Popup}}<span class="pill tone-good">{{t "message_popup_badge"}}</span>{{end}}
+            {{if not $delivery.Message.Enabled}}<span class="pill tone-muted">{{t "message_disabled"}}</span>{{end}}
+          </div>
+        </div>
+        <div class="message-body">{{renderSiteMessageMarkdown $delivery.Message.Body}}</div>
+      </div>
+      <div class="message-actions">
+        {{if and (not $delivery.Read) (not $delivery.Message.PublicPopup)}}
+        <form method="post" action="/messages/{{$delivery.Message.ID}}/read" data-ajax-form data-ajax-target='[data-partial="messages-page"]'>
+          <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+          <button type="submit" class="ghost">{{t "message_mark_read"}}</button>
+        </form>
+        {{end}}
+        {{if isAdminUser $.CurrentUser}}
+        <button type="button" class="ghost" data-group-settings-open="message-edit-{{$index}}">{{t "edit"}}</button>
+        <form method="post" action="/messages/{{$delivery.Message.ID}}/delete" data-confirm="{{tf "confirm_delete_message" $delivery.Message.Title}}" data-ajax-form data-ajax-target='[data-partial="messages-page"]'>
+          <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+          <button type="submit" class="danger">{{t "delete"}}</button>
+        </form>
+        {{end}}
+        {{if $delivery.Message.PublicPopup}}<span class="pill tone-good">{{t "message_public_popup_badge"}}</span>{{end}}
+      </div>
+      {{if isAdminUser $.CurrentUser}}
+      <div class="settings-overlay" id="message-edit-{{$index}}" role="dialog" aria-modal="true" aria-labelledby="message-edit-title-{{$index}}" hidden>
+        <div class="settings-dialog message-dialog">
+          <div class="settings-header">
+            <div>
+              <h3 id="message-edit-title-{{$index}}">{{t "message_update"}}</h3>
+              <p>{{$delivery.Message.Title}}</p>
+            </div>
+            <button type="button" class="icon-button settings-close" data-group-settings-close aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M18 6 6 18"></path>
+                <path d="m6 6 12 12"></path>
+              </svg>
+            </button>
+          </div>
+          <form class="settings-form" method="post" action="/messages/{{$delivery.Message.ID}}/update" data-ajax-form data-ajax-target='[data-partial="messages-page"]'>
+            <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+            <label>
+              <span>{{t "message_title"}}</span>
+              <input name="title" value="{{$delivery.Message.Title}}" required>
+            </label>
+            <label>
+              <span>{{t "message_body"}}</span>
+              <textarea name="body" rows="4" required>{{$delivery.Message.Body}}</textarea>
+            </label>
+            <label class="checkbox-row">
+              <input type="checkbox" name="enabled" {{if $delivery.Message.Enabled}}checked{{end}}>
+              <span>{{t "message_enabled"}}</span>
+            </label>
+            {{template "messageTargetFields" dict "Message" $delivery.Message "Users" $.Users "AccountGroups" $.AccountGroups}}
+            <label class="checkbox-row" data-message-popup-row {{if $delivery.Message.PublicPopup}}hidden{{end}}>
+              <input type="checkbox" name="popup" {{if and $delivery.Message.Popup (not $delivery.Message.PublicPopup)}}checked{{end}} {{if $delivery.Message.PublicPopup}}disabled{{end}}>
+              <span>{{t "message_popup_enabled"}}</span>
+            </label>
+            <div class="settings-actions">
+              <button type="submit">{{t "message_update"}}</button>
+              <button type="button" class="ghost" data-group-settings-close>{{t "cancel"}}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+      {{end}}
+    </article>
+    {{else}}
+    <div class="empty">{{t "no_messages"}}</div>
+    {{end}}
+  </div>
+  {{if or .MessagePage.HasPrev .MessagePage.HasNext}}
+  <div class="pager">
+    <div class="panel-note">{{.MessageTotal}} {{t "messages"}}</div>
+    <div class="action-row">
+      {{if .MessagePage.HasPrev}}<a class="button-link ghost-link" href="/messages?page={{.MessagePage.PrevPage}}">{{t "previous"}}</a>{{end}}
+      {{if .MessagePage.HasNext}}<a class="button-link ghost-link" href="/messages?page={{.MessagePage.NextPage}}">{{t "next"}}</a>{{end}}
+    </div>
+  </div>
+  {{end}}
+</section>
+</div>
+{{end}}
+
+{{define "messageTargetFields"}}
+{{$mode := siteMessageTargetMode .Message}}
+<div class="message-target-fields" data-message-target>
+  <label>
+    <span>{{t "message_target_mode"}}</span>
+    <select name="target_mode" data-message-target-mode>
+      <option value="all" {{if eq $mode "all"}}selected{{end}}>{{t "message_target_all_option"}}</option>
+      <option value="website" {{if eq $mode "website"}}selected{{end}}>{{t "message_target_website_option"}}</option>
+      <option value="group" {{if eq $mode "group"}}selected{{end}}>{{t "message_target_group_option"}}</option>
+      <option value="user" {{if eq $mode "user"}}selected{{end}}>{{t "message_target_user_option"}}</option>
+    </select>
+  </label>
+
+  <div class="message-target-panel" data-message-target-panel="group" {{if ne $mode "group"}}hidden{{end}}>
+    <span>{{t "message_target_groups"}}</span>
+    <div class="message-choice-list">
+      {{range .AccountGroups}}
+      {{if .Name}}
+      <label class="message-choice">
+        <input type="checkbox" name="target_group" value="{{.Name}}" {{if siteMessageTargetGroupSelected $.Message .Name}}checked{{end}}>
+        <span>{{.Name}}</span>
+      </label>
+      {{end}}
+      {{end}}
+    </div>
+  </div>
+
+  <div class="message-target-panel" data-message-target-panel="user" {{if ne $mode "user"}}hidden{{end}}>
+    <span>{{t "message_target_users"}}</span>
+    <div class="message-user-picker">
+      <input type="search" data-message-user-search data-message-user-search-url="/messages/users/search" placeholder="{{t "message_user_search_placeholder"}}" autocomplete="off">
+      <button type="button" class="ghost" data-message-user-add>{{t "add"}}</button>
+    </div>
+    <div class="message-user-results" data-message-user-results hidden></div>
+    <div hidden>
+      {{range .Users}}
+      <span data-message-user-option data-user-id="{{.ID}}" data-user-name="{{.Username}}"></span>
+      {{end}}
+    </div>
+    <div class="message-selected-users" data-message-selected-users>
+      {{range .Users}}
+      {{if siteMessageTargetUserSelected $.Message .ID}}
+      <span class="message-selected-user" data-user-id="{{.ID}}">
+        <input type="hidden" name="target_user_id" value="{{.ID}}">
+        <span>{{.Username}}</span>
+        <button type="button" data-message-user-remove aria-label="{{t "delete"}}" title="{{t "delete"}}">×</button>
+      </span>
+      {{end}}
+      {{end}}
+    </div>
+  </div>
+  <p class="field-note">{{t "message_target_hint"}}</p>
+</div>
+{{end}}

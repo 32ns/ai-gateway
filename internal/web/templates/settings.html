@@ -1,0 +1,684 @@
+{{define "content"}}
+<section class="hero compact">
+  <div>
+    <h1>{{t "settings_heading"}}</h1>
+    <p>{{t "settings_summary"}}</p>
+  </div>
+  <div class="hero-actions">
+    <button type="submit" form="system-settings-form">{{t "save_settings"}}</button>
+  </div>
+</section>
+
+{{if .Saved}}
+<div class="system-notice tone-good" data-clear-url-params="saved">{{t "settings_saved"}}</div>
+{{end}}
+{{if .Error}}
+<div class="system-notice tone-bad">{{.Error}}</div>
+{{end}}
+
+<div class="system-settings-page">
+  <form id="system-settings-form" method="post" action="/admin/settings">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+  </form>
+
+  <div class="settings-overlay email-template-overlay" id="email-template-editor" role="dialog" aria-modal="true" aria-labelledby="email-template-title" hidden>
+    <div class="settings-dialog email-template-dialog">
+      <div class="settings-header">
+        <div>
+          <h3 id="email-template-title">{{t "email_template_title"}}</h3>
+          <p>{{t "email_template_summary"}}</p>
+        </div>
+        <button type="button" class="icon-button settings-close" data-group-settings-close aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M18 6 6 18"></path>
+            <path d="m6 6 12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <div class="grid-form single-column email-template-form">
+        <label>
+          <span>{{t "email_template_subject"}}</span>
+          <input name="email_template_subject" value="{{.Settings.Email.VerificationSubjectTemplate}}" form="system-settings-form" data-modal-autofocus>
+          <p class="field-note">{{t "email_template_placeholders_hint"}}</p>
+        </label>
+        <label>
+          <span>{{t "email_template_text"}}</span>
+          <textarea name="email_template_text" rows="6" form="system-settings-form">{{.Settings.Email.VerificationTextTemplate}}</textarea>
+        </label>
+        <label>
+          <span>{{t "email_template_html"}}</span>
+          <textarea name="email_template_html" rows="8" form="system-settings-form">{{.Settings.Email.VerificationHTMLTemplate}}</textarea>
+          <p class="field-note">{{t "email_template_html_hint"}}</p>
+        </label>
+        <div class="settings-actions">
+          <button type="button" class="ghost" data-group-settings-close>{{t "cancel"}}</button>
+          <button type="submit" form="system-settings-form">{{t "save_settings"}}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-tab-layout">
+    <nav class="settings-tabs" aria-label="{{t "settings_heading"}}">
+      <a href="#settings-runtime">{{t "settings_runtime"}}</a>
+      <a href="#settings-home">{{t "settings_home"}}</a>
+      <a href="#settings-network">{{t "settings_network_oauth"}}</a>
+      <a href="#settings-users">{{t "settings_users"}}</a>
+      <a href="#settings-image">{{t "image_settings_open"}}</a>
+      <a href="#settings-payment">{{t "settings_payment"}}</a>
+      <a href="#settings-limits">{{t "settings_limits"}}</a>
+      <a href="#settings-backup">{{t "nav_backup"}}</a>
+    </nav>
+
+    <div class="settings-tab-content">
+    <section class="panel" id="settings-runtime">
+      <div class="panel-head">
+        <h2>{{t "settings_runtime"}}</h2>
+        <span class="panel-note">{{t "settings_runtime_hint"}}</span>
+      </div>
+      <div class="grid-form">
+        <label class="full-span">
+          <span>{{t "public_base_url"}}</span>
+          <input name="public_base_url" value="{{.Settings.Runtime.PublicBaseURL}}" placeholder="{{t "public_base_url_placeholder"}}" form="system-settings-form">
+          <p class="field-note">{{t "public_base_url_hint"}}</p>
+        </label>
+        <label class="checkbox-row full-span">
+          <input type="hidden" name="responses_websocket_upstream_present" value="1" form="system-settings-form">
+          <input type="checkbox" name="responses_websocket_upstream_enabled" {{if responsesWebSocketUpstreamEnabled .Settings.Runtime}}checked{{end}} form="system-settings-form">
+          <span>{{t "responses_websocket_upstream_enabled"}}</span>
+        </label>
+        <p class="field-note full-span">{{t "responses_websocket_upstream_enabled_hint"}}</p>
+        <label class="checkbox-row full-span">
+          <input type="checkbox" name="user_dashboard_custom_panel_enabled" {{if .Settings.UserDashboard.CustomPanelEnabled}}checked{{end}} form="system-settings-form">
+          <span>{{t "user_dashboard_custom_panel_enabled"}}</span>
+        </label>
+        <label class="full-span">
+          <span>{{t "user_dashboard_custom_panel_html"}}</span>
+          <textarea name="user_dashboard_custom_panel_html" rows="6" form="system-settings-form">{{.Settings.UserDashboard.CustomPanelHTML}}</textarea>
+          <p class="field-note">{{t "user_dashboard_custom_panel_html_hint"}}</p>
+        </label>
+      </div>
+    </section>
+
+    <section class="panel" id="settings-home">
+      <div class="panel-head">
+        <h2>{{t "settings_home"}}</h2>
+        <span class="panel-note">{{t "settings_home_hint"}}</span>
+      </div>
+      <div class="grid-form">
+        <label>
+          <span>{{t "home_settings_brand_title"}}</span>
+          <input name="home_brand_title" value="{{.Settings.Home.BrandTitle}}" form="system-settings-form">
+        </label>
+        <label>
+          <span>{{t "home_settings_brand_subtitle"}}</span>
+          <input name="home_brand_subtitle" value="{{.Settings.Home.BrandSubtitle}}" form="system-settings-form">
+        </label>
+        <label class="full-span">
+          <span>{{t "home_settings_heading"}}</span>
+          <input name="home_heading" value="{{.Settings.Home.Heading}}" form="system-settings-form">
+        </label>
+        <label class="full-span">
+          <span>{{t "home_settings_summary"}}</span>
+          <textarea name="home_summary" rows="3" form="system-settings-form">{{.Settings.Home.Summary}}</textarea>
+        </label>
+        <label>
+          <span>{{t "home_settings_availability_key"}}</span>
+          <input name="home_availability_key" value="{{.Settings.Home.AvailabilityKey}}" form="system-settings-form">
+        </label>
+        <label>
+          <span>{{t "home_settings_availability"}}</span>
+          <input name="home_availability" value="{{.Settings.Home.Availability}}" form="system-settings-form">
+        </label>
+        <label>
+          <span>{{t "home_settings_cost_key"}}</span>
+          <input name="home_cost_key" value="{{.Settings.Home.CostKey}}" form="system-settings-form">
+        </label>
+        <label>
+          <span>{{t "home_settings_cost"}}</span>
+          <input name="home_cost_multiplier" value="{{.Settings.Home.CostMultiplier}}" form="system-settings-form">
+        </label>
+        <label>
+          <span>{{t "home_settings_latency_key"}}</span>
+          <input name="home_latency_key" value="{{.Settings.Home.LatencyKey}}" form="system-settings-form">
+        </label>
+        <label>
+          <span>{{t "home_settings_latency"}}</span>
+          <input name="home_latency" value="{{.Settings.Home.Latency}}" form="system-settings-form">
+        </label>
+        <label>
+          <span>{{t "home_settings_capability_key"}}</span>
+          <input name="home_capability_key" value="{{.Settings.Home.CapabilityKey}}" form="system-settings-form">
+        </label>
+        <label>
+          <span>{{t "home_settings_capability"}}</span>
+          <input name="home_capability" value="{{.Settings.Home.Capability}}" form="system-settings-form">
+        </label>
+        <div class="form-actions full-span">
+          <button type="submit" form="system-settings-form">{{t "save_settings"}}</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="settings-network">
+      <div class="panel-head">
+        <h2>{{t "settings_network_oauth"}}</h2>
+        <span class="panel-note">{{t "settings_network_oauth_hint"}}</span>
+      </div>
+      <div class="grid-form">
+        <label class="proxy-field full-span">
+          <span>{{t "system_proxy"}}</span>
+          <span class="proxy-control">
+            <input data-proxy-test-input name="system_proxy_url" value="{{.Settings.Network.SystemProxyURL}}" placeholder="{{t "proxy_url_placeholder"}}" form="system-settings-form">
+            <button
+              type="button"
+              form="system-settings-form"
+              class="ghost proxy-test-button"
+              data-proxy-test
+              data-proxy-test-url="/admin/proxy-test"
+              data-proxy-test-running="{{t "proxy_test_running"}}"
+              data-proxy-test-success="{{t "proxy_test_success"}}"
+              data-proxy-test-failed="{{t "proxy_test_failed"}}"
+            >{{t "test_proxy"}}</button>
+          </span>
+          <p class="field-note">{{t "system_proxy_hint"}}</p>
+          <p class="proxy-test-result" data-proxy-test-result aria-live="polite"></p>
+        </label>
+
+        <label class="checkbox-row">
+          <input type="checkbox" name="openai_oauth_enabled" {{if .Settings.OAuth.OpenAIEnabled}}checked{{end}} form="system-settings-form">
+          <span>{{t "openai_oauth_enabled"}}</span>
+        </label>
+        <label class="checkbox-row">
+          <input type="checkbox" name="claude_oauth_enabled" {{if .Settings.OAuth.ClaudeEnabled}}checked{{end}} form="system-settings-form">
+          <span>{{t "claude_oauth_enabled"}}</span>
+        </label>
+      </div>
+    </section>
+
+    <section class="panel" id="settings-users">
+      <div class="panel-head">
+        <h2>{{t "settings_users"}}</h2>
+        <span class="panel-note">{{t "settings_users_hint"}}</span>
+      </div>
+      <div class="settings-module-stack">
+        <section class="settings-module" id="settings-registration">
+          <h3>{{t "registration_settings"}}</h3>
+          <div class="grid-form">
+          <label class="checkbox-row">
+            <input type="checkbox" name="allow_public_registration" {{if .Settings.Runtime.AllowPublicRegistration}}checked{{end}} form="system-settings-form">
+            <span>{{t "allow_public_registration"}}</span>
+          </label>
+          <label class="checkbox-row">
+            <input type="checkbox" name="new_user_reward_enabled" {{if .Settings.Registration.NewUserRewardEnabled}}checked{{end}} form="system-settings-form">
+            <span>{{t "new_user_reward_enabled"}}</span>
+          </label>
+          <label>
+            <span>{{t "new_user_reward"}}</span>
+            <input name="new_user_reward_usd" inputmode="decimal" value="{{formatNanoUSD .Settings.Registration.NewUserRewardNanoUSD}}" form="system-settings-form">
+          </label>
+          <label>
+            <span>{{t "registration_username_min_length"}}</span>
+            <input type="number" min="1" max="64" name="registration_username_min_length" value="{{.Settings.Registration.UsernameMinLength}}" form="system-settings-form">
+          </label>
+          </div>
+        </section>
+
+        <section class="settings-module" id="settings-registration-security">
+          <h3>{{t "registration_security_settings"}}</h3>
+          <div class="grid-form">
+            <label>
+              <span>{{t "register_ip_hourly_limit"}}</span>
+              <input type="number" min="1" max="1000" name="register_ip_hourly_limit" value="{{.Settings.Registration.RegisterIPHourlyLimit}}" form="system-settings-form">
+            </label>
+            <label>
+              <span>{{t "email_code_ip_hourly_limit"}}</span>
+              <input type="number" min="1" max="1000" name="email_code_ip_hourly_limit" value="{{.Settings.Registration.EmailCodeIPHourlyLimit}}" form="system-settings-form">
+            </label>
+            <label class="checkbox-row full-span">
+              <input type="checkbox" name="turnstile_enabled" {{if .Settings.Registration.TurnstileEnabled}}checked{{end}} form="system-settings-form">
+              <span>{{t "turnstile_enabled"}}</span>
+            </label>
+            <label>
+              <span>{{t "turnstile_site_key"}}</span>
+              <input name="turnstile_site_key" value="{{.Settings.Registration.TurnstileSiteKey}}" form="system-settings-form">
+            </label>
+            <label>
+              <span>{{t "turnstile_secret_key"}}</span>
+              <input type="password" name="turnstile_secret_key" placeholder="{{if .Settings.Registration.TurnstileSecretKey}}{{t "secret_keep_placeholder"}}{{end}}" form="system-settings-form">
+            </label>
+          </div>
+        </section>
+
+        <section class="settings-module" id="settings-email-verification">
+          <div class="settings-module-head">
+            <h3>{{t "email_verification_settings"}}</h3>
+            <button type="button" class="ghost" data-group-settings-open="email-template-editor">{{t "email_template_button"}}</button>
+          </div>
+          <div class="grid-form">
+            <label class="checkbox-row full-span">
+              <input type="checkbox" name="email_verify_on_register" {{if .Settings.Email.RegistrationVerificationEnabled}}checked{{end}} form="system-settings-form">
+              <span>{{t "email_verify_on_register"}}</span>
+            </label>
+            <label class="checkbox-row full-span">
+              <input type="checkbox" name="registration_email_allowlist_enabled" {{if .Settings.Runtime.RegistrationEmailAllowlistEnabled}}checked{{end}} form="system-settings-form">
+              <span>{{t "registration_email_allowlist_enabled"}}</span>
+            </label>
+            <label class="full-span">
+              <span>{{t "registration_email_allowlist"}}</span>
+              <textarea name="registration_email_allowlist" rows="5" placeholder="@qq.com&#10;@163.com" form="system-settings-form">{{joinLines .Settings.Runtime.RegistrationEmailAllowlist}}</textarea>
+              <p class="field-note">{{t "registration_email_allowlist_hint"}}</p>
+            </label>
+            <label>
+              <span>{{t "email_provider"}}</span>
+              <select name="email_provider" data-email-provider-select form="system-settings-form">
+                <option value="smtp" {{if eq .Settings.Email.Provider "smtp"}}selected{{end}}>SMTP</option>
+                <option value="cloudmail" {{if eq .Settings.Email.Provider "cloudmail"}}selected{{end}}>CloudMail</option>
+              </select>
+            </label>
+            <label data-email-provider-field="cloudmail">
+              <span>{{t "cloudmail_base_url"}}</span>
+              <input name="cloudmail_base_url" value="{{.Settings.Email.CloudMailBaseURL}}" placeholder="https://mail.allcode.cc" form="system-settings-form">
+            </label>
+            <label data-email-provider-field="cloudmail">
+              <span>{{t "cloudmail_email"}}</span>
+              <input name="cloudmail_email" value="{{.Settings.Email.CloudMailEmail}}" placeholder="mail@allcode.cc" form="system-settings-form">
+            </label>
+            <label data-email-provider-field="cloudmail">
+              <span>{{t "cloudmail_password"}}</span>
+              <input type="password" name="cloudmail_password" placeholder="{{if .Settings.Email.CloudMailPassword}}{{t "secret_keep_placeholder"}}{{end}}" form="system-settings-form">
+            </label>
+            <label data-email-provider-field="cloudmail">
+              <span>{{t "cloudmail_account_id"}}</span>
+              <input type="number" min="1" name="cloudmail_account_id" value="{{.Settings.Email.CloudMailAccountID}}" form="system-settings-form">
+            </label>
+            <label data-email-provider-field="smtp">
+              <span>{{t "smtp_host"}}</span>
+              <input name="smtp_host" value="{{.Settings.Email.SMTPHost}}" form="system-settings-form">
+            </label>
+            <label data-email-provider-field="smtp">
+              <span>{{t "smtp_port"}}</span>
+              <input type="number" min="1" max="65535" name="smtp_port" value="{{.Settings.Email.SMTPPort}}" form="system-settings-form">
+            </label>
+            <label data-email-provider-field="smtp">
+              <span>{{t "smtp_username"}}</span>
+              <input name="smtp_username" value="{{.Settings.Email.SMTPUsername}}" form="system-settings-form">
+            </label>
+            <label data-email-provider-field="smtp">
+              <span>{{t "smtp_password"}}</span>
+              <input type="password" name="smtp_password" placeholder="{{if .Settings.Email.SMTPPassword}}{{t "secret_keep_placeholder"}}{{end}}" form="system-settings-form">
+            </label>
+            <label data-email-provider-field="smtp">
+              <span>{{t "smtp_from_email"}}</span>
+              <input name="smtp_from_email" value="{{.Settings.Email.FromEmail}}" form="system-settings-form">
+            </label>
+            <label>
+              <span>{{t "smtp_from_name"}}</span>
+              <input name="smtp_from_name" value="{{.Settings.Email.FromName}}" form="system-settings-form">
+            </label>
+            <label class="proxy-field full-span">
+              <span>{{t "email_test_to"}}</span>
+              <span class="proxy-control">
+                <input name="email_test_to" data-email-test-input placeholder="you@example.com" form="system-settings-form">
+                <button
+                  type="button"
+                  form="system-settings-form"
+                  class="ghost proxy-test-button"
+                  data-email-test
+                  data-email-test-url="/admin/email-test"
+                  data-email-test-running="{{t "email_test_running"}}"
+                  data-email-test-success="{{t "email_test_success"}}"
+                  data-email-test-failed="{{t "email_test_failed"}}"
+                >{{t "test_email_send"}}</button>
+              </span>
+              <p class="proxy-test-result" data-email-test-result aria-live="polite"></p>
+            </label>
+            <label>
+              <span>{{t "email_code_ttl_seconds"}}</span>
+              <input type="number" min="60" max="3600" name="email_code_ttl_seconds" value="{{.Settings.Email.CodeTTLSeconds}}" form="system-settings-form">
+            </label>
+            <label>
+              <span>{{t "email_send_cooldown_seconds"}}</span>
+              <input type="number" min="10" max="3600" name="email_send_cooldown_seconds" value="{{.Settings.Email.SendCooldownSeconds}}" form="system-settings-form">
+            </label>
+            <label>
+              <span>{{t "email_hourly_send_limit"}}</span>
+              <input type="number" min="1" max="100" name="email_hourly_send_limit" value="{{.Settings.Email.HourlySendLimit}}" form="system-settings-form">
+            </label>
+            <label>
+              <span>{{t "email_max_attempts"}}</span>
+              <input type="number" min="1" max="20" name="email_max_attempts" value="{{.Settings.Email.MaxAttempts}}" form="system-settings-form">
+            </label>
+          </div>
+        </section>
+
+        <section class="settings-module" id="settings-invitation">
+          <h3>{{t "invitation_settings"}}</h3>
+          <div class="grid-form">
+          <label class="checkbox-row">
+            <input type="checkbox" name="invitation_enabled" {{if .Settings.Invitation.Enabled}}checked{{end}} form="system-settings-form">
+            <span>{{t "invitation_enabled"}}</span>
+          </label>
+          <label class="checkbox-row">
+            <input type="checkbox" name="require_invitation_code" {{if .Settings.Registration.RequireInvitationCode}}checked{{end}} form="system-settings-form">
+            <span>{{t "require_invitation_code"}}</span>
+          </label>
+          <label>
+            <span>{{t "inviter_recharge_reward_percent"}}</span>
+            <input name="inviter_recharge_reward_percent" inputmode="decimal" value="{{formatPercentBps .Settings.Invitation.InviterRechargeRewardBps}}" form="system-settings-form">
+          </label>
+          <label>
+            <span>{{t "invitee_reward"}}</span>
+            <input name="invitee_reward_usd" inputmode="decimal" value="{{formatNanoUSD .Settings.Invitation.InviteeRewardNanoUSD}}" form="system-settings-form">
+          </label>
+          </div>
+        </section>
+
+        <section class="settings-module" id="settings-third-party-login">
+          <h3>{{t "third_party_login_settings"}}</h3>
+          <div class="settings-oauth-provider-groups">
+            <div class="settings-oauth-provider-group">
+              <label class="checkbox-row">
+                <input type="checkbox" name="github_login_enabled" {{if .Settings.OAuth.GitHubLoginEnabled}}checked{{end}} form="system-settings-form">
+                <span>{{t "github_login_enabled"}}</span>
+              </label>
+              <label>
+                <span>{{t "github_client_id"}}</span>
+                <input name="github_login_client_id" value="{{.Settings.OAuth.GitHubLoginClientID}}" form="system-settings-form">
+              </label>
+              <label>
+                <span>{{t "github_client_secret"}}</span>
+                <input type="password" name="github_login_secret" placeholder="{{if .Settings.OAuth.GitHubLoginSecret}}{{t "secret_keep_placeholder"}}{{end}}" form="system-settings-form">
+              </label>
+            </div>
+            <div class="settings-oauth-provider-group">
+              <label class="checkbox-row">
+                <input type="checkbox" name="google_login_enabled" {{if .Settings.OAuth.GoogleLoginEnabled}}checked{{end}} form="system-settings-form">
+                <span>{{t "google_login_enabled"}}</span>
+              </label>
+              <label>
+                <span>{{t "google_client_id"}}</span>
+                <input name="google_login_client_id" value="{{.Settings.OAuth.GoogleLoginClientID}}" form="system-settings-form">
+              </label>
+              <label>
+                <span>{{t "google_client_secret"}}</span>
+                <input type="password" name="google_login_secret" placeholder="{{if .Settings.OAuth.GoogleLoginSecret}}{{t "secret_keep_placeholder"}}{{end}}" form="system-settings-form">
+              </label>
+            </div>
+            <label class="checkbox-row full-span">
+              <input type="checkbox" name="login_oauth_auto_create_user" {{if .Settings.OAuth.LoginAutoCreateUser}}checked{{end}} form="system-settings-form">
+              <span>{{t "login_oauth_auto_create_user"}}</span>
+            </label>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section class="panel" id="settings-image">
+      <div class="panel-head">
+        <h2>{{t "image_settings_heading"}}</h2>
+        <span class="panel-note">{{t "image_settings_hint"}}</span>
+      </div>
+      <div class="grid-form">
+        <label class="checkbox-row full-span">
+          <input type="checkbox" name="image_user_console_enabled" {{if imageUserConsoleEnabled .Settings.Image}}checked{{end}} form="system-settings-form">
+          <span>{{t "image_user_console_enabled"}}</span>
+          <p class="field-note">{{t "image_user_console_enabled_hint"}}</p>
+        </label>
+
+        <label class="full-span">
+          <span>{{t "image_backend"}}</span>
+          <select name="image_backend" form="system-settings-form">
+            <option value="auto" {{if eq .Settings.Image.Backend "auto"}}selected{{end}}>{{t "image_backend_auto"}}</option>
+            <option value="official" {{if eq .Settings.Image.Backend "official"}}selected{{end}}>{{t "image_backend_official"}}</option>
+          </select>
+          <p class="field-note">{{t "image_backend_hint"}}</p>
+        </label>
+
+      </div>
+    </section>
+
+  <section class="panel" id="settings-payment">
+    <div class="panel-head">
+      <h2>{{t "settings_payment"}}</h2>
+      <span class="panel-note">{{t "settings_payment_hint"}}</span>
+    </div>
+    <div class="settings-module-stack">
+      <section class="settings-module" id="settings-payment-exchange">
+        <h3>{{t "payment_exchange_settings"}}</h3>
+        <div class="grid-form single-column">
+          <label class="full-span">
+            <span>{{t "payment_recharge_input_mode"}}</span>
+            <select name="payment_recharge_input_mode" form="system-settings-form">
+              <option value="payment_cny" {{if eq .Settings.Payment.RechargeInputMode "payment_cny"}}selected{{end}}>{{t "payment_recharge_input_mode_payment_cny"}}</option>
+              <option value="balance_usd" {{if eq .Settings.Payment.RechargeInputMode "balance_usd"}}selected{{end}}>{{t "payment_recharge_input_mode_balance_usd"}}</option>
+            </select>
+            <p class="field-note">{{t "payment_recharge_input_mode_hint"}}</p>
+          </label>
+          <label class="full-span">
+            <span>{{t "payment_cny_per_usd"}}</span>
+            <input name="payment_cny_per_usd" inputmode="decimal" value="{{.Settings.Payment.CNYPerUSD}}" form="system-settings-form">
+            <p class="field-note">{{t "payment_cny_per_usd_hint"}}</p>
+          </label>
+          <label class="full-span">
+            <span>{{t "payment_min_recharge_usd"}}</span>
+            <input name="payment_min_recharge_usd" inputmode="decimal" value="{{formatNanoUSD .Settings.Payment.MinRechargeNanoUSD}}" placeholder="0" form="system-settings-form">
+            <p class="field-note">{{t "payment_min_recharge_usd_hint"}}</p>
+          </label>
+          <label class="full-span">
+            <span>{{t "payment_max_recharge_usd"}}</span>
+            <input name="payment_max_recharge_usd" inputmode="decimal" value="{{formatNanoUSD .Settings.Payment.MaxRechargeNanoUSD}}" placeholder="0" form="system-settings-form">
+            <p class="field-note">{{t "payment_max_recharge_usd_hint"}}</p>
+          </label>
+        </div>
+      </section>
+
+      <section class="settings-module" id="settings-payment-personalpay">
+        <h3>{{t "personalpay_settings"}}</h3>
+        <div class="grid-form single-column">
+          <label class="checkbox-row full-span">
+            <input type="checkbox" name="personalpay_enabled" {{if .Settings.Payment.PersonalPay.Enabled}}checked{{end}} form="system-settings-form">
+            <span>{{t "personalpay_enabled"}}</span>
+          </label>
+          <label class="full-span">
+            <span>{{t "personalpay_expire_after_sec"}}</span>
+            <input name="personalpay_expire_after_sec" inputmode="numeric" value="{{.Settings.Payment.PersonalPay.ExpireAfterSec}}" form="system-settings-form">
+          </label>
+          <label class="full-span">
+            <span>{{t "personalpay_android_token"}}</span>
+            <input type="password" name="personalpay_android_token" placeholder="{{if .Settings.Payment.PersonalPay.AndroidToken}}{{t "secret_keep_placeholder"}}{{end}}" form="system-settings-form">
+          </label>
+        </div>
+        <div class="metric-grid finance-metrics">
+          <div class="metric"><span class="metric-label">{{t "personalpay_devices"}}</span><strong>{{.PersonalPay.Summary.DeviceCount}}</strong></div>
+          <div class="metric"><span class="metric-label">{{t "personalpay_accounts"}}</span><strong>{{.PersonalPay.Summary.AccountCount}}</strong></div>
+          <div class="metric"><span class="metric-label">{{t "personalpay_idle_accounts"}}</span><strong>{{.PersonalPay.Summary.IdleAccountCount}}</strong></div>
+          <div class="metric"><span class="metric-label">{{t "personalpay_occupied_accounts"}}</span><strong>{{.PersonalPay.Summary.OccupiedCount}}</strong></div>
+        </div>
+        <div class="table-wrap finance-compact-table">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>{{t "personalpay_device"}}</th>
+                <th>{{t "personalpay_device_status"}}</th>
+                <th>{{t "personalpay_device_accounts"}}</th>
+                <th>{{t "personalpay_account_status"}}</th>
+                <th>{{t "personalpay_processing_order"}}</th>
+                <th>{{t "updated_at"}}</th>
+                <th>{{t "action"}}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {{range .PersonalPay.Devices}}
+              <tr>
+                <td>
+                  <strong>{{if .Label}}{{.Label}}{{else}}{{t "personalpay_unnamed_device"}}{{end}}</strong>
+                </td>
+                <td>{{if .Online}}{{t "personalpay_device_online"}}{{else}}{{t "personalpay_device_offline"}}{{end}}</td>
+                <td>
+                  {{range .Accounts}}
+                  <div>
+                    <strong>{{if .DisplayName}}{{.DisplayName}}{{else}}{{.ID}}{{end}}</strong>
+                    <span class="muted">{{personalPayChannelText .Channel}}</span>
+                  </div>
+                  {{else}}
+                  <span class="muted">{{t "personalpay_device_no_accounts"}}</span>
+                  {{end}}
+                </td>
+                <td>
+                  {{range .Accounts}}
+                  <div>{{personalPayAccountStatusText .Status}}</div>
+                  {{else}}
+                  <span class="muted">-</span>
+                  {{end}}
+                </td>
+                <td>
+                  {{range .Accounts}}
+                  <div>{{if .OccupiedBy}}{{.OccupiedBy}}{{else}}-{{end}}</div>
+                  {{else}}
+                  <span class="muted">-</span>
+                  {{end}}
+                </td>
+                <td>{{formatTime .LastSeen}}</td>
+                <td>
+                  {{range .Accounts}}
+                  {{if .OccupiedBy}}
+                  <form method="post" action="/admin/personalpay/accounts/{{pathEscape .ID}}/release" data-confirm="{{tf "confirm_release_personalpay_account" .OccupiedBy}}">
+                    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                    <button class="ghost" type="submit">{{t "release_personalpay_order"}}</button>
+                  </form>
+                  {{end}}
+                  {{end}}
+                  <form method="post" action="/admin/personalpay/devices/{{pathEscape .ID}}/delete" data-confirm="{{tf "confirm_delete_personalpay_device" .ID}}">
+                    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                    <button class="danger" type="submit">{{t "delete"}}</button>
+                  </form>
+                </td>
+              </tr>
+              {{else}}
+              <tr>
+                <td colspan="7">{{t "personalpay_no_devices"}}</td>
+              </tr>
+              {{end}}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="settings-module" id="settings-payment-wechatpay">
+        <h3>{{t "wechatpay_settings"}}</h3>
+        <div class="grid-form single-column">
+          <label class="checkbox-row full-span">
+            <input type="checkbox" name="wechat_pay_enabled" {{if .Settings.Payment.WeChatPay.Enabled}}checked{{end}} form="system-settings-form">
+            <span>{{t "wechat_pay_enabled"}}</span>
+          </label>
+          <label class="full-span">
+            <span>{{t "wechat_pay_app_id"}}</span>
+            <input name="wechat_pay_app_id" value="{{.Settings.Payment.WeChatPay.AppID}}" form="system-settings-form">
+          </label>
+          <label class="full-span">
+            <span>{{t "wechat_pay_mch_id"}}</span>
+            <input name="wechat_pay_mch_id" value="{{.Settings.Payment.WeChatPay.MchID}}" form="system-settings-form">
+          </label>
+          <label class="full-span">
+            <span>{{t "wechat_pay_api_v3_key"}}</span>
+            <input type="password" name="wechat_pay_api_v3_key" placeholder="{{if .Settings.Payment.WeChatPay.APIV3Key}}{{t "secret_keep_placeholder"}}{{end}}" form="system-settings-form">
+          </label>
+          <label class="full-span">
+            <span>{{t "wechat_pay_merchant_serial_no"}}</span>
+            <input name="wechat_pay_merchant_serial_no" value="{{.Settings.Payment.WeChatPay.MerchantSerialNo}}" form="system-settings-form">
+          </label>
+          <label class="full-span">
+            <span>{{t "wechat_pay_public_key_id"}}</span>
+            <input name="wechat_pay_public_key_id" value="{{.Settings.Payment.WeChatPay.WeChatPayPublicKeyID}}" form="system-settings-form">
+          </label>
+          <label class="full-span">
+            <span>{{t "wechat_pay_merchant_private_key_pem"}}</span>
+            <textarea name="wechat_pay_merchant_private_key_pem" rows="4" placeholder="{{if .Settings.Payment.WeChatPay.MerchantPrivateKeyPEM}}{{t "secret_keep_placeholder"}}{{end}}" form="system-settings-form"></textarea>
+          </label>
+          <label class="full-span">
+            <span>{{t "wechat_pay_public_key_pem"}}</span>
+            <textarea name="wechat_pay_public_key_pem" rows="4" form="system-settings-form">{{.Settings.Payment.WeChatPay.WeChatPayPublicKeyPEM}}</textarea>
+          </label>
+        </div>
+      </section>
+
+      <section class="settings-module" id="settings-payment-alipay">
+        <h3>{{t "alipay_settings"}}</h3>
+        <div class="grid-form single-column">
+          <label class="checkbox-row full-span">
+            <input type="checkbox" name="alipay_enabled" {{if .Settings.Payment.Alipay.Enabled}}checked{{end}} form="system-settings-form">
+            <span>{{t "alipay_enabled"}}</span>
+          </label>
+          <label class="full-span">
+            <span>{{t "alipay_app_id"}}</span>
+            <input name="alipay_app_id" value="{{.Settings.Payment.Alipay.AppID}}" form="system-settings-form">
+          </label>
+          <label class="full-span">
+            <span>{{t "alipay_gateway_url"}}</span>
+            <input name="alipay_gateway_url" value="{{.Settings.Payment.Alipay.GatewayURL}}" form="system-settings-form">
+          </label>
+          <label class="full-span">
+            <span>{{t "alipay_sign_type"}}</span>
+            <input name="alipay_sign_type" value="{{.Settings.Payment.Alipay.SignType}}" form="system-settings-form">
+          </label>
+          <label class="full-span">
+            <span>{{t "alipay_return_url"}}</span>
+            <input name="alipay_return_url" value="{{.Settings.Payment.Alipay.ReturnURL}}" form="system-settings-form">
+          </label>
+          <label class="full-span">
+            <span>{{t "alipay_private_key_pem"}}</span>
+            <textarea name="alipay_private_key_pem" rows="4" placeholder="{{if .Settings.Payment.Alipay.PrivateKeyPEM}}{{t "secret_keep_placeholder"}}{{end}}" form="system-settings-form"></textarea>
+          </label>
+          <label class="full-span">
+            <span>{{t "alipay_public_key_pem"}}</span>
+            <textarea name="alipay_public_key_pem" rows="4" form="system-settings-form">{{.Settings.Payment.Alipay.AlipayPublicKeyPEM}}</textarea>
+          </label>
+        </div>
+      </section>
+    </div>
+  </section>
+
+    <section class="panel" id="settings-limits">
+    <div class="panel-head">
+      <h2>{{t "settings_limits"}}</h2>
+      <span class="panel-note">{{t "settings_limits_hint"}}</span>
+    </div>
+    <div class="grid-form">
+      <label>
+        <span>{{t "user_concurrent_request_limit"}}</span>
+        <input type="number" min="0" max="100000" name="user_concurrent_request_limit" value="{{.Settings.Runtime.UserConcurrentRequestLimit}}" form="system-settings-form">
+      </label>
+      <label>
+        <span>{{t "plan_concurrent_request_limit"}}</span>
+        <input type="number" min="0" max="100000" name="plan_concurrent_request_limit" value="{{.Settings.Runtime.PlanConcurrentRequestLimit}}" form="system-settings-form">
+      </label>
+      <label>
+        <span>{{t "user_request_rate_limit_per_minute"}}</span>
+        <input type="number" min="0" max="100000" name="user_request_rate_limit_per_minute" value="{{.Settings.Runtime.UserRequestRateLimitPerMinute}}" form="system-settings-form">
+      </label>
+      <label>
+        <span>{{t "audit_limit"}}</span>
+        <input type="number" min="1" max="100000" name="audit_limit" value="{{.Settings.Retention.AuditLimit}}" form="system-settings-form">
+      </label>
+      <label>
+        <span>{{t "usage_log_max_age_days"}}</span>
+        <input type="number" min="0" max="365" name="usage_log_max_age_days" value="{{.Settings.Retention.UsageLogMaxAgeDays}}" form="system-settings-form">
+      </label>
+      <label>
+        <span>{{t "billing_ledger_retention_days"}}</span>
+        <input type="number" min="3" max="365" name="billing_ledger_retention_days" value="{{.Settings.Retention.BillingLedgerRetentionDays}}" form="system-settings-form">
+      </label>
+      <div class="form-actions full-span">
+        <button type="submit" form="system-settings-form">{{t "save_settings"}}</button>
+      </div>
+    </div>
+    </section>
+
+    <section class="panel" id="settings-backup">
+      {{template "backupPanel" .}}
+    </section>
+    </div>
+  </div>
+</div>
+{{end}}

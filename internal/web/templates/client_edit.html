@@ -1,0 +1,74 @@
+{{define "content"}}
+<section class="hero compact">
+  <div>
+    <h1>{{if eq .Mode "create"}}{{t "create_client"}}{{else}}{{t "edit_client"}}{{end}}</h1>
+    <p>{{t "client_summary"}}</p>
+  </div>
+</section>
+
+{{if .Error}}
+<div class="system-notice tone-bad">{{.Error}}</div>
+{{end}}
+
+<section class="panel wide">
+  <div class="panel-head">
+    <h2>{{if .Editor.Client.Name}}{{.Editor.Client.Name}}{{else}}{{t "new_client"}}{{end}}</h2>
+    {{if .Editor.Client.ID}}<span class="panel-note">{{tf "client_id" .Editor.Client.ID}}</span>{{end}}
+  </div>
+  <form class="grid-form" method="post" action="{{if eq .Mode "create"}}/clients/new{{else}}/clients/{{.Editor.Client.ID}}/edit{{end}}">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+    <label>
+      <span>{{t "client_name"}}</span>
+      <input name="name" value="{{.Editor.Client.Name}}" placeholder="{{t "client_name_placeholder"}}" required>
+    </label>
+
+    <label>
+      <span>{{t "spend_limit_usd"}}</span>
+      <input name="spend_limit_usd" inputmode="decimal" value="{{formatNanoUSD .Editor.Client.SpendLimitNanoUSD}}" placeholder="0">
+    </label>
+
+    <div class="stack-form full-span">
+      {{if .Editor.AvailableAccountGroups}}
+      <label>
+        <span>{{t "account_group"}}</span>
+        <select name="account_group">
+          {{$cashSource := clientBillingSourceCash}}
+          {{$planSource := clientBillingSourcePlan}}
+          {{$showBillingSource := or .Editor.HasActivePlan (eq .Editor.SelectedBillingSource $planSource)}}
+          {{if $showBillingSource}}
+          {{range .Editor.AvailableAccountGroups}}
+          {{if and (accountGroupAllowsPlanBilling .) (or $.Editor.HasActivePlan (clientBillingSourceSelected $.Editor . $planSource))}}
+          <option value="{{accountGroupBillingOptionValue .Name $planSource}}" {{if clientBillingSourceSelected $.Editor . $planSource}}selected{{end}} data-select-description="{{.Remark}}">{{accountGroupBillingOptionText . $planSource}}</option>
+          {{end}}
+          {{end}}
+          <option disabled data-select-separator="true">---------------------</option>
+          {{range .Editor.AvailableAccountGroups}}
+          <option value="{{accountGroupBillingOptionValue .Name $cashSource}}" {{if clientBillingSourceSelected $.Editor . $cashSource}}selected{{end}} data-select-description="{{.Remark}}">{{accountGroupBillingOptionText . $cashSource}}</option>
+          {{end}}
+          {{else}}
+          {{range .Editor.AvailableAccountGroups}}
+          <option value="{{accountGroupQueryKey .Name}}" {{if clientBillingSourceSelected $.Editor . $cashSource}}selected{{end}} data-select-description="{{.Remark}}">{{accountGroupLabel .Name}} ({{accountGroupMultiplierOptionText .}})</option>
+          {{end}}
+          {{end}}
+        </select>
+      </label>
+      {{else}}
+      <p class="muted">{{t "no_accounts_available"}}</p>
+      {{end}}
+    </div>
+
+    <label class="checkbox-row full-span">
+      <input type="checkbox" name="enabled" {{if .Editor.Client.Enabled}}checked{{end}}>
+      <span>{{t "client_enabled"}}</span>
+    </label>
+
+    <div class="form-actions full-span">
+      <button type="submit">{{if eq .Mode "create"}}{{t "create_client"}}{{else}}{{t "save_client"}}{{end}}</button>
+      {{if eq .Mode "edit"}}
+      <button class="danger" type="submit" formaction="/clients/{{.Editor.Client.ID}}/delete" data-confirm="{{tf "confirm_delete_client" .Editor.Client.Name}}">{{t "delete"}}</button>
+      {{end}}
+      <a class="button-link ghost-link" href="/clients">{{t "cancel"}}</a>
+    </div>
+  </form>
+</section>
+{{end}}

@@ -1,0 +1,738 @@
+{{define "content"}}
+<section class="hero compact finance-hero">
+  <div>
+    <h1>{{t "finance"}}</h1>
+    <p>{{t "finance_hint"}}</p>
+  </div>
+</section>
+
+{{template "finance_page" .}}
+{{end}}
+
+{{define "finance_page"}}
+<div class="finance-page-partial" data-partial="finance-page">
+{{if .NoticeError}}
+<div class="system-notice tone-bad" data-clear-url-params="notice_error">{{.NoticeError}}</div>
+{{end}}
+{{if .ReconcileReleaseOK}}
+<div class="system-notice tone-good" data-clear-url-params="notice">{{t "reserved_request_released"}}</div>
+{{end}}
+{{if eq .FinanceNotice "refund_created"}}
+<div class="system-notice tone-good" data-clear-url-params="notice">{{t "refund_created"}}</div>
+{{end}}
+{{if eq .FinanceNotice "refund_completed"}}
+<div class="system-notice tone-good" data-clear-url-params="notice">{{t "refund_completed"}}</div>
+{{end}}
+{{if eq .FinanceNotice "refund_failed"}}
+<div class="system-notice tone-bad" data-clear-url-params="notice">{{t "refund_marked_failed"}}</div>
+{{end}}
+{{if eq .FinanceNotice "payment_confirmed_paid"}}
+<div class="system-notice tone-good" data-clear-url-params="notice">{{t "payment_confirmed_paid"}}</div>
+{{end}}
+<section class="metric-grid finance-metrics">
+  <div class="metric"><span class="metric-label">{{t "total_balance"}}</span><strong>{{formatUSD .Finance.Overview.TotalBalanceNanoUSD}}</strong></div>
+  <div class="metric"><span class="metric-label">{{t "today_income"}}</span><strong>{{formatUSD .Finance.Overview.TodayIncomeNanoUSD}}</strong></div>
+  <div class="metric"><span class="metric-label">{{t "today_balance_spend"}}</span><strong>{{formatUSD .Finance.Overview.TodayBalanceSpendNanoUSD}}</strong></div>
+  <div class="metric"><span class="metric-label">{{t "today_plan_spend"}}</span><strong>{{formatUSD .Finance.Overview.TodayPlanSpendNanoUSD}}</strong></div>
+  <div class="metric"><span class="metric-label">{{t "paid_payment_amount"}}</span><strong>{{formatUSD .Finance.Overview.PaidOrderNanoUSD}}</strong></div>
+  <div class="metric"><span class="metric-label">{{t "finance_risk_items"}}</span><strong>{{len .Finance.Overview.ReconcileIssues}}</strong></div>
+</section>
+
+<section class="finance-workspace" data-partial="finance-workspace">
+  <div class="finance-tabs" role="tablist" aria-label="{{t "finance_navigation"}}">
+    <a class="{{if eq .FinanceTab "overview"}}is-active{{end}}" href="/admin/finance" data-ajax-link data-ajax-target='[data-partial="finance-page"]' data-ajax-partial="finance-page">{{t "finance_tab_overview"}}</a>
+    <a class="{{if eq .FinanceTab "users"}}is-active{{end}}" href="/admin/finance?tab=users" data-ajax-link data-ajax-target='[data-partial="finance-page"]' data-ajax-partial="finance-page">{{t "finance_user_accounts"}}</a>
+    <a class="{{if eq .FinanceTab "ledger"}}is-active{{end}}" href="/admin/finance?tab=ledger" data-ajax-link data-ajax-target='[data-partial="finance-page"]' data-ajax-partial="finance-page">{{t "finance_ledger"}}</a>
+    <a class="{{if eq .FinanceTab "orders"}}is-active{{end}}" href="/admin/finance?tab=orders" data-ajax-link data-ajax-target='[data-partial="finance-page"]' data-ajax-partial="finance-page">{{t "finance_orders"}}</a>
+    <a class="{{if eq .FinanceTab "usage"}}is-active{{end}}" href="/admin/finance?tab=usage" data-ajax-link data-ajax-target='[data-partial="finance-page"]' data-ajax-partial="finance-page">{{t "finance_usage"}}</a>
+    <a class="{{if eq .FinanceTab "tokens"}}is-active{{end}}" href="/admin/finance?tab=tokens" data-ajax-link data-ajax-target='[data-partial="finance-page"]' data-ajax-partial="finance-page">{{t "finance_tokens"}}</a>
+    <a class="{{if eq .FinanceTab "reconcile"}}is-active{{end}}" href="/admin/finance?tab=reconcile" data-ajax-link data-ajax-target='[data-partial="finance-page"]' data-ajax-partial="finance-page">{{t "finance_reconcile"}}</a>
+  </div>
+
+  {{if eq .FinanceTab "overview"}}
+  <div class="finance-overview-grid">
+    <section class="panel finance-daily-panel" data-partial="finance-overview-daily" {{with .FinanceOverviewDeferred}}data-deferred-url="{{index . "daily"}}" data-deferred-error="{{t "finance_report_load_failed"}}"{{end}}>
+      <div class="panel-head">
+        <h2>{{t "finance_daily_report"}}</h2>
+        <span class="panel-note">{{t "finance_daily_report_hint"}}</span>
+      </div>
+      <div class="table-wrap finance-compact-table">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>{{t "date"}}</th>
+              <th>{{t "income"}}</th>
+              <th>{{t "spend"}}</th>
+              <th>{{t "today_balance_spend"}}</th>
+              <th>{{t "today_plan_spend"}}</th>
+              <th>{{t "profit"}}</th>
+              <th>{{t "payment_order"}}</th>
+              <th>{{t "request_count"}}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{range .Finance.Daily}}
+            <tr>
+              <td><strong>{{.Date}}</strong></td>
+              <td>{{formatUSD .IncomeNanoUSD}}</td>
+              <td>{{formatUSD .SpendNanoUSD}}</td>
+              <td>{{formatUSD .BalanceSpendNanoUSD}}</td>
+              <td>{{formatUSD .PlanSpendNanoUSD}}</td>
+              <td>{{signedUSD .ProfitNanoUSD}}</td>
+              <td>{{.OrderCount}}</td>
+              <td>{{.RequestCount}}</td>
+            </tr>
+            {{else}}
+            <tr><td colspan="8" class="empty">{{if .FinanceOverviewDeferred}}{{t "finance_report_loading"}}{{else}}{{t "no_records"}}{{end}}</td></tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <div class="finance-overview-stack">
+      <section class="panel finance-model-panel" data-partial="finance-overview-models" {{with .FinanceOverviewDeferred}}data-deferred-url="{{index . "models"}}" data-deferred-error="{{t "finance_report_load_failed"}}"{{end}}>
+        <div class="panel-head">
+          <h2>{{t "finance_model_report"}}</h2>
+          <span class="panel-note">{{t "finance_model_report_hint"}}</span>
+        </div>
+        <div class="table-wrap finance-compact-table">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>{{t "model"}}</th>
+                <th>{{t "request_count"}}</th>
+                <th>{{t "input_tokens"}}</th>
+                <th>{{t "output_tokens"}}</th>
+                <th>{{t "spend"}}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {{range .Finance.Models}}
+              <tr>
+                <td><code>{{.Model}}</code></td>
+                <td>{{.RequestCount}}</td>
+                <td>{{.PromptTokens}}</td>
+                <td>{{.CompletionTokens}}</td>
+                <td>{{formatUSD .SpendNanoUSD}}</td>
+              </tr>
+              {{else}}
+              <tr><td colspan="5" class="empty">{{if .FinanceOverviewDeferred}}{{t "finance_report_loading"}}{{else}}{{t "no_records"}}{{end}}</td></tr>
+              {{end}}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel finance-users-panel" data-partial="finance-overview-top-users" {{with .FinanceOverviewDeferred}}data-deferred-url="{{index . "top_users"}}" data-deferred-error="{{t "finance_report_load_failed"}}"{{end}}>
+        <div class="panel-head">
+          <h2>{{t "top_users_by_spend"}}</h2>
+          <span class="panel-note">{{tf "finance_user_count" .Finance.Overview.TotalUsers}}</span>
+        </div>
+        <div class="table-wrap finance-compact-table">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>{{t "user"}}</th>
+                <th>{{t "balance"}}</th>
+                <th>{{t "historical_spend"}}</th>
+                <th>{{t "recharge"}}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {{range .Finance.Overview.TopUsersBySpend}}
+              <tr>
+                <td><strong>{{.User.Username}}</strong></td>
+                <td>{{formatUSD .BalanceNanoUSD}}</td>
+                <td>{{formatUSD .SpendNanoUSD}}</td>
+                <td>{{formatUSD .RechargeNanoUSD}}</td>
+              </tr>
+              {{else}}
+              <tr><td colspan="4" class="empty">{{if .FinanceOverviewDeferred}}{{t "finance_report_loading"}}{{else}}{{t "no_users"}}{{end}}</td></tr>
+              {{end}}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel finance-clients-panel" data-partial="finance-overview-top-clients" {{with .FinanceOverviewDeferred}}data-deferred-url="{{index . "top_clients"}}" data-deferred-error="{{t "finance_report_load_failed"}}"{{end}}>
+        <div class="panel-head">
+          <h2>{{t "top_clients_by_spend"}}</h2>
+          <span class="panel-note">{{tf "finance_client_count" .Finance.Overview.TotalClients .Finance.Overview.ActiveClients}}</span>
+        </div>
+        <div class="table-wrap finance-compact-table">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>{{t "client"}}</th>
+                <th>{{t "owner"}}</th>
+                <th>{{t "spend"}}</th>
+                <th>{{t "limit"}}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {{range .Finance.Overview.TopClientsBySpend}}
+              <tr>
+                <td><strong>{{.Client.Name}}</strong><div class="muted"><code>{{.Client.ID}}</code></div></td>
+                <td>
+                  {{if .Client.OwnerUserID}}
+                  {{with userIdentity .Client.OwnerUserID}}
+                  {{if .Known}}<strong>{{.Username}}</strong>{{else}}<code>{{.ID}}</code>{{end}}
+                  {{end}}
+                  {{else}}-{{end}}
+                </td>
+                <td>{{formatUSD .Spend.SpendUsedNanoUSD}}</td>
+                <td>{{if .Spend.SpendLimitNanoUSD}}{{formatUSD .Spend.SpendLimitNanoUSD}}{{else}}{{t "unlimited"}}{{end}}</td>
+              </tr>
+              {{else}}
+              <tr><td colspan="4" class="empty">{{if .FinanceOverviewDeferred}}{{t "finance_report_loading"}}{{else}}{{t "no_clients"}}{{end}}</td></tr>
+              {{end}}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+  {{end}}
+
+  {{if eq .FinanceTab "users"}}
+  <section class="panel">
+    <div class="panel-head">
+      <h2>{{t "finance_user_accounts"}}</h2>
+      <span class="panel-note">{{tf "finance_user_count" .Finance.Overview.TotalUsers}}</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>{{t "user"}}</th>
+            <th>{{t "balance"}}</th>
+            <th>{{t "recharge"}}</th>
+            <th>{{t "reward"}}</th>
+            <th>{{t "historical_spend"}}</th>
+            <th>{{t "refund"}}</th>
+            <th>{{t "client"}}</th>
+            <th>{{t "last_activity"}}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Finance.Users}}
+          <tr>
+            <td><strong>{{.User.Username}}</strong></td>
+            <td>{{formatUSD .BalanceNanoUSD}}</td>
+            <td>{{formatUSD .RechargeNanoUSD}}</td>
+            <td>{{formatUSD .RewardNanoUSD}}</td>
+            <td>{{formatUSD .SpendNanoUSD}}</td>
+            <td>{{formatUSD .RefundNanoUSD}}</td>
+            <td>{{.ClientCount}} / {{formatUSD .ClientSpendNanoUSD}}</td>
+            <td>
+              <div class="cell-stack">
+                <span>{{t "payment"}}: {{if .LastPaymentAt}}{{formatTime .LastPaymentAt}}{{else}}-{{end}}</span>
+                <span>{{t "spend"}}: {{if .LastSpendAt}}{{formatTime .LastSpendAt}}{{else}}-{{end}}</span>
+              </div>
+            </td>
+          </tr>
+          {{else}}
+          <tr><td colspan="8" class="empty">{{t "no_users"}}</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    {{if or .Finance.UserPage.HasPrev .Finance.UserPage.HasNext}}
+    <div class="pager">
+      <div class="panel-note">{{tf "finance_user_count" .Finance.UserPage.Total}}</div>
+      <div class="action-row">
+        {{if .Finance.UserPage.HasPrev}}<a class="button-link ghost-link" href="{{financeUserPageURL .Finance.UserPage.PrevPage}}" data-ajax-link data-ajax-target='[data-partial="finance-page"]' data-ajax-partial="finance-page">{{t "previous"}}</a>{{end}}
+        {{if .Finance.UserPage.HasNext}}<a class="button-link ghost-link" href="{{financeUserPageURL .Finance.UserPage.NextPage}}" data-ajax-link data-ajax-target='[data-partial="finance-page"]' data-ajax-partial="finance-page">{{t "next"}}</a>{{end}}
+      </div>
+    </div>
+    {{end}}
+  </section>
+  {{end}}
+
+  {{if eq .FinanceTab "ledger"}}
+  <section class="panel">
+    <div class="panel-head">
+      <h2>{{t "finance_ledger"}}</h2>
+      <span class="panel-note">{{t "finance_recent_ledger_hint"}}</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>{{t "created_at"}}</th>
+            <th>{{t "filter_user"}}</th>
+            <th>{{t "type"}}</th>
+            <th>{{t "payment_received_amount"}}</th>
+            <th>{{t "current_balance"}}</th>
+            <th>{{t "request_id"}}</th>
+            <th>{{t "note"}}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Finance.Overview.RecentLedger}}
+          <tr>
+            <td>{{formatTime .CreatedAt}}</td>
+            <td>
+              {{with userIdentity .UserID}}
+              {{if .Known}}<strong>{{.Username}}</strong>{{else}}<code>{{.ID}}</code>{{end}}
+              {{end}}
+            </td>
+            <td>{{billingLedgerKindText .Kind}}</td>
+            <td>{{signedUSD .AmountNanoUSD}}</td>
+            <td>{{formatUSD .BalanceAfterNanoUSD}}</td>
+            <td>{{if .RequestID}}<code>{{.RequestID}}</code>{{else}}-{{end}}</td>
+            <td>{{if .Note}}{{.Note}}{{else}}-{{end}}</td>
+          </tr>
+          {{else}}
+          <tr><td colspan="7" class="empty">{{t "no_balance_log"}}</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {{end}}
+
+  {{if eq .FinanceTab "orders"}}
+  <section class="panel">
+    <div class="panel-head">
+      <h2>{{t "finance_orders"}}</h2>
+      <span class="panel-note">{{tf "payment_total_count" .Finance.Orders.Total}}</span>
+    </div>
+    <form class="stack-form finance-orders-filter-form" method="get" action="/admin/finance" data-ajax-form data-ajax-target='[data-partial="finance-page"]' data-ajax-partial="finance-page">
+      <input type="hidden" name="tab" value="orders">
+      <div class="filter-grid has-actions finance-orders-filter-grid">
+        <label><span>{{t "filter_user"}}</span><input name="order_user_id" value="{{with userIdentity .Finance.Orders.Filter.UserID}}{{if .Known}}{{.Username}}{{else}}{{.ID}}{{end}}{{end}}"></label>
+        <label>
+          <span>{{t "provider"}}</span>
+          <select name="order_provider">
+            <option value="">{{t "none"}}</option>
+            <option value="alipay" {{if eq (printf "%s" .Finance.Orders.Filter.Provider) "alipay"}}selected{{end}}>{{t "alipay"}}</option>
+            <option value="wechatpay" {{if eq (printf "%s" .Finance.Orders.Filter.Provider) "wechatpay"}}selected{{end}}>{{t "wechat_pay"}}</option>
+            <option value="personalpay" {{if eq (printf "%s" .Finance.Orders.Filter.Provider) "personalpay"}}selected{{end}}>{{t "personalpay_wechat"}}</option>
+          </select>
+        </label>
+        <label>
+          <span>{{t "status"}}</span>
+          <select name="order_status">
+            <option value="">{{t "none"}}</option>
+            <option value="paid" {{if eq (printf "%s" .Finance.Orders.Filter.Status) "paid"}}selected{{end}}>{{t "payment_status_paid"}}</option>
+            <option value="closed" {{if eq (printf "%s" .Finance.Orders.Filter.Status) "closed"}}selected{{end}}>{{t "payment_status_closed"}}</option>
+            <option value="failed" {{if eq (printf "%s" .Finance.Orders.Filter.Status) "failed"}}selected{{end}}>{{t "payment_status_failed"}}</option>
+          </select>
+        </label>
+        <div class="form-actions filter-actions finance-filter-actions">
+          <button type="submit">{{t "filter_apply"}}</button>
+          <a class="button-link ghost-link" href="/admin/finance?tab=orders" data-ajax-link data-ajax-target='[data-partial="finance-page"]' data-ajax-partial="finance-page">{{t "clear_filters"}}</a>
+        </div>
+      </div>
+    </form>
+    <div class="table-wrap finance-orders-table-wrap">
+      <table class="data-table finance-orders-table">
+        <thead>
+          <tr>
+            <th>{{t "created_at"}}</th>
+            <th>{{t "filter_user"}}</th>
+            <th>{{t "payment_order"}}</th>
+            <th>{{t "provider"}}</th>
+            <th>{{t "payment_type"}}</th>
+            <th>{{t "amount"}}</th>
+            <th>{{t "status"}}</th>
+            <th>{{t "payment_refunds"}}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Finance.Orders.Orders}}
+          {{$refundSummary := index $.Finance.OrderRefunds .ID}}
+          {{$paidOrder := eq (printf "%s" .Status) "paid"}}
+          {{$canConfirmPaid := or (eq (printf "%s" .Status) "closed") (eq (printf "%s" .Status) "failed")}}
+          {{$hasRefunds := gt (len $refundSummary.Refunds) 0}}
+          {{$canRefund := and $paidOrder (gt $refundSummary.AvailableRefundNanoUSD 0)}}
+          {{$showRefundDialog := or $canRefund $hasRefunds}}
+          <tr>
+            <td>{{formatTime .CreatedAt}}</td>
+            <td>
+              {{with userIdentity .UserID}}
+              {{if .Known}}<strong>{{.Username}}</strong>{{else}}<code>{{.ID}}</code>{{end}}
+              {{end}}
+            </td>
+            <td><code>{{.OutTradeNo}}</code></td>
+            <td>{{paymentProviderText .Provider}}</td>
+            <td>{{paymentOrderTypeText .}}</td>
+            <td>
+              <strong>{{formatUSD .AmountNanoUSD}}</strong>
+              <div class="muted">{{t "payment_amount"}} {{formatCNYCents .ProviderAmountCents}}</div>
+              <div class="muted">{{t "payment_exchange_rate"}} {{paymentExchangeRateText .}}</div>
+            </td>
+            <td>
+              <div class="cell-stack finance-payment-status-cell">
+                <span class="pill {{paymentStatusClass .Status}}">{{paymentStatusText .Status}}</span>
+                {{if $canConfirmPaid}}
+                <form method="post" action="/admin/finance/orders/confirm-paid" data-confirm="{{t "confirm_payment_mark_paid"}}" data-ajax-form data-ajax-target='[data-partial="finance-page"]' data-ajax-partial="finance-page">
+                  <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                  <input type="hidden" name="order_id" value="{{.ID}}">
+                  <button type="submit" class="ghost finance-payment-confirm-paid">{{t "manual_confirm_payment_paid"}}</button>
+                </form>
+                {{end}}
+              </div>
+            </td>
+            <td class="finance-refund-cell">
+              {{if $refundSummary}}
+              <div class="finance-refund-summary">
+                {{if $paidOrder}}
+                <div class="finance-refund-summary-line"><span class="muted">{{t "refundable_amount"}}</span><strong>{{formatUSD $refundSummary.AvailableRefundNanoUSD}}</strong></div>
+                <div class="finance-refund-summary-line"><span class="muted">{{t "refund_payout_amount"}}</span><strong>{{formatCNYCents $refundSummary.AvailableProviderAmountCents}}</strong></div>
+                {{if $refundSummary.PendingUserRefundNanoUSD}}<div class="finance-refund-summary-line"><span class="muted">{{t "pending_refund_amount"}}</span><strong>{{formatUSD $refundSummary.PendingUserRefundNanoUSD}}</strong></div>{{end}}
+                {{else}}
+                <div class="finance-refund-summary-line"><span class="muted">{{t "status"}}</span><strong>{{paymentStatusText .Status}}</strong></div>
+                <div class="finance-refund-summary-line"><span class="muted">{{t "refundable_amount"}}</span><strong>{{formatUSD 0}}</strong></div>
+                {{if $hasRefunds}}<div class="finance-refund-summary-line"><span class="muted">{{t "payment_refunds"}}</span><strong>{{formatUSD $refundSummary.RefundedNanoUSD}}</strong></div>{{end}}
+                {{end}}
+              </div>
+              {{if $showRefundDialog}}
+              <button type="button" class="ghost finance-refund-open" data-group-settings-open="payment-refund-{{.ID}}">{{if $canRefund}}{{t "manual_payment_refund"}}{{else}}{{t "payment_refunds"}}{{end}}</button>
+              <div class="settings-overlay finance-refund-overlay" id="payment-refund-{{.ID}}" role="dialog" aria-modal="true" aria-labelledby="payment-refund-title-{{.ID}}" hidden>
+                <div class="settings-dialog finance-refund-dialog">
+                  <div class="settings-header">
+                    <div>
+                      <h3 id="payment-refund-title-{{.ID}}">{{if $canRefund}}{{t "manual_payment_refund"}}{{else}}{{t "payment_refunds"}}{{end}}</h3>
+                      <p><code>{{.OutTradeNo}}</code></p>
+                    </div>
+                    <button type="button" class="icon-button settings-close" data-group-settings-close aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M18 6 6 18"></path>
+                        <path d="m6 6 12 12"></path>
+                      </svg>
+                    </button>
+                  </div>
+                  <div class="finance-refund-modal-summary">
+                    <div>
+                      <span>{{t "filter_user"}}</span>
+                      {{with userIdentity .UserID}}
+                      <strong>{{if .Known}}{{.Username}}{{else}}{{.ID}}{{end}}</strong>
+                      {{end}}
+                    </div>
+                    <div>
+                      <span>{{t "status"}}</span>
+                      <strong>{{paymentStatusText .Status}}</strong>
+                    </div>
+                    <div>
+                      <span>{{t "amount"}}</span>
+                      <strong>{{formatUSD .AmountNanoUSD}}</strong>
+                      <small>{{formatCNYCents .ProviderAmountCents}}</small>
+                    </div>
+                    <div>
+                      <span>{{t "refundable_amount"}}</span>
+                      <strong>{{formatUSD $refundSummary.AvailableRefundNanoUSD}}</strong>
+                      <small>{{t "refund_payout_amount"}} {{formatCNYCents $refundSummary.AvailableProviderAmountCents}}</small>
+                    </div>
+                    <div>
+                      <span>{{t "order_refund_remaining"}}</span>
+                      <strong>{{formatUSD $refundSummary.RemainingNanoUSD}}</strong>
+                      <small>{{formatCNYCents $refundSummary.RemainingProviderAmountCents}}</small>
+                    </div>
+                    <div>
+                      <span>{{t "pending_refund_amount"}}</span>
+                      <strong>{{formatUSD $refundSummary.PendingUserRefundNanoUSD}}</strong>
+                      <small>{{t "payment_refunds"}} {{formatUSD $refundSummary.RefundedNanoUSD}}</small>
+                    </div>
+                  </div>
+
+                  <div class="finance-refund-modal-section">
+                    {{if $canRefund}}
+                    <form class="stack-form finance-refund-create-form" method="post" action="/admin/finance/refunds/create" data-confirm="{{t "confirm_create_payment_refund"}}" data-ajax-form data-ajax-target='[data-partial="finance-page"]' data-ajax-partial="finance-page">
+                      <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                      <input type="hidden" name="order_id" value="{{.ID}}">
+                      <label><span>{{t "refund_amount_usd"}}</span><input name="amount_usd" inputmode="decimal" value="{{formatNanoUSD $refundSummary.AvailableRefundNanoUSD}}" placeholder="{{t "refund_amount_usd"}}" data-modal-autofocus></label>
+                      <label><span>{{t "refund_reason"}}</span><input name="reason" value="" placeholder="{{t "refund_reason"}}"></label>
+                      <div class="settings-actions">
+                        <button type="button" class="ghost" data-group-settings-close>{{t "cancel"}}</button>
+                        <button type="submit">{{t "create_refund"}}</button>
+                      </div>
+                    </form>
+                    {{else}}
+                    <div class="empty finance-refund-empty">{{t "refundable_amount"}} {{formatUSD $refundSummary.AvailableRefundNanoUSD}}</div>
+                    {{end}}
+                  </div>
+
+                  <div class="finance-refund-modal-section">
+                    <div class="finance-refund-section-head">
+                      <strong>{{t "payment_refunds"}}</strong>
+                    </div>
+                    <div class="finance-refund-list">
+                      {{range $refundSummary.Refunds}}
+                      <div class="finance-refund-item">
+                        <div class="finance-refund-item-head">
+                          <span class="pill {{paymentRefundStatusClass .Status}}">{{paymentRefundStatusText .Status}}</span>
+                          <strong>{{formatUSD .AmountNanoUSD}}</strong>
+                          <span class="muted">{{formatCNYCents .ProviderAmountCents}}</span>
+                        </div>
+                        {{if .Reason}}<div class="muted">{{.Reason}}</div>{{end}}
+                        {{if .ManualPayoutRef}}<div class="muted">{{t "payout_reference"}} {{.ManualPayoutRef}}</div>{{end}}
+                        {{if .ManualPayoutNote}}<div class="muted">{{t "payout_note"}} {{.ManualPayoutNote}}</div>{{end}}
+                        {{if .ManualPayoutAt}}<div class="muted">{{formatTime .ManualPayoutAt}}</div>{{end}}
+                        {{if eq (printf "%s" .Status) "pending"}}
+                        <div class="finance-refund-action-grid">
+                          <form class="stack-form finance-refund-action-form" method="post" action="/admin/finance/refunds/complete" data-confirm="{{t "confirm_complete_payment_refund"}}" data-ajax-form data-ajax-target='[data-partial="finance-page"]' data-ajax-partial="finance-page">
+                            <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                            <input type="hidden" name="refund_id" value="{{.ID}}">
+                            <label><span>{{t "payout_reference"}}</span><input name="payout_ref" inputmode="text" placeholder="{{t "payout_reference"}}"></label>
+                            <label><span>{{t "payout_note"}}</span><input name="note" inputmode="text" placeholder="{{t "payout_note"}}"></label>
+                            <div class="settings-actions">
+                              <button type="submit">{{t "confirm_manual_refund_payout"}}</button>
+                            </div>
+                          </form>
+                          <form class="stack-form finance-refund-action-form" method="post" action="/admin/finance/refunds/fail" data-confirm="{{t "confirm_fail_payment_refund"}}" data-ajax-form data-ajax-target='[data-partial="finance-page"]' data-ajax-partial="finance-page">
+                            <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                            <input type="hidden" name="refund_id" value="{{.ID}}">
+                            <label><span>{{t "payout_note"}}</span><input name="note" inputmode="text" placeholder="{{t "payout_note"}}"></label>
+                            <div class="settings-actions">
+                              <button type="submit" class="ghost danger">{{t "mark_refund_failed"}}</button>
+                            </div>
+                          </form>
+                        </div>
+                        {{end}}
+                      </div>
+                      {{else}}
+                      <div class="empty finance-refund-empty">{{t "none"}}</div>
+                      {{end}}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {{end}}
+              {{else}}
+              <span class="muted">-</span>
+              {{end}}
+            </td>
+          </tr>
+          {{else}}
+          <tr><td colspan="8" class="empty">{{t "no_payment_orders"}}</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    <div class="pager">
+      <div class="panel-note">{{tf "payment_total_count" .Finance.Orders.Total}}</div>
+      <div class="action-row">
+        {{if .Finance.Orders.HasPrev}}<a class="button-link ghost-link" href="{{financePaymentOrderPageURL .Finance.Orders.Filter .Finance.Orders.PrevPage}}" data-ajax-link data-ajax-target='[data-partial="finance-page"]' data-ajax-partial="finance-page">{{t "previous"}}</a>{{end}}
+        {{if .Finance.Orders.HasNext}}<a class="button-link ghost-link" href="{{financePaymentOrderPageURL .Finance.Orders.Filter .Finance.Orders.NextPage}}" data-ajax-link data-ajax-target='[data-partial="finance-page"]' data-ajax-partial="finance-page">{{t "next"}}</a>{{end}}
+      </div>
+    </div>
+  </section>
+  {{end}}
+
+  {{if eq .FinanceTab "usage"}}
+  <section class="panel">
+    <div class="panel-head">
+      <h2>{{t "finance_usage"}}</h2>
+      <span class="panel-note">{{tf "usage_log_total_count" .Finance.Usage.Total}}</span>
+    </div>
+    <form class="stack-form" method="get" action="/admin/finance" data-ajax-form data-ajax-target='[data-partial="finance-page"]' data-ajax-partial="finance-page">
+      <input type="hidden" name="tab" value="usage">
+      <div class="filter-grid has-actions">
+        <label><span>{{t "filter_user"}}</span><input name="usage_user_id" value="{{with userIdentity .Finance.Usage.Filter.UserID}}{{if .Known}}{{.Username}}{{else}}{{.ID}}{{end}}{{end}}"></label>
+        <label><span>{{t "client_id_label"}}</span><input name="usage_client_id" value="{{.Finance.Usage.Filter.ClientID}}"></label>
+        <label><span>{{t "model"}}</span><input name="usage_model" value="{{.Finance.Usage.Filter.Model}}"></label>
+        <label>
+          <span>{{t "status"}}</span>
+          <select name="usage_status">
+            <option value="">{{t "none"}}</option>
+            <option value="settled" {{if eq (printf "%s" .Finance.Usage.Filter.Status) "settled"}}selected{{end}}>{{t "usage_status_settled"}}</option>
+            <option value="reserved" {{if eq (printf "%s" .Finance.Usage.Filter.Status) "reserved"}}selected{{end}}>{{t "usage_status_reserved"}}</option>
+            <option value="usage_missing" {{if eq (printf "%s" .Finance.Usage.Filter.Status) "usage_missing"}}selected{{end}}>{{t "usage_status_usage_missing"}}</option>
+            <option value="released" {{if eq (printf "%s" .Finance.Usage.Filter.Status) "released"}}selected{{end}}>{{t "usage_status_released"}}</option>
+          </select>
+        </label>
+        <label><span>{{t "started_at"}}</span><input type="datetime-local" name="usage_started_at" value="{{datetimeInputValue .Finance.Usage.Filter.StartedAt}}"></label>
+        <label><span>{{t "ended_at"}}</span><input type="datetime-local" name="usage_ended_at" value="{{datetimeInputValue .Finance.Usage.Filter.EndedAt}}"></label>
+        <div class="form-actions filter-actions">
+          <button type="submit">{{t "filter_apply"}}</button>
+          <a class="button-link ghost-link" href="/admin/finance?tab=usage" data-ajax-link data-ajax-target='[data-partial="finance-page"]' data-ajax-partial="finance-page">{{t "clear_filters"}}</a>
+        </div>
+      </div>
+    </form>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>{{t "at"}}</th>
+            <th>{{t "filter_user"}}</th>
+            <th>{{t "client"}}</th>
+            <th>{{t "request_id"}}</th>
+            <th>{{t "model"}}</th>
+            <th>{{t "status"}}</th>
+            <th>{{t "input_tokens"}}</th>
+            <th>{{t "first_token"}}</th>
+            <th>{{t "output_tokens"}}</th>
+            <th>{{t "cost"}}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Finance.Usage.Rows}}
+          <tr>
+            <td>{{formatTime .Request.CreatedAt}}</td>
+            <td>
+              {{with userIdentity .Request.UserID}}
+              {{if .Known}}<strong>{{.Username}}</strong>{{else}}<code>{{.ID}}</code>{{end}}
+              {{end}}
+            </td>
+            <td>{{if .ClientName}}{{.ClientName}}{{else}}<code>{{.Request.ClientID}}</code>{{end}}</td>
+            <td><code>{{.Request.RequestID}}</code></td>
+            <td><code>{{usageLogModelText .Request}}</code></td>
+            <td><span class="pill {{usageStatusClass .Request.Status}}">{{usageStatusText .Request.Status}}</span></td>
+            <td>{{.Request.PromptTokens}}{{if .Request.CachedPromptTokens}} <span class="muted">({{t "cached"}} {{.Request.CachedPromptTokens}})</span>{{end}}</td>
+            <td>{{usageFirstTokenText .Request}}</td>
+            <td>{{.Request.CompletionTokens}}</td>
+            <td>{{usageBillingAmountText .Request}}</td>
+          </tr>
+          {{else}}
+          <tr><td colspan="10" class="empty">{{t "no_requests"}}</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    <div class="pager">
+      <div class="panel-note">{{tf "usage_log_total_count" .Finance.Usage.Total}}</div>
+      <div class="action-row">
+        {{if .Finance.Usage.HasPrev}}<a class="button-link ghost-link" href="{{financeUsageLogPageURL .Finance.Usage.Filter .Finance.Usage.PrevPage}}" data-ajax-link data-ajax-target='[data-partial="finance-page"]' data-ajax-partial="finance-page">{{t "previous"}}</a>{{end}}
+        {{if .Finance.Usage.HasNext}}<a class="button-link ghost-link" href="{{financeUsageLogPageURL .Finance.Usage.Filter .Finance.Usage.NextPage}}" data-ajax-link data-ajax-target='[data-partial="finance-page"]' data-ajax-partial="finance-page">{{t "next"}}</a>{{end}}
+      </div>
+    </div>
+  </section>
+  {{end}}
+
+  {{if eq .FinanceTab "tokens"}}
+  <div class="finance-overview-grid">
+    <section class="panel finance-daily-panel">
+      <div class="panel-head">
+        <h2>{{t "site_daily_token_usage"}}</h2>
+        <span class="panel-note">{{t "site_daily_token_usage_hint"}}</span>
+      </div>
+      <div class="table-wrap finance-compact-table">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>{{t "date"}}</th>
+              <th>{{t "request_count"}}</th>
+              <th>{{t "input_tokens"}}</th>
+              <th>{{t "cached_tokens"}}</th>
+              <th>{{t "output_tokens"}}</th>
+              <th>{{t "image_output_tokens"}}</th>
+              <th>{{t "total_tokens"}}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{range .Finance.TokenSiteDaily}}
+            <tr>
+              <td><strong>{{.Date}}</strong></td>
+              <td>{{formatInteger .RequestCount}}</td>
+              <td>{{formatInteger .PromptTokens}}</td>
+              <td>{{formatInteger .CachedTokens}}</td>
+              <td>{{formatInteger .CompletionTokens}}</td>
+              <td>{{formatInteger .ImageOutputTokens}}</td>
+              <td><strong>{{formatInteger .TotalTokens}}</strong></td>
+            </tr>
+            {{else}}
+            <tr><td colspan="7" class="empty">{{t "no_records"}}</td></tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel finance-users-panel">
+      <div class="panel-head">
+        <h2>{{t "user_daily_token_usage"}}</h2>
+        <span class="panel-note">{{t "user_daily_token_usage_hint"}}</span>
+      </div>
+      <div class="table-wrap finance-compact-table">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>{{t "date"}}</th>
+              <th>{{t "user"}}</th>
+              <th>{{t "request_count"}}</th>
+              <th>{{t "input_tokens"}}</th>
+              <th>{{t "cached_tokens"}}</th>
+              <th>{{t "output_tokens"}}</th>
+              <th>{{t "image_output_tokens"}}</th>
+              <th>{{t "total_tokens"}}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{range .Finance.TokenUserDaily}}
+            <tr>
+              <td><strong>{{.Date}}</strong></td>
+              <td>{{if .Username}}<strong>{{.Username}}</strong>{{else}}<code>{{.UserID}}</code>{{end}}</td>
+              <td>{{formatInteger .RequestCount}}</td>
+              <td>{{formatInteger .PromptTokens}}</td>
+              <td>{{formatInteger .CachedTokens}}</td>
+              <td>{{formatInteger .CompletionTokens}}</td>
+              <td>{{formatInteger .ImageOutputTokens}}</td>
+              <td><strong>{{formatInteger .TotalTokens}}</strong></td>
+            </tr>
+            {{else}}
+            <tr><td colspan="8" class="empty">{{t "no_records"}}</td></tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+  {{end}}
+
+  {{if eq .FinanceTab "reconcile"}}
+  <section class="panel">
+    <div class="panel-head">
+      <h2>{{t "finance_reconcile"}}</h2>
+      <span class="panel-note">{{tf "finance_issue_count" (len .Finance.Overview.ReconcileIssues)}}</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>{{t "type"}}</th>
+            <th>{{t "status"}}</th>
+            <th>{{t "resource"}}</th>
+            <th>{{t "amount"}}</th>
+            <th>{{t "note"}}</th>
+            <th>{{t "operation"}}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Finance.Overview.ReconcileIssues}}
+          <tr>
+            <td>{{financeReconcileIssueKindText .Kind}}</td>
+            <td><span class="pill {{financeReconcileSeverityClass .Severity}}">{{financeReconcileSeverityText .Severity}}</span></td>
+            <td>
+              {{if or (eq .Kind "negative_balance") (eq .Kind "client_spend_over_limit")}}
+              {{if .Message}}<strong>{{.Message}}</strong>{{else}}<code>{{.ResourceID}}</code>{{end}}
+              {{else}}
+              <code>{{.ResourceID}}</code>
+              {{end}}
+            </td>
+            <td>{{if .DeltaNanoUSD}}{{signedUSD .DeltaNanoUSD}}{{else}}-{{end}}</td>
+            <td>{{if .Message}}{{.Message}}{{else}}-{{end}}</td>
+            <td>
+              {{if eq .Kind "stale_reserved_request"}}
+              <form class="row-actions" method="post" action="/admin/finance/reconcile/release" data-confirm="{{t "confirm_release_reserved_request"}}" data-ajax-form data-ajax-target='[data-partial="finance-page"]'>
+                <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                <input type="hidden" name="request_id" value="{{.ResourceID}}">
+                <input type="hidden" name="client_id" value="{{.Message}}">
+                <button class="ghost" type="submit">{{t "release_reserved_request"}}</button>
+              </form>
+              {{else}}-{{end}}
+            </td>
+          </tr>
+          {{else}}
+          <tr><td colspan="6" class="empty">{{t "finance_no_issues"}}</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {{end}}
+</section>
+</div>
+{{end}}

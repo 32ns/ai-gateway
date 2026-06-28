@@ -1,0 +1,28 @@
+{{define "content"}}
+<section class="hero compact">
+  <div>
+    <h1>{{if .IsEdit}}{{t "document_update"}}{{else}}{{t "document_new"}}{{end}}</h1>
+    <p>{{t "docs_admin_hint"}}</p>
+  </div>
+  <div class="hero-actions">
+    {{if and .IsEdit .Document.Slug}}
+    <a class="button-link ghost-link" href="/docs/{{.Document.Slug}}">{{t "preview"}}</a>
+    {{end}}
+  </div>
+</section>
+
+<section class="panel wide document-editor-panel">
+  <div class="panel-head">
+    <h2>{{if .Document.Title}}{{.Document.Title}}{{else}}{{t "document_new"}}{{end}}</h2>
+    {{if .Document.Slug}}<span class="panel-note">/docs/{{.Document.Slug}}</span>{{end}}
+  </div>
+  <form class="settings-form document-form document-page-form" method="post" action="{{.FormAction}}">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+    {{template "documentFormFields" dict "Document" .Document}}
+    <div class="form-actions document-page-actions">
+      <button type="submit">{{if .IsEdit}}{{t "document_update"}}{{else}}{{t "document_create"}}{{end}}</button>
+      <a class="button-link ghost-link" href="/admin/docs">{{t "cancel"}}</a>
+    </div>
+  </form>
+</section>
+{{end}}

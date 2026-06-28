@@ -1,0 +1,113 @@
+{{define "backupPanel"}}
+{{if .Restored}}
+<div class="system-notice tone-good" data-clear-url-params="restored,backup">
+  {{t "backup_restore_done"}} {{if .Backup}}<code>{{.Backup}}</code>{{end}}
+</div>
+{{end}}
+
+{{if .ShowPersonalPayAndroidBackup}}
+<section class="settings-module">
+  <div class="panel-head">
+    <h2>{{t "backup_android_auto"}}</h2>
+    <span class="panel-note">{{t "backup_android_auto_hint"}}</span>
+  </div>
+  <div class="settings-form">
+    <label class="checkbox-row full-span">
+      <input type="checkbox" name="backup_android_auto_enabled" {{if .Settings.Backup.AndroidAutoEnabled}}checked{{end}} form="system-settings-form">
+      <span>{{t "backup_android_auto_enabled"}}</span>
+    </label>
+    <label>
+      <span>{{t "backup_android_time"}}</span>
+      <input type="time" name="backup_android_time" value="{{.Settings.Backup.AndroidTimeOfDay}}" form="system-settings-form">
+      <p class="field-note">{{t "backup_android_time_hint"}}</p>
+    </label>
+    <div class="full-span">
+      <div class="panel-head">
+        <h3>{{t "backup_android_data"}}</h3>
+        <span class="panel-note">{{t "backup_android_data_hint"}}</span>
+      </div>
+      <div class="backup-data-grid">
+        {{range .BackupOptions}}
+        <label class="backup-data-option">
+          <input type="checkbox" name="backup_android_data" value="{{.Value}}" {{if containsString $.Settings.Backup.AndroidDataSets .Value}}checked{{end}} form="system-settings-form">
+          <span>
+            <strong>{{t .LabelKey}}</strong>
+            <small>{{t .HintKey}}</small>
+          </span>
+        </label>
+        {{end}}
+      </div>
+    </div>
+    <div class="settings-actions">
+      <button type="submit" form="system-settings-form">{{t "backup_android_save"}}</button>
+    </div>
+  </div>
+</section>
+{{end}}
+
+<section class="settings-module">
+  <div class="panel-head">
+    <h2>{{t "backup_export"}}</h2>
+    <span class="panel-note">{{t "backup_export_hint"}}</span>
+  </div>
+  <form class="settings-form" method="post" action="/admin/backup/export" data-download-form data-long-running-message="{{t "backup_export_running"}}" data-download-filename="ai-gateway.agbak">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+    <div class="backup-data-grid">
+      {{range .BackupOptions}}
+      <label class="backup-data-option">
+        <input type="checkbox" name="backup_data" value="{{.Value}}" checked>
+        <span>
+          <strong>{{t .LabelKey}}</strong>
+          <small>{{t .HintKey}}</small>
+        </span>
+      </label>
+      {{end}}
+    </div>
+    <div class="settings-actions">
+      <button type="submit">{{t "backup_download"}}</button>
+    </div>
+  </form>
+</section>
+
+<section class="settings-module">
+  <div class="panel-head">
+    <h2>{{t "backup_restore"}}</h2>
+    <span class="panel-note">{{t "backup_restore_hint"}}</span>
+  </div>
+  <form class="settings-form" method="post" action="/admin/backup/restore" enctype="multipart/form-data"
+    data-backup-restore-form
+    data-long-running-form
+    data-long-running-message="{{t "backup_restore_running"}}"
+    data-backup-inspect-url="/admin/backup/inspect"
+    data-backup-master-key-title="{{t "backup_master_key_title"}}"
+    data-backup-master-key-message="{{t "backup_master_key_message"}}"
+    data-backup-master-key-placeholder="{{t "backup_master_key_placeholder"}}"
+    data-backup-master-key-submit="{{t "backup_master_key_submit"}}"
+    data-backup-inspect-error="{{t "backup_inspect_error"}}">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+    <input type="hidden" name="backup_master_key" value="" data-backup-master-key>
+    <label>
+      <span>{{t "backup_file"}}</span>
+      <input type="file" name="backup" accept=".agbak,.tar.gz,.tgz,application/gzip" required>
+    </label>
+    <div class="backup-data-grid">
+      {{range .BackupOptions}}
+      <label class="backup-data-option">
+        <input type="checkbox" name="restore_data" value="{{.Value}}" checked>
+        <span>
+          <strong>{{t .LabelKey}}</strong>
+          <small>{{t .HintKey}}</small>
+        </span>
+      </label>
+      {{end}}
+    </div>
+    <label>
+      <span>{{t "backup_confirm"}}</span>
+      <input name="confirm" placeholder="RESTORE" required>
+    </label>
+    <div class="settings-actions">
+      <button type="submit" class="danger">{{t "backup_restore_button"}}</button>
+    </div>
+  </form>
+</section>
+{{end}}

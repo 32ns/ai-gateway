@@ -1,0 +1,172 @@
+{{define "supportWorkspace"}}
+<section
+  class="support-workspace {{if .SupportAdmin}}admin{{else}}user{{end}}"
+  data-support-root
+  data-support-admin="{{if .SupportAdmin}}true{{else}}false{{end}}"
+  data-support-ws="{{if .SupportAdmin}}/admin/support/ws{{else}}/support/ws{{end}}"
+  data-support-active="{{.SupportActive.ID}}"
+  data-support-connecting="{{t "support_connecting"}}"
+  data-support-connected="{{t "support_connected"}}"
+  data-support-disconnected="{{t "support_disconnected"}}"
+  data-support-empty="{{if .SupportAdmin}}{{t "support_empty_admin"}}{{else}}{{t "support_empty"}}{{end}}"
+  data-support-empty-messages="{{if .SupportAdmin}}{{t "support_select_conversation"}}{{else}}{{t "support_select_or_create"}}{{end}}"
+  data-support-no-active="{{t "support_no_active"}}"
+  data-support-status-open="{{t "support_status_open"}}"
+  data-support-status-pending-admin="{{t "support_status_pending_admin"}}"
+  data-support-status-pending-user="{{t "support_status_pending_user"}}"
+  data-support-status-resolved="{{t "support_status_resolved"}}"
+  data-support-status-closed="{{t "support_status_closed"}}"
+>
+  <nav class="support-rail" aria-label="{{t "support"}}">
+    <div class="support-rail-avatar">AG</div>
+  </nav>
+  <aside class="support-sidebar">
+    <div class="support-sidebar-head">
+      <div>
+        <h2>{{if .SupportAdmin}}{{t "support_admin"}}{{else}}{{t "support"}}{{end}}</h2>
+      </div>
+      <span data-support-connection>{{t "support_connecting"}}</span>
+      {{if not .SupportAdmin}}
+      <button type="button" data-support-new>{{t "support_new"}}</button>
+      {{end}}
+    </div>
+    <div class="support-search">
+      <input type="search" data-support-search placeholder="{{t "search_keyword"}}" autocomplete="off">
+    </div>
+    <div class="support-ticket-list" data-support-ticket-list>
+      {{range .SupportTickets}}
+      <div role="button" tabindex="0" class="support-ticket {{if eq $.SupportActive.ID .ID}}active{{end}}" data-support-ticket-id="{{.ID}}">
+        <span class="support-ticket-avatar">{{if $.SupportAdmin}}{{avatarInitial .Username}}{{else}}客{{end}}</span>
+        <span class="support-ticket-main">
+          <span class="support-ticket-row">
+            <span class="support-ticket-title">{{if $.SupportAdmin}}{{.Username}}{{else}}{{.Title}}{{end}}</span>
+            <span class="support-ticket-time">{{formatTime .UpdatedAt}}{{if gt .UnreadCount 0}}<span class="support-ticket-unread">{{.UnreadCount}}</span>{{end}}</span>
+          </span>
+          <span class="support-ticket-preview">{{.LastMessage}}</span>
+        </span>
+        {{if $.SupportAdmin}}
+        <button type="button" class="support-ticket-delete" data-support-ticket-delete aria-label="删除会话" title="删除会话">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 7h16"></path>
+            <path d="M10 11v6"></path>
+            <path d="M14 11v6"></path>
+            <path d="M6 7l1 14h10l1-14"></path>
+            <path d="M9 7V4h6v3"></path>
+          </svg>
+        </button>
+        {{end}}
+      </div>
+      {{else}}
+      <div class="support-empty" data-support-empty>{{if $.SupportAdmin}}{{t "support_empty_admin"}}{{else}}{{t "support_empty"}}{{end}}</div>
+      {{end}}
+    </div>
+  </aside>
+
+  <section class="support-chat {{if not .SupportActive.ID}}is-empty{{end}}">
+    <div class="support-chat-head">
+      <div class="support-chat-avatar" data-support-active-avatar>{{if .SupportActive.ID}}{{if .SupportAdmin}}{{avatarInitial .SupportActive.Username}}{{else}}客{{end}}{{else}}-{{end}}</div>
+      <div>
+        <h2 data-support-active-title>{{if .SupportActive.ID}}{{.SupportActive.Title}}{{else}}{{t "support_no_active"}}{{end}}</h2>
+        <span data-support-active-meta>{{if .SupportActive.ID}}{{if .SupportAdmin}}{{.SupportActive.Username}} · {{end}}{{supportStatusText .SupportActive.Status}}{{end}}</span>
+      </div>
+    </div>
+    <div class="support-messages" data-support-messages>
+      {{range .SupportMessages}}
+      <article class="support-message {{if eq .ActorRole "admin"}}admin{{else}}user{{end}}" data-support-message-id="{{.ID}}">
+        <div class="support-message-body">{{.Body}}</div>
+        <div class="support-message-meta">{{formatTime .CreatedAt}}</div>
+      </article>
+      {{else}}
+      <div class="support-empty" data-support-message-empty>{{if $.SupportAdmin}}{{t "support_select_conversation"}}{{else}}{{t "support_select_or_create"}}{{end}}</div>
+      {{end}}
+    </div>
+    <form class="support-compose" data-support-compose>
+      <input type="hidden" name="ticket_id" value="{{.SupportActive.ID}}" data-support-compose-ticket>
+      <label data-support-title-field {{if or .SupportAdmin .SupportActive.ID}}hidden{{end}}>
+        <span>{{t "support_subject"}}</span>
+        <input name="title" maxlength="120" autocomplete="off" placeholder="{{t "support_subject_placeholder"}}">
+      </label>
+      <div class="support-compose-row">
+      <label>
+        <span class="sr-only">{{t "support_message"}}</span>
+        <textarea name="body" rows="3" maxlength="8000" placeholder="{{if .SupportAdmin}}{{t "support_message_placeholder_admin"}}{{else}}{{t "support_message_placeholder"}}{{end}}"></textarea>
+      </label>
+      <p class="form-error" data-support-error hidden></p>
+      <div class="support-compose-actions">
+        <button type="submit">{{t "support_send"}}</button>
+      </div>
+      </div>
+    </form>
+  </section>
+
+</section>
+{{end}}
+
+{{define "supportFloatingWidget"}}
+<section
+  class="support-widget collapsed"
+  data-support-root
+  data-support-widget
+  data-support-admin="false"
+  data-support-single="true"
+  data-support-ws="/support/ws"
+  data-support-active=""
+  data-support-connecting="{{t "support_connecting"}}"
+  data-support-connected="{{t "support_connected"}}"
+  data-support-disconnected="{{t "support_disconnected"}}"
+  data-support-empty="{{t "support_empty"}}"
+  data-support-empty-messages="{{t "support_select_or_create"}}"
+  data-support-no-active="{{t "support_no_active"}}"
+  data-support-status-open="{{t "support_status_open"}}"
+  data-support-status-pending-admin="{{t "support_status_pending_admin"}}"
+  data-support-status-pending-user="{{t "support_status_pending_user"}}"
+  data-support-status-resolved="{{t "support_status_resolved"}}"
+  data-support-status-closed="{{t "support_status_closed"}}"
+>
+  <button type="button" class="support-widget-button" data-support-widget-toggle aria-label="{{t "support"}}" title="{{t "support"}}">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5 7.8C5 6.25 6.25 5 7.8 5h8.4C17.75 5 19 6.25 19 7.8v5.1c0 1.55-1.25 2.8-2.8 2.8h-3.55L9.2 18.4v-2.7H7.8C6.25 15.7 5 14.45 5 12.9V7.8Z"></path>
+      <path d="M8.7 9.4h6.6"></path>
+      <path d="M8.7 12h4.4"></path>
+    </svg>
+    <span class="support-widget-badge" data-support-widget-badge hidden></span>
+  </button>
+  <div class="support-widget-panel" role="dialog" aria-label="{{t "support"}}" hidden>
+    <header class="support-widget-head" data-support-widget-drag>
+      <div class="support-widget-titlebar">
+        <h2>{{t "support"}}</h2>
+      </div>
+      <div class="support-widget-actions">
+        <span data-support-connection>{{t "support_connecting"}}</span>
+        <button type="button" class="icon-button" data-support-widget-close aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M18 6 6 18"></path>
+            <path d="m6 6 12 12"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+    <div class="support-widget-body">
+      <section class="support-chat">
+        <div class="support-messages" data-support-messages>
+          <div class="support-empty" data-support-message-empty>发送消息开始咨询</div>
+        </div>
+        <form class="support-compose" data-support-compose>
+          <input type="hidden" name="ticket_id" value="" data-support-compose-ticket>
+          <div class="support-compose-row">
+            <label>
+              <span class="sr-only">{{t "support_message"}}</span>
+              <textarea name="body" rows="3" maxlength="8000" placeholder="{{t "support_message_placeholder"}}"></textarea>
+            </label>
+            <p class="form-error" data-support-error hidden></p>
+            <div class="support-compose-actions">
+              <button type="submit">{{t "support_send"}}</button>
+            </div>
+          </div>
+        </form>
+      </section>
+    </div>
+    <span class="support-widget-resize" data-support-widget-resize aria-hidden="true"></span>
+  </div>
+</section>
+{{end}}

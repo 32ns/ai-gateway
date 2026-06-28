@@ -1,0 +1,94 @@
+{{define "content"}}
+<div class="user-model-page" data-partial="user-models-page">
+<section class="hero compact user-model-overview" aria-labelledby="user-model-title">
+  <div class="user-model-title-group">
+    <h1 id="user-model-title">{{t "supported_models"}}</h1>
+  </div>
+</section>
+
+<section class="panel user-model-panel" aria-labelledby="user-model-table-title">
+  <h2 class="sr-only" id="user-model-table-title">{{t "supported_models"}}</h2>
+  {{if .ModelPriceSections}}
+  {{range .ModelPriceSections}}
+  <section class="user-model-provider-section" aria-labelledby="user-model-provider-{{.Provider}}">
+    <div class="user-model-provider-head">
+      <div>
+        <h3 id="user-model-provider-{{.Provider}}">{{.Label}}</h3>
+        <p class="panel-note">{{tf "supported_models_count" .Count}}</p>
+      </div>
+    </div>
+  <div class="table-wrap user-model-table-wrap">
+    <table class="data-table user-model-table">
+      <thead>
+        <tr>
+          <th>{{t "model"}}</th>
+          <th>{{t "model_group"}}</th>
+          <th>{{t "billing_mode"}}</th>
+          <th>{{t "price_request_short"}}</th>
+          <th>{{t "price_input_short"}}</th>
+          <th>{{t "price_cached_input_short"}}</th>
+          <th>{{t "price_output_short"}}</th>
+          <th>{{t "price_image_output_short"}}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Rows}}
+        <tr>
+          <td data-label="{{t "model"}}">
+            <div class="user-model-name-cell">
+              <div class="cell-stack">
+                <span class="user-model-id-line">
+                  <strong>{{.ID}}</strong>
+                  <button
+                    type="button"
+                    class="icon-button copy-secret-button user-model-copy-button"
+                    data-copy-secret
+                    data-copy-value="{{.ID}}"
+                    data-copy-label="{{t "copy_model_id"}}"
+                    data-copy-success="{{t "copied"}}"
+                    data-copy-failed="{{t "copy_failed"}}"
+                    aria-label="{{t "copy_model_id"}}"
+                    title="{{t "copy_model_id"}}"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="8" y="3" width="8" height="4" rx="1"></rect>
+                      <path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"></path>
+                    </svg>
+                  </button>
+                </span>
+                <span class="user-model-meta">
+                  <span class="user-model-provider">{{.Provider}}</span>
+                  {{if and .DisplayName (ne .DisplayName .ID)}}<span>{{.DisplayName}}</span>{{end}}
+                </span>
+              </div>
+            </div>
+          </td>
+          <td data-label="{{t "model_group"}}">
+            <span class="user-model-group">
+              <span>{{accountGroupLabel .AccountGroup}}</span>
+              <span class="user-model-group-multiplier">{{formatMultiplier .AccountGroupMultiplierBps}}x</span>
+            </span>
+          </td>
+          <td data-label="{{t "billing_mode"}}">
+            <span class="pill tone-muted user-model-billing-pill">
+              {{if eq .BillingMode "request"}}{{t "billing_mode_request"}}{{else if eq .BillingMode "tiered_expr"}}{{tf "pricing_tiers_count" .TierCount}}{{else}}{{t "billing_mode_token"}}{{end}}
+            </span>
+          </td>
+          <td class="user-model-price-cell" data-label="{{t "price_request_short"}}">{{if .RequestPriceNanoUSD}}<span class="user-model-price">{{formatUSD .RequestPriceNanoUSD}} / {{t "pricing_unit_request"}}</span>{{else}}<span class="user-model-empty">-</span>{{end}}</td>
+          <td class="user-model-price-cell" data-label="{{t "price_input_short"}}">{{if .InputPriceNanoUSDPer1M}}<span class="user-model-price">{{formatUSD .InputPriceNanoUSDPer1M}} / 1M</span>{{else}}<span class="user-model-empty">-</span>{{end}}</td>
+          <td class="user-model-price-cell" data-label="{{t "price_cached_input_short"}}">{{if .CachedInputPriceNanoUSDPer1M}}<span class="user-model-price">{{formatUSD .CachedInputPriceNanoUSDPer1M}} / 1M</span>{{else}}<span class="user-model-empty">-</span>{{end}}</td>
+          <td class="user-model-price-cell" data-label="{{t "price_output_short"}}">{{if .OutputPriceNanoUSDPer1M}}<span class="user-model-price">{{formatUSD .OutputPriceNanoUSDPer1M}} / 1M</span>{{else}}<span class="user-model-empty">-</span>{{end}}</td>
+          <td class="user-model-price-cell" data-label="{{t "price_image_output_short"}}">{{if .ImageOutputPriceNanoUSDPer1M}}<span class="user-model-price">{{formatUSD .ImageOutputPriceNanoUSDPer1M}} / 1M</span>{{else}}<span class="user-model-empty">-</span>{{end}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  </section>
+  {{end}}
+  {{else}}
+  <div class="empty user-model-empty-state">{{t "no_supported_models"}}</div>
+  {{end}}
+</section>
+</div>
+{{end}}

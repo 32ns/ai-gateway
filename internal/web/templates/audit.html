@@ -1,0 +1,119 @@
+{{define "content"}}
+<section class="hero compact">
+  <div>
+    <h1>{{t "audit_heading"}}</h1>
+    <p>{{t "audit_summary"}}</p>
+  </div>
+</section>
+
+{{template "audit_page" .}}
+{{end}}
+
+{{define "audit_page"}}
+<div data-partial="audit-page">
+<section class="panel">
+  <div class="panel-head">
+    <h2>{{t "audit_filters"}}</h2>
+    <span class="panel-note">{{tf "audit_total_count" .Audit.Total}}</span>
+  </div>
+  <form class="stack-form" method="get" action="/admin/audit">
+    <div class="filter-grid has-actions">
+      <label>
+        <span>{{t "filter_kind"}}</span>
+        <select name="kind">
+          <option value="">{{t "audit_kind_all"}}</option>
+          <option value="gateway" {{if eq .Audit.Filter.Kind "gateway"}}selected{{end}}>{{t "audit_kind_gateway"}}</option>
+          <option value="admin" {{if eq .Audit.Filter.Kind "admin"}}selected{{end}}>{{t "audit_kind_admin"}}</option>
+        </select>
+      </label>
+      <label>
+        <span>{{t "filter_status"}}</span>
+        <select name="status">
+          <option value="">{{t "none"}}</option>
+          <option value="ok" {{if eq .Audit.Filter.Status "ok"}}selected{{end}}>{{t "success"}}</option>
+          <option value="error" {{if eq .Audit.Filter.Status "error"}}selected{{end}}>{{t "error"}}</option>
+        </select>
+      </label>
+      <label>
+        <span>{{t "filter_actor"}}</span>
+        <input name="actor" value="{{.Audit.Filter.Actor}}">
+      </label>
+      <label>
+        <span>{{t "filter_resource"}}</span>
+        <input name="resource" value="{{.Audit.Filter.Resource}}">
+      </label>
+      <div class="form-actions filter-actions">
+        <button type="submit">{{t "filter_apply"}}</button>
+        <a class="button-link ghost-link" href="/admin/audit">{{t "clear_filters"}}</a>
+      </div>
+    </div>
+  </form>
+</section>
+
+<section class="panel">
+  <div class="table-wrap audit-table-wrap">
+    <table class="data-table audit-table">
+      <colgroup>
+        <col class="audit-col-kind">
+        <col class="audit-col-status">
+        <col class="audit-col-subject">
+        <col class="audit-col-operation">
+        <col class="audit-col-details">
+        <col class="audit-col-time">
+      </colgroup>
+      <thead>
+        <tr>
+          <th>{{t "kind"}}</th>
+          <th>{{t "status"}}</th>
+          <th>{{t "subject"}}</th>
+          <th>{{t "operation"}}</th>
+          <th>{{t "details"}}</th>
+          <th>{{t "at"}}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Audit.Items}}
+        <tr>
+          <td>{{auditKindText .EffectiveKind}}</td>
+          <td><span class="pill {{if eq .Status "ok"}}tone-good{{else}}tone-bad{{end}}">{{auditStatusText .Status}}</span></td>
+          <td>{{auditSubjectText .}}</td>
+          <td>
+            <div class="audit-operation-cell">
+              <span>{{auditOperationText .}}</span>
+            </div>
+          </td>
+          <td>
+            <div class="audit-detail-cell">
+              {{range auditDetailLines .}}
+              <div class="audit-detail-line">
+                <span class="muted audit-detail-label">{{.Label}}:</span>
+                <span class="audit-detail-value">{{.Value}}</span>
+              </div>
+              {{else}}
+              <div class="muted">-</div>
+              {{end}}
+            </div>
+          </td>
+          <td>{{.CreatedAt.Local.Format "2006-01-02 15:04:05"}}</td>
+        </tr>
+        {{else}}
+        <tr>
+          <td colspan="6" class="empty">{{t "no_requests"}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="pager">
+    <div class="panel-note">{{tf "audit_total_count" .Audit.Total}}</div>
+    <div class="action-row">
+      {{if .Audit.HasPrev}}<a class="button-link ghost-link" href="{{auditPageURL .Audit.Filter .Audit.PrevPage}}">{{t "previous"}}</a>{{end}}
+      {{if .Audit.HasNext}}<a class="button-link ghost-link" href="{{auditPageURL .Audit.Filter .Audit.NextPage}}">{{t "next"}}</a>{{end}}
+    </div>
+  </div>
+</section>
+</div>
+{{end}}

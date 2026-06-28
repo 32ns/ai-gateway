@@ -1,0 +1,150 @@
+{{define "content"}}
+<section class="hero compact">
+  <div>
+    <h1>{{t "clients"}}</h1>
+    <p>{{t "clients_hint"}}</p>
+  </div>
+  <div class="hero-actions">
+    <a class="button-link primary-link" href="/clients/new">{{t "create_client"}}</a>
+  </div>
+</section>
+
+{{if .ClientCreated}}
+<div class="system-notice tone-good" data-clear-url-params="created">{{t "client_created"}}</div>
+{{end}}
+
+<section class="panel" data-partial="clients-list">
+  <div class="panel-head">
+    <h2>{{t "managed_clients"}}</h2>
+    <span class="panel-note">{{tf "managed_clients_count" .ClientTotal}}</span>
+  </div>
+  <div class="card-grid">
+    {{range .State.Clients}}
+    {{$spend := clientSpend .}}
+    <article class="resource-card">
+      {{$groupRemark := accountGroupRemark .AccountGroup}}
+      <div class="card-head">
+        <div class="cell-stack">
+          <h3>{{.Name}}</h3>
+        </div>
+        <span class="pill {{if .Enabled}}tone-good{{else}}tone-muted{{end}}">{{boolStateText .Enabled}}</span>
+      </div>
+      <div class="kv-list">
+        <div class="kv">
+          <span>{{t "account_group"}}</span>
+          {{if $groupRemark}}
+          <strong class="client-group-value">
+            <span>{{accountGroupLabel .AccountGroup}}</span>
+            <small>{{$groupRemark}}</small>
+          </strong>
+          {{else}}
+          <strong>{{accountGroupLabel .AccountGroup}}</strong>
+          {{end}}
+        </div>
+        <div class="kv"><span>{{t "billing_source"}}</span><strong>{{clientBillingOptionText .}}</strong></div>
+        <div class="kv"><span>{{t "spend"}}</span><strong>{{formatUSD $spend.SpendUsedNanoUSD}} / {{if eq $spend.SpendLimitNanoUSD 0}}{{t "unlimited"}}{{else}}{{formatUSD $spend.SpendLimitNanoUSD}}{{end}}</strong></div>
+        <div class="kv">
+          <span>{{t "client_key"}}</span>
+          <div class="copy-secret">
+            <code>{{maskClientKey .}}</code>
+            <button
+              type="button"
+              class="icon-button copy-secret-button"
+              data-copy-secret
+              data-copy-value="{{.APIKey}}"
+              data-copy-label="{{t "copy_key"}}"
+              data-copy-success="{{t "copied"}}"
+              data-copy-failed="{{t "copy_failed"}}"
+              aria-label="{{t "copy_key"}}"
+              title="{{t "copy_key"}}"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="8" y="3" width="8" height="4" rx="1"></rect>
+                <path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="kv">
+          <span class="server-address-label">
+            <span class="server-address-icon-frame">
+              <img class="server-address-icon" src="/static/claude.svg?v=2026053101" alt="" aria-hidden="true">
+            </span>
+            <span>Claude</span>
+          </span>
+          <div class="copy-secret">
+            <code>{{$.ClaudeBaseURL}}</code>
+            <button
+              type="button"
+              class="icon-button copy-secret-button"
+              data-copy-secret
+              data-copy-value="{{$.ClaudeBaseURL}}"
+              data-copy-label="{{t "copy_server_address"}}"
+              data-copy-success="{{t "copied"}}"
+              data-copy-failed="{{t "copy_failed"}}"
+              aria-label="{{t "copy_server_address"}}"
+              title="{{t "copy_server_address"}}"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="8" y="3" width="8" height="4" rx="1"></rect>
+                <path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="kv">
+          <span class="server-address-label">
+            <span class="server-address-icon-frame">
+              <img class="server-address-icon" src="/static/codex.svg?v=2026053101" alt="" aria-hidden="true">
+            </span>
+            <span>Codex</span>
+          </span>
+          <div class="copy-secret">
+            <code>{{$.CodexBaseURL}}</code>
+            <button
+              type="button"
+              class="icon-button copy-secret-button"
+              data-copy-secret
+              data-copy-value="{{$.CodexBaseURL}}"
+              data-copy-label="{{t "copy_server_address"}}"
+              data-copy-success="{{t "copied"}}"
+              data-copy-failed="{{t "copy_failed"}}"
+              aria-label="{{t "copy_server_address"}}"
+              title="{{t "copy_server_address"}}"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="8" y="3" width="8" height="4" rx="1"></rect>
+                <path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="kv"><span>{{t "last_used"}}</span><span>{{formatTime .LastUsedAt}}</span></div>
+      </div>
+      <div class="action-row">
+        <a class="button-link ghost-link" href="/clients/{{.ID}}/edit">{{t "edit"}}</a>
+        <form method="post" action="/clients/{{.ID}}/toggle" data-ajax-form data-ajax-target='[data-partial="clients-list"]'>
+          <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+          <button class="ghost" type="submit">{{if .Enabled}}{{t "disable"}}{{else}}{{t "enable"}}{{end}}</button>
+        </form>
+        <form method="post" action="/clients/{{.ID}}/delete" data-confirm="{{tf "confirm_delete_client" .Name}}" data-ajax-form data-ajax-target='[data-partial="clients-list"]'>
+          <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+          <button class="danger" type="submit">{{t "delete"}}</button>
+        </form>
+      </div>
+    </article>
+    {{else}}
+    <div class="empty">{{t "no_clients"}}</div>
+    {{end}}
+  </div>
+  {{if or .ClientPage.HasPrev .ClientPage.HasNext}}
+  <div class="pager">
+    <div class="panel-note">{{tf "managed_clients_count" .ClientTotal}}</div>
+    <div class="action-row">
+      {{if .ClientPage.HasPrev}}<a class="button-link ghost-link" href="/clients?page={{.ClientPage.PrevPage}}">{{t "previous"}}</a>{{end}}
+      {{if .ClientPage.HasNext}}<a class="button-link ghost-link" href="/clients?page={{.ClientPage.NextPage}}">{{t "next"}}</a>{{end}}
+    </div>
+  </div>
+  {{end}}
+</section>
+{{end}}

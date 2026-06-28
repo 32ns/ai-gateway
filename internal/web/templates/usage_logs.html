@@ -1,0 +1,127 @@
+{{define "content"}}
+<section class="hero compact">
+  <div>
+    <h1>{{t "usage_logs"}}</h1>
+    <p>{{t "usage_logs_hint"}}</p>
+  </div>
+</section>
+
+{{template "usage_logs_page" .}}
+{{end}}
+
+{{define "usage_logs_page"}}
+<div class="usage-logs-page" data-partial="usage-logs-page">
+<section class="panel">
+  <div class="panel-head">
+    <h2>{{t "usage_log_filters"}}</h2>
+    <span class="panel-note">{{tf "usage_log_total_count" .Logs.Total}}</span>
+  </div>
+  <form class="stack-form" method="get" action="/logs">
+    <div class="filter-grid has-actions">
+      {{if isAdminUser .CurrentUser}}
+      <label>
+        <span>{{t "filter_user"}}</span>
+        <input name="user_id" value="{{with userIdentity .Logs.Filter.UserID}}{{if .Known}}{{.Username}}{{else}}{{.ID}}{{end}}{{end}}">
+      </label>
+      {{end}}
+      <label>
+        <span>{{t "client_id_label"}}</span>
+        <input name="client_id" value="{{.Logs.Filter.ClientID}}">
+      </label>
+      <label>
+        <span>{{t "model"}}</span>
+        <input name="model" value="{{.Logs.Filter.Model}}">
+      </label>
+      <label>
+        <span>{{t "status"}}</span>
+        <select name="status">
+          <option value="">{{t "none"}}</option>
+          <option value="settled" {{if eq (printf "%s" .Logs.Filter.Status) "settled"}}selected{{end}}>{{t "usage_status_settled"}}</option>
+          <option value="reserved" {{if eq (printf "%s" .Logs.Filter.Status) "reserved"}}selected{{end}}>{{t "usage_status_reserved"}}</option>
+          <option value="usage_missing" {{if eq (printf "%s" .Logs.Filter.Status) "usage_missing"}}selected{{end}}>{{t "usage_status_usage_missing"}}</option>
+          <option value="released" {{if eq (printf "%s" .Logs.Filter.Status) "released"}}selected{{end}}>{{t "usage_status_released"}}</option>
+        </select>
+      </label>
+      <label>
+        <span>{{t "started_at"}}</span>
+        <input type="datetime-local" name="started_at" value="{{datetimeInputValue .Logs.Filter.StartedAt}}">
+      </label>
+      <label>
+        <span>{{t "ended_at"}}</span>
+        <input type="datetime-local" name="ended_at" value="{{datetimeInputValue .Logs.Filter.EndedAt}}">
+      </label>
+      <div class="form-actions filter-actions">
+        <button type="submit">{{t "filter_apply"}}</button>
+        <a class="button-link ghost-link" href="/logs">{{t "clear_filters"}}</a>
+      </div>
+    </div>
+  </form>
+</section>
+
+<section class="panel">
+  <div class="table-wrap usage-log-table-wrap">
+    <table class="data-table usage-log-table">
+      <thead>
+        <tr>
+          <th class="usage-col-time">{{t "at"}}</th>
+          {{if isAdminUser .CurrentUser}}<th class="usage-col-user">{{t "filter_user"}}</th>{{end}}
+          <th class="usage-col-client">{{t "client"}}</th>
+          {{if isAdminUser .CurrentUser}}<th class="usage-col-account">{{t "account"}}</th>{{end}}
+          <th class="usage-col-model">{{t "model"}}</th>
+          <th class="usage-col-group">{{t "account_group"}}</th>
+          <th class="usage-col-status">{{t "status"}}</th>
+          <th class="usage-col-first-token">{{t "first_token"}}</th>
+          <th class="usage-col-input">{{t "input_tokens"}}</th>
+          <th class="usage-col-output">{{t "output_tokens"}}</th>
+          <th class="usage-col-cost">{{t "cost"}}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Logs.Rows}}
+        <tr>
+          <td class="usage-col-time" data-label="{{t "at"}}">{{.Request.CreatedAt.Local.Format "2006-01-02 15:04:05"}}</td>
+          {{if isAdminUser $.CurrentUser}}
+          <td class="usage-col-user" data-label="{{t "filter_user"}}">{{with userIdentity .Request.UserID}}<a class="usage-user-link" href="{{userSearchPageURL .ID}}">{{if .Known}}<strong>{{.Username}}</strong>{{else}}<code>{{.ID}}</code>{{end}}</a>{{else}}-{{end}}</td>
+          {{end}}
+          <td class="usage-col-client" data-label="{{t "client"}}">
+            {{if .ClientName}}<strong>{{.ClientName}}</strong>{{else}}<code>{{.Request.ClientID}}</code>{{end}}
+          </td>
+          {{if isAdminUser $.CurrentUser}}
+          <td class="usage-col-account" data-label="{{t "account"}}">
+            {{if .AccountLabel}}<span class="usage-account-cell"><strong>{{accountLabelDisplay .AccountLabel}}</strong>{{if .FailedAccountLabels}}<span class="usage-account-warning" title="{{usageFailedAccountTitle .FailedAccountLabels}}" aria-label="{{usageFailedAccountTitle .FailedAccountLabels}}">!</span>{{end}}</span>{{else}}-{{end}}
+          </td>
+          {{end}}
+          <td class="usage-col-model" data-label="{{t "model"}}"><code>{{usageLogModelText .Request}}</code></td>
+          <td class="usage-col-group" data-label="{{t "account_group"}}">{{usageAccountGroupLabel .AccountGroup .Request}}</td>
+          <td class="usage-col-status" data-label="{{t "status"}}"><span class="pill {{usageStatusClass .Request.Status}}">{{usageStatusText .Request.Status}}</span></td>
+          <td class="usage-col-first-token" data-label="{{t "first_token"}}">{{usageFirstTokenText .Request}}</td>
+          <td class="usage-col-input" data-label="{{t "input_tokens"}}">
+            <div class="cell-stack">
+              <span>{{.Request.PromptTokens}}</span>
+              {{if .Request.CachedPromptTokens}}<span class="muted">{{t "cached"}}: {{.Request.CachedPromptTokens}}</span>{{end}}
+            </div>
+          </td>
+          <td class="usage-col-output" data-label="{{t "output_tokens"}}">{{.Request.CompletionTokens}}</td>
+          <td class="usage-col-cost" data-label="{{t "cost"}}">{{usageBillingAmountText .Request}}</td>
+        </tr>
+        {{else}}
+        <tr>
+          <td colspan="{{if isAdminUser $.CurrentUser}}11{{else}}9{{end}}" class="empty">{{t "no_requests"}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="pager">
+    <div class="panel-note">{{tf "usage_log_total_count" .Logs.Total}}</div>
+    <div class="action-row">
+      {{if .Logs.HasPrev}}<a class="button-link ghost-link" href="{{usageLogPageURL .Logs.Filter .Logs.PrevPage}}">{{t "previous"}}</a>{{end}}
+      {{if .Logs.HasNext}}<a class="button-link ghost-link" href="{{usageLogPageURL .Logs.Filter .Logs.NextPage}}">{{t "next"}}</a>{{end}}
+    </div>
+  </div>
+</section>
+</div>
+{{end}}

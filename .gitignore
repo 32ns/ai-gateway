@@ -1,0 +1,12 @@
+data/
+tmp/
+dist/
+.codex
+.codegraph
+.agents
+/ai-gateway.exe
+/ai-gateway.exe~
+/install/ag-linux-*
+config.json
+/coverage
+/coverage.out

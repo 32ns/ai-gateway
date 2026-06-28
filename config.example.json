@@ -1,0 +1,19 @@
+{
+  "host": "127.0.0.1",
+  "port": "8088",
+  "api_key": "",
+  "audit_limit": 512,
+  "gateway_audit": false,
+  "max_in_flight": 1024,
+  "upstream_max_idle_conns": 512,
+  "upstream_max_idle_conns_per_host": 128,
+  "upstream_max_conns_per_host": 0,
+  "protocol_request_body_limit": 67108864,
+  "database_backend": "sqlite",
+  "state_path": "data/state.db",
+  "master_key": "",
+  "trusted_proxy_cidrs": [
+    "127.0.0.1/32",
+    "::1/128"
+  ]
+}

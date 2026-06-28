@@ -1,0 +1,78 @@
+{{define "pricingEditor"}}
+<div class="pricing-editor">
+  <div class="billing-mode-group" role="radiogroup" aria-label="{{t "billing_mode"}}">
+    <label>
+      <input type="radio" name="billing_mode" value="token" {{if eq .Mode "token"}}checked{{end}}>
+      <span>{{t "billing_mode_token"}}</span>
+    </label>
+    <label>
+      <input type="radio" name="billing_mode" value="request" {{if eq .Mode "request"}}checked{{end}}>
+      <span>{{t "billing_mode_request"}}</span>
+    </label>
+    <label>
+      <input type="radio" name="billing_mode" value="tiered_expr" {{if or (eq .Mode "tiered_expr") (eq .Mode "tiered")}}checked{{end}}>
+      <span>{{t "billing_mode_tiered"}}</span>
+    </label>
+  </div>
+  <div class="pricing-editor-grid">
+    <label data-pricing-mode-panel="token">
+      <span>{{t "price_input_short"}}</span>
+      <input name="input_price_usd_per_1m" inputmode="decimal" value="{{formatNanoUSD .Input}}" placeholder="0">
+    </label>
+    <label data-pricing-mode-panel="token">
+      <span>{{t "price_cached_input_short"}}</span>
+      <input name="cached_input_price_usd_per_1m" inputmode="decimal" value="{{formatNanoUSD .CachedInput}}" placeholder="0">
+    </label>
+    <label data-pricing-mode-panel="token">
+      <span>{{t "price_output_short"}}</span>
+      <input name="output_price_usd_per_1m" inputmode="decimal" value="{{formatNanoUSD .Output}}" placeholder="0">
+    </label>
+    <label data-pricing-mode-panel="token">
+      <span>{{t "price_image_output_short"}}</span>
+      <input name="image_output_price_usd_per_1m" inputmode="decimal" value="{{formatNanoUSD .ImageOutput}}" placeholder="0">
+    </label>
+    <label data-pricing-mode-panel="request">
+      <span>{{t "request_price_usd"}}</span>
+      <input name="request_price_usd" inputmode="decimal" value="{{formatNanoUSD .Request}}" placeholder="0">
+    </label>
+  </div>
+
+  <div class="tier-editor" data-pricing-mode-panel="tiered_expr">
+    <div class="tier-editor-head">
+      <span>{{t "tier_name"}}</span>
+      <span>{{t "tier_max_input_tokens"}}</span>
+      <span>{{t "price_input_short"}}</span>
+      <span>{{t "price_cached_input_short"}}</span>
+      <span>{{t "price_output_short"}}</span>
+      <span>{{t "price_image_output_short"}}</span>
+      <span>{{t "action"}}</span>
+    </div>
+    {{range .Tiers}}
+    {{template "pricingTierRow" .}}
+    {{end}}
+  </div>
+  <template data-pricing-tier-template>
+    {{template "pricingTierRow" dict "Name" "" "MaxInputTokens" 0 "InputPriceNanoUSD" 0 "CachedInputPriceNanoUSD" 0 "OutputPriceNanoUSD" 0 "ImageOutputPriceNanoUSD" 0}}
+  </template>
+  <button class="ghost tier-add-button" type="button" data-pricing-tier-add data-model-create-action-target data-pricing-mode-panel="tiered_expr">{{t "add_pricing_tier"}}</button>
+  {{if .Expression}}
+  <code class="pricing-expression" data-pricing-mode-panel="tiered_expr">{{.Expression}}</code>
+  {{end}}
+  <label class="checkbox-row billing-fixed-row">
+    <input type="checkbox" name="billing_fixed" {{if .Fixed}}checked{{end}}>
+    <span>{{t "billing_fixed"}}</span>
+  </label>
+</div>
+{{end}}
+
+{{define "pricingTierRow"}}
+<div class="tier-editor-row">
+  <input name="pricing_tier_name" value="{{.Name}}" placeholder="standard">
+  <input name="pricing_tier_max_input_tokens" inputmode="numeric" value="{{if .MaxInputTokens}}{{.MaxInputTokens}}{{end}}" placeholder="{{t "tier_fallback_placeholder"}}">
+  <input name="pricing_tier_input_price_usd_per_1m" inputmode="decimal" value="{{formatNanoUSD .InputPriceNanoUSD}}" placeholder="0">
+  <input name="pricing_tier_cached_input_price_usd_per_1m" inputmode="decimal" value="{{formatNanoUSD .CachedInputPriceNanoUSD}}" placeholder="0">
+  <input name="pricing_tier_output_price_usd_per_1m" inputmode="decimal" value="{{formatNanoUSD .OutputPriceNanoUSD}}" placeholder="0">
+  <input name="pricing_tier_image_output_price_usd_per_1m" inputmode="decimal" value="{{formatNanoUSD .ImageOutputPriceNanoUSD}}" placeholder="0">
+  <button class="ghost tier-delete-button" type="button" data-pricing-tier-delete data-confirm="{{t "confirm_delete_pricing_tier"}}">{{t "delete"}}</button>
+</div>
+{{end}}

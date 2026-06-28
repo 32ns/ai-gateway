@@ -1,0 +1,528 @@
+{{define "user_details_content"}}
+{{$user := .User}}
+<div class="settings-form user-details-list">
+  <div class="kv"><span>{{t "username"}}</span><strong>{{$user.Username}}</strong></div>
+  <div class="kv"><span>{{t "role"}}</span><strong>{{userRoleText $user.Role}}</strong></div>
+  <div class="kv"><span>{{t "balance"}}</span><strong>{{formatUSD $user.BalanceNanoUSD}}</strong></div>
+  <div class="kv"><span>{{t "historical_recharge"}}</span><strong>{{formatUSD .UserRechargeNanoUSD}}</strong></div>
+  <div class="kv"><span>{{t "historical_spend"}}</span><strong>{{formatUSD .UserSpendNanoUSD}}</strong></div>
+  <div class="kv"><span>{{t "user_concurrent_request_limit_override"}}</span><strong>{{userConcurrentRequestLimitText $user}}</strong></div>
+  <div class="kv"><span>{{t "user_request_rate_limit_override"}}</span><strong>{{userRequestRateLimitText $user}}</strong></div>
+  <div class="kv"><span>{{t "status"}}</span><span class="pill {{if $user.Enabled}}tone-good{{else}}tone-muted{{end}}">{{boolStateText $user.Enabled}}</span></div>
+  <div class="kv"><span>{{t "inviter"}}</span><strong>{{if $user.InviterUserID}}{{with userIdentity $user.InviterUserID}}{{if .Known}}{{.Username}}{{else}}{{t "unknown"}}{{end}}{{end}}{{else}}-{{end}}</strong></div>
+  <div class="kv"><span>{{t "registration_ip"}}</span><strong>{{if $user.RegistrationIP}}{{$user.RegistrationIP}}{{else}}-{{end}}</strong></div>
+  <div class="kv"><span>{{t "browser_fingerprint"}}</span><strong>{{if $user.RegistrationBrowserFingerprint}}{{$user.RegistrationBrowserFingerprint}}{{else}}-{{end}}</strong></div>
+  <div class="kv"><span>{{t "created_at"}}</span><strong>{{formatTime $user.CreatedAt}}</strong></div>
+  <div class="kv"><span>{{t "last_used"}}</span><strong>{{formatTime $user.LastLoginAt}}</strong></div>
+</div>
+{{$clients := .Clients}}
+{{with $clients}}
+<div class="user-details-chart">
+  <div class="panel-head">
+    <h3>{{t "managed_clients"}}</h3>
+    <span class="panel-note">{{tf "managed_clients_count" (len $clients)}}</span>
+  </div>
+  <div class="table-wrap compact-table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>{{t "client"}}</th>
+          <th>{{t "client_key"}}</th>
+          <th>{{t "account_group"}}</th>
+          <th>{{t "billing_source"}}</th>
+          <th>{{t "status"}}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .}}
+        <tr>
+          <td><strong>{{.Name}}</strong></td>
+          <td>
+            <div class="copy-secret">
+              <code>{{maskClientKey .}}</code>
+              <button
+                type="button"
+                class="icon-button copy-secret-button"
+                data-copy-secret
+                data-copy-value="{{.APIKey}}"
+                data-copy-label="{{t "copy_key"}}"
+                data-copy-success="{{t "copied"}}"
+                data-copy-failed="{{t "copy_failed"}}"
+                aria-label="{{t "copy_key"}}"
+                title="{{t "copy_key"}}"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="8" y="3" width="8" height="4" rx="1"></rect>
+                  <path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"></path>
+                </svg>
+              </button>
+            </div>
+          </td>
+          <td>{{accountGroupLabel .AccountGroup}}</td>
+          <td>{{clientBillingOptionText .}}</td>
+          <td><span class="pill {{if .Enabled}}tone-good{{else}}tone-muted{{end}}">{{boolStateText .Enabled}}</span></td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}
+{{with .ActivePlans}}
+<div class="user-details-chart">
+  <div class="panel-head">
+    <h3>{{t "active_plan"}}</h3>
+  </div>
+  <div class="table-wrap compact-table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>{{t "plan_name"}}</th>
+          <th>{{t "plan_current_quota"}}</th>
+          <th>{{t "plan_quota_used"}}</th>
+          <th>{{t "plan_remaining_periods"}}</th>
+          <th>{{t "plan_next_reset"}}</th>
+          <th>{{t "expires_at"}}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .}}
+        <tr>
+          <td><strong>{{.PlanName}}</strong></td>
+          <td>{{formatUSD (planQuotaRemaining .)}} / {{formatUSD (planCurrentQuotaLimit .)}}</td>
+          <td>{{formatUSD (planQuotaUsed .)}}</td>
+          <td>{{.RemainingPeriods}} / {{.TotalPeriods}}</td>
+          <td>{{formatTime .CurrentPeriodEndsAt}}</td>
+          <td>{{formatTime .ExpiresAt}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}
+{{$paymentOrders := .PaymentOrders}}
+<div class="user-details-chart">
+  <div class="panel-head">
+    <h3>{{t "payment_order"}}</h3>
+    <span class="panel-note">{{tf "payment_total_count" (len $paymentOrders)}}</span>
+  </div>
+  <div class="table-wrap compact-table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>{{t "created_at"}}</th>
+          <th>{{t "payment_order"}}</th>
+          <th>{{t "payment_method"}}</th>
+          <th>{{t "payment_received_amount"}}</th>
+          <th>{{t "status"}}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range $paymentOrders}}
+        <tr>
+          <td>{{formatTime .CreatedAt}}</td>
+          <td><code>{{.OutTradeNo}}</code></td>
+          <td>{{paymentOrderMethodText .}}</td>
+          <td>
+            <strong>{{formatUSD .AmountNanoUSD}}</strong>
+            <div class="muted">{{t "payment_amount"}} {{formatCNYCents .ProviderAmountCents}}</div>
+            <div class="muted">{{t "payment_exchange_rate"}} {{paymentExchangeRateText .}}</div>
+          </td>
+          <td><span class="pill {{paymentStatusClass .Status}}">{{paymentStatusText .Status}}</span></td>
+        </tr>
+        {{else}}
+        <tr><td colspan="5" class="empty">{{t "no_payment_orders"}}</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{$chart := .Chart}}
+<div class="user-details-chart">
+  <div class="panel-head">
+    <h3>{{t "today_usage_cost"}}</h3>
+    <strong>{{formatUSD $chart.Total}}</strong>
+  </div>
+  <div class="usage-chart" role="img" aria-label="{{t "today_usage_cost"}}">
+    {{range $chart.Points}}
+    <div class="usage-chart-bar" title="{{.Label}} {{formatUSD .NanoUSD}}">
+      <span class="usage-chart-fill" style="height: {{.Percent}}%;"></span>
+    </div>
+    {{end}}
+  </div>
+  <div class="usage-chart-labels" aria-hidden="true">
+    {{range $chart.Points}}
+    <span class="usage-chart-label">{{.Hour}}</span>
+    {{end}}
+  </div>
+</div>
+{{$ledger := .Ledger}}
+<div class="user-details-chart">
+  <div class="panel-head">
+    <h3>{{t "balance_log"}}</h3>
+  </div>
+  <div class="table-wrap compact-table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>{{t "type"}}</th>
+          <th>{{t "amount"}}</th>
+          <th>{{t "current_balance"}}</th>
+          <th>{{t "note"}}</th>
+          <th>{{t "created_at"}}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range $ledger}}
+        <tr>
+          <td>{{billingLedgerKindText .Kind}}</td>
+          <td>{{signedUSD .AmountNanoUSD}}</td>
+          <td>{{formatUSD .BalanceAfterNanoUSD}}</td>
+          <td>{{if .Note}}{{.Note}}{{else}}-{{end}}</td>
+          <td>{{formatTime .CreatedAt}}</td>
+        </tr>
+        {{else}}
+        <tr><td colspan="5" class="empty">{{t "no_balance_log"}}</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}
+
+{{define "content"}}
+<section class="hero compact">
+  <div>
+    <h1>{{t "users"}}</h1>
+    <p>{{t "users_hint"}}</p>
+  </div>
+  <div class="hero-actions">
+    <button type="button" data-group-settings-open="user-create">{{t "create_user"}}</button>
+  </div>
+</section>
+
+<div class="settings-overlay" id="user-create" role="dialog" aria-modal="true" aria-labelledby="user-create-title" hidden>
+  <div class="settings-dialog">
+    <div class="settings-header">
+      <div>
+        <h3 id="user-create-title">{{t "create_user"}}</h3>
+        <p>{{t "user_summary"}}</p>
+      </div>
+      <button type="button" class="icon-button settings-close" data-group-settings-close aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M18 6 6 18"></path>
+          <path d="m6 6 12 12"></path>
+        </svg>
+      </button>
+    </div>
+    <form class="settings-form" method="post" action="/admin/users/new" data-ajax-form data-ajax-target='[data-partial="users-panel"]'>
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <label>
+        <span>{{t "username"}}</span>
+        <input name="username" autocomplete="username" maxlength="64" pattern="[A-Za-z0-9_.-]+" title="{{t "username_allowed_characters_hint"}}" required>
+      </label>
+      <label>
+        <span>{{t "password"}}</span>
+        <input type="password" name="password" autocomplete="new-password" required>
+      </label>
+      <label>
+        <span>{{t "role"}}</span>
+        <select name="role">
+          {{range userRoleOptions}}
+          <option value="{{.Value}}" {{if eq .Value "user"}}selected{{end}}>{{userRoleText .Value}}</option>
+          {{end}}
+        </select>
+      </label>
+      <label>
+        <span>{{t "user_concurrent_request_limit_override"}}</span>
+        <input type="number" min="0" max="100000" name="concurrent_request_limit" placeholder="{{t "inherit_system_default"}}">
+        <p class="field-note">{{t "user_concurrent_request_limit_override_hint"}}</p>
+      </label>
+      <label>
+        <span>{{t "user_request_rate_limit_override"}}</span>
+        <input type="number" min="0" max="100000" name="request_rate_limit_per_minute" placeholder="{{t "inherit_system_default"}}">
+        <p class="field-note">{{t "user_request_rate_limit_override_hint"}}</p>
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" name="enabled" checked>
+        <span>{{t "user_enabled"}}</span>
+      </label>
+      <div class="settings-actions">
+        <button type="submit">{{t "create_user"}}</button>
+        <button type="button" class="ghost" data-group-settings-close>{{t "cancel"}}</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{{template "users_panel" .}}
+{{end}}
+
+{{define "users_panel"}}
+{{if .NoticeError}}
+<div class="system-notice tone-bad" data-clear-url-params="notice_error">{{.NoticeError}}</div>
+{{end}}
+<section class="panel" data-partial="users-panel">
+  <div class="panel-head">
+    <h2>{{t "user_filters"}}</h2>
+    <span class="panel-note">{{tf "users_filtered_count" .UserFilteredCount .UserTotalCount}}</span>
+  </div>
+  <form class="stack-form" method="get" action="/admin/users" data-ajax-form data-ajax-target='[data-partial="users-panel"]' data-ajax-partial="users-panel">
+    <div class="filter-grid has-actions">
+      <label>
+        <span>{{t "search_keyword"}}</span>
+        <input name="q" value="{{.UserFilter.Query}}">
+      </label>
+      <label>
+        <span>{{t "role"}}</span>
+        <select name="role">
+          <option value="">{{t "all_roles"}}</option>
+          {{range userRoleOptions}}
+          <option value="{{.Value}}" {{if eq $.UserFilter.Role .Value}}selected{{end}}>{{userRoleText .Value}}</option>
+          {{end}}
+        </select>
+      </label>
+      <label>
+        <span>{{t "status"}}</span>
+        <select name="status">
+          <option value="">{{t "all_statuses"}}</option>
+          <option value="enabled" {{if eq .UserFilter.Status "enabled"}}selected{{end}}>{{t "enabled"}}</option>
+          <option value="disabled" {{if eq .UserFilter.Status "disabled"}}selected{{end}}>{{t "disabled"}}</option>
+        </select>
+      </label>
+      <label>
+        <span>{{t "inviter"}}</span>
+        <input name="inviter" value="{{.UserFilter.Inviter}}">
+      </label>
+      <label>
+        <span>{{t "sort_by"}}</span>
+        <select name="sort">
+          <option value="spend" {{if eq .UserFilter.Sort "spend"}}selected{{end}}>{{t "historical_spend"}}</option>
+          <option value="balance" {{if eq .UserFilter.Sort "balance"}}selected{{end}}>{{t "balance"}}</option>
+          <option value="created_at" {{if eq .UserFilter.Sort "created_at"}}selected{{end}}>{{t "created_at"}}</option>
+          <option value="last_login" {{if eq .UserFilter.Sort "last_login"}}selected{{end}}>{{t "last_used"}}</option>
+          <option value="username" {{if eq .UserFilter.Sort "username"}}selected{{end}}>{{t "username"}}</option>
+          <option value="role" {{if eq .UserFilter.Sort "role"}}selected{{end}}>{{t "role"}}</option>
+          <option value="status" {{if eq .UserFilter.Sort "status"}}selected{{end}}>{{t "status"}}</option>
+          <option value="invite_count" {{if eq .UserFilter.Sort "invite_count"}}selected{{end}}>{{t "invitation_count"}}</option>
+        </select>
+      </label>
+      <label>
+        <span>{{t "sort_direction"}}</span>
+        <select name="direction">
+          <option value="desc" {{if eq .UserFilter.Direction "desc"}}selected{{end}}>{{t "sort_desc"}}</option>
+          <option value="asc" {{if eq .UserFilter.Direction "asc"}}selected{{end}}>{{t "sort_asc"}}</option>
+        </select>
+      </label>
+      <div class="form-actions filter-actions">
+        <button type="submit">{{t "filter_apply"}}</button>
+        <a class="button-link ghost-link" href="/admin/users" data-ajax-link data-ajax-target='[data-partial="users-panel"]' data-ajax-partial="users-panel">{{t "clear_filters"}}</a>
+      </div>
+    </div>
+  </form>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>{{t "username"}}</th>
+          <th>{{t "role"}}</th>
+          <th>{{t "balance"}}</th>
+          <th>{{t "historical_spend"}}</th>
+          <th>{{t "status"}}</th>
+          <th>{{t "inviter"}}</th>
+          <th>{{t "last_used"}}</th>
+          <th>{{t "created_at"}}</th>
+          <th>{{t "action"}}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range $index, $user := .Users}}
+        <tr>
+          <td><strong>{{$user.Username}}</strong></td>
+          <td>{{userRoleText $user.Role}}</td>
+          <td>{{formatUSD $user.BalanceNanoUSD}}</td>
+          <td>{{formatUSD (index $.UserSpendNanoUSD $user.ID)}}</td>
+          <td><span class="pill {{if $user.Enabled}}tone-good{{else}}tone-muted{{end}}">{{boolStateText $user.Enabled}}</span></td>
+          <td>{{if $user.InviterUserID}}{{with userIdentity $user.InviterUserID}}{{if .Known}}{{.Username}}{{else}}{{t "unknown"}}{{end}}{{end}}{{else}}-{{end}}</td>
+          <td>{{formatTime $user.LastLoginAt}}</td>
+          <td>{{formatTime $user.CreatedAt}}</td>
+          <td>
+            <div class="action-row compact">
+              <button type="button" class="ghost" data-group-settings-open="user-details-{{$index}}">{{t "details"}}</button>
+              <button type="button" class="ghost" data-group-settings-open="user-edit-{{$index}}">{{t "edit"}}</button>
+              <button type="button" class="ghost" data-group-settings-open="user-credit-{{$index}}">{{t "recharge"}}</button>
+              <button type="button" class="ghost" data-group-settings-open="user-debit-{{$index}}">{{t "deduct"}}</button>
+              <form
+                method="post"
+                action="/admin/users/{{$user.ID}}/delete"
+                data-confirm="{{tf "confirm_delete_user" $user.Username}}"
+                data-confirm-option-name="delete_invited_users"
+                data-confirm-option-value="1"
+                data-confirm-option-label="{{tf "delete_invited_users" (index $.UserInviteCounts $user.ID)}}"
+                data-ajax-form
+                data-ajax-target='[data-partial="users-panel"]'
+              >
+                <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                <button class="danger" type="submit">{{t "delete"}}</button>
+              </form>
+            </div>
+            <div class="settings-overlay" id="user-edit-{{$index}}" role="dialog" aria-modal="true" aria-labelledby="user-edit-title-{{$index}}" hidden>
+              <div class="settings-dialog">
+                <div class="settings-header">
+                  <div>
+                    <h3 id="user-edit-title-{{$index}}">{{t "edit_user"}}</h3>
+                    <p>{{$user.Username}}</p>
+                  </div>
+                  <button type="button" class="icon-button settings-close" data-group-settings-close aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M18 6 6 18"></path>
+                      <path d="m6 6 12 12"></path>
+                    </svg>
+                  </button>
+                </div>
+                <form class="settings-form" method="post" action="/admin/users/{{$user.ID}}/edit" data-ajax-form data-ajax-target='[data-partial="users-panel"]'>
+                  <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                  <label>
+                    <span>{{t "username"}}</span>
+                    <input name="username" value="{{$user.Username}}" autocomplete="username" maxlength="64" pattern="[A-Za-z0-9_.-]+" title="{{t "username_allowed_characters_hint"}}" required>
+                  </label>
+                  <label>
+                    <span>{{t "password"}}</span>
+                    <input type="password" name="password" autocomplete="new-password" placeholder="{{t "password_keep_placeholder"}}">
+                  </label>
+                  <label>
+                    <span>{{t "role"}}</span>
+                    <select name="role">
+                      {{range userRoleOptions}}
+                      <option value="{{.Value}}" {{if eq $user.Role .Value}}selected{{end}}>{{userRoleText .Value}}</option>
+                      {{end}}
+                    </select>
+                  </label>
+                  <label>
+                    <span>{{t "user_concurrent_request_limit_override"}}</span>
+                    <input type="number" min="0" max="100000" name="concurrent_request_limit" value="{{userConcurrentRequestLimitValue $user}}" placeholder="{{t "inherit_system_default"}}">
+                    <p class="field-note">{{t "user_concurrent_request_limit_override_hint"}}</p>
+                  </label>
+                  <label>
+                    <span>{{t "user_request_rate_limit_override"}}</span>
+                    <input type="number" min="0" max="100000" name="request_rate_limit_per_minute" value="{{userRequestRateLimitValue $user}}" placeholder="{{t "inherit_system_default"}}">
+                    <p class="field-note">{{t "user_request_rate_limit_override_hint"}}</p>
+                  </label>
+                  <div class="kv"><span>{{t "balance"}}</span><strong>{{formatUSD $user.BalanceNanoUSD}}</strong></div>
+                  <label class="checkbox-row">
+                    <input type="checkbox" name="enabled" {{if $user.Enabled}}checked{{end}}>
+                    <span>{{t "user_enabled"}}</span>
+                  </label>
+                  <div class="settings-actions">
+                    <button type="submit">{{t "save_user"}}</button>
+                    <button type="button" class="ghost" data-group-settings-close>{{t "cancel"}}</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+            <div class="settings-overlay" id="user-credit-{{$index}}" role="dialog" aria-modal="true" aria-labelledby="user-credit-title-{{$index}}" hidden>
+              <div class="settings-dialog">
+                <div class="settings-header">
+                  <div>
+                    <h3 id="user-credit-title-{{$index}}">{{t "recharge"}}</h3>
+                    <p>{{$user.Username}} · {{formatUSD $user.BalanceNanoUSD}}</p>
+                  </div>
+                  <button type="button" class="icon-button settings-close" data-group-settings-close aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M18 6 6 18"></path>
+                      <path d="m6 6 12 12"></path>
+                    </svg>
+                  </button>
+                </div>
+                <form class="settings-form" method="post" action="/admin/users/{{$user.ID}}/balance" data-ajax-form data-ajax-target='[data-partial="users-panel"]'>
+                  <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                  <input type="hidden" name="direction" value="credit">
+                  <label>
+                    <span>{{t "amount_usd"}}</span>
+                    <input name="amount_usd" inputmode="decimal" placeholder="0.00" required data-modal-autofocus>
+                  </label>
+                  <label>
+                    <span>{{t "note"}}</span>
+                    <input name="reason" placeholder="{{t "optional_note"}}">
+                  </label>
+                  <div class="settings-actions">
+                    <button type="submit">{{t "recharge"}}</button>
+                    <button type="button" class="ghost" data-group-settings-close>{{t "cancel"}}</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+            <div class="settings-overlay" id="user-debit-{{$index}}" role="dialog" aria-modal="true" aria-labelledby="user-debit-title-{{$index}}" hidden>
+              <div class="settings-dialog">
+                <div class="settings-header">
+                  <div>
+                    <h3 id="user-debit-title-{{$index}}">{{t "deduct"}}</h3>
+                    <p>{{$user.Username}} · {{formatUSD $user.BalanceNanoUSD}}</p>
+                  </div>
+                  <button type="button" class="icon-button settings-close" data-group-settings-close aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M18 6 6 18"></path>
+                      <path d="m6 6 12 12"></path>
+                    </svg>
+                  </button>
+                </div>
+                <form class="settings-form" method="post" action="/admin/users/{{$user.ID}}/balance" data-ajax-form data-ajax-target='[data-partial="users-panel"]'>
+                  <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                  <input type="hidden" name="direction" value="debit">
+                  <label>
+                    <span>{{t "amount_usd"}}</span>
+                    <input name="amount_usd" inputmode="decimal" placeholder="0.00" required data-modal-autofocus>
+                  </label>
+                  <label>
+                    <span>{{t "note"}}</span>
+                    <input name="reason" placeholder="{{t "optional_note"}}">
+                  </label>
+                  <div class="settings-actions">
+                    <button class="danger" type="submit">{{t "deduct"}}</button>
+                    <button type="button" class="ghost" data-group-settings-close>{{t "cancel"}}</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+            <div class="settings-overlay user-details-overlay" id="user-details-{{$index}}" role="dialog" aria-modal="true" aria-labelledby="user-details-title-{{$index}}" hidden>
+              <div class="settings-dialog user-details-dialog">
+                <div class="settings-header">
+                  <div>
+                    <h3 id="user-details-title-{{$index}}">{{t "user_details"}}</h3>
+                    <p>{{$user.Username}}</p>
+                  </div>
+                  <button type="button" class="icon-button settings-close" data-group-settings-close aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M18 6 6 18"></path>
+                      <path d="m6 6 12 12"></path>
+                    </svg>
+                  </button>
+                </div>
+                <div class="user-details-body" data-user-details-body data-user-details-url="/admin/users/{{pathEscape $user.ID}}/details" data-user-details-loading="{{t "user_details_loading"}}" data-user-details-error="{{t "user_details_load_failed"}}">
+                  <div class="empty user-details-placeholder">{{t "user_details_loading"}}</div>
+                </div>
+                <div class="settings-actions">
+                  <button type="button" class="ghost" data-group-settings-close>{{t "cancel"}}</button>
+                </div>
+              </div>
+            </div>
+          </td>
+        </tr>
+        {{else}}
+        <tr><td colspan="9" class="empty">{{t "no_users"}}</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{if or .UserPage.HasPrev .UserPage.HasNext}}
+  <div class="pager">
+    <div class="panel-note">{{tf "users_filtered_count" .UserFilteredCount .UserTotalCount}}</div>
+    <div class="action-row">
+      {{if .UserPage.HasPrev}}<a class="button-link ghost-link" href="{{userPageURL .UserFilter .UserPage.PrevPage}}" data-ajax-link data-ajax-target='[data-partial="users-panel"]' data-ajax-partial="users-panel">{{t "previous"}}</a>{{end}}
+      {{if .UserPage.HasNext}}<a class="button-link ghost-link" href="{{userPageURL .UserFilter .UserPage.NextPage}}" data-ajax-link data-ajax-target='[data-partial="users-panel"]' data-ajax-partial="users-panel">{{t "next"}}</a>{{end}}
+    </div>
+  </div>
+  {{end}}
+</section>
+{{end}}

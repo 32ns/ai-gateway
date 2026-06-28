@@ -1,0 +1,66 @@
+{{define "content"}}
+<section class="hero compact">
+  <div>
+    <h1>{{if eq .Mode "create"}}{{t "create_user"}}{{else}}{{t "edit_user"}}{{end}}</h1>
+    <p>{{t "user_summary"}}</p>
+  </div>
+</section>
+
+{{if .Error}}
+<div class="system-notice tone-bad">{{.Error}}</div>
+{{end}}
+
+<section class="panel wide">
+  <div class="panel-head">
+    <h2>{{if .User.Username}}{{.User.Username}}{{else}}{{t "new_user"}}{{end}}</h2>
+  </div>
+  <form class="grid-form single-column" method="post" action="{{if eq .Mode "create"}}/admin/users/new{{else}}/admin/users/{{.User.ID}}/edit{{end}}">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+    <label>
+      <span>{{t "username"}}</span>
+      <input name="username" value="{{.User.Username}}" autocomplete="username" maxlength="64" pattern="[A-Za-z0-9_.-]+" title="{{t "username_allowed_characters_hint"}}" required>
+    </label>
+    <label>
+      <span>{{t "password"}}</span>
+      <input type="password" name="password" autocomplete="new-password" {{if eq .Mode "create"}}required{{end}} placeholder="{{if eq .Mode "edit"}}{{t "password_keep_placeholder"}}{{end}}">
+    </label>
+    <label>
+      <span>{{t "role"}}</span>
+      <select name="role">
+        {{range .Roles}}
+        <option value="{{.Value}}" {{if eq $.User.Role .Value}}selected{{end}}>{{userRoleText .Value}}</option>
+        {{end}}
+      </select>
+    </label>
+    <label>
+      <span>{{t "user_concurrent_request_limit_override"}}</span>
+      <input type="number" min="0" max="100000" name="concurrent_request_limit" value="{{userConcurrentRequestLimitValue .User}}" placeholder="{{t "inherit_system_default"}}">
+      <p class="field-note">{{t "user_concurrent_request_limit_override_hint"}}</p>
+    </label>
+    <label>
+      <span>{{t "user_request_rate_limit_override"}}</span>
+      <input type="number" min="0" max="100000" name="request_rate_limit_per_minute" value="{{userRequestRateLimitValue .User}}" placeholder="{{t "inherit_system_default"}}">
+      <p class="field-note">{{t "user_request_rate_limit_override_hint"}}</p>
+    </label>
+    <label class="checkbox-row full-span">
+      <input type="checkbox" name="enabled" {{if .User.Enabled}}checked{{end}}>
+      <span>{{t "user_enabled"}}</span>
+    </label>
+    <div class="form-actions full-span">
+      <button type="submit">{{if eq .Mode "create"}}{{t "create_user"}}{{else}}{{t "save_user"}}{{end}}</button>
+      {{if eq .Mode "edit"}}
+      <button
+        class="danger"
+        type="submit"
+        formaction="/admin/users/{{.User.ID}}/delete"
+        data-confirm="{{tf "confirm_delete_user" .User.Username}}"
+        data-confirm-option-name="delete_invited_users"
+        data-confirm-option-value="1"
+        data-confirm-option-label="{{tf "delete_invited_users" .InvitedUserCount}}"
+      >{{t "delete"}}</button>
+      {{end}}
+      <a class="button-link ghost-link" href="/admin/users">{{t "cancel"}}</a>
+    </div>
+  </form>
+</section>
+{{end}}

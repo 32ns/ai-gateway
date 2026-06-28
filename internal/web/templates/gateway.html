@@ -1,0 +1,159 @@
+{{define "content"}}
+<section class="hero compact">
+  <div>
+    <h1>{{t "gateway_surface"}}</h1>
+    <p>{{t "gateway_surface_note"}}</p>
+  </div>
+</section>
+
+<section class="grid-two">
+  <section class="panel">
+    <div class="panel-head">
+      <h2>{{t "gateway_surface"}}</h2>
+      <span class="panel-note">{{t "gateway_surface_note"}}</span>
+    </div>
+    <div class="gateway-api-groups">
+      {{range .APIGroups}}
+      <section class="gateway-api-group" aria-labelledby="gateway-api-group-{{.ID}}">
+        <div class="gateway-api-group-head">
+          <h3 id="gateway-api-group-{{.ID}}">{{.Title}}</h3>
+          <p>{{.Description}}</p>
+        </div>
+        <div class="endpoint-list gateway-endpoint-list">
+          {{range .Endpoints}}
+          <button type="button" class="endpoint-item endpoint-button" data-group-settings-open="gateway-api-{{.ID}}" aria-haspopup="dialog" aria-controls="gateway-api-{{.ID}}">
+            <code><span class="endpoint-method">{{.Method}}</span> <span class="endpoint-path">{{.Path}}</span></code>
+            <span class="endpoint-badge">{{.Badge}}</span>
+          </button>
+          {{end}}
+        </div>
+      </section>
+      {{end}}
+    </div>
+  </section>
+
+  <div class="stack">
+    <section class="panel">
+      <div class="panel-head">
+        <h2>{{t "gateway_error_codes"}}</h2>
+        <span class="panel-note">{{t "gateway_error_codes_note"}}</span>
+      </div>
+      <div class="table-wrap gateway-error-table-wrap">
+        <table class="data-table gateway-error-table">
+          <thead>
+            <tr>
+              <th>{{t "error_code"}}</th>
+              <th>{{t "kind"}}</th>
+              <th>{{t "description"}}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{range .ErrorGroups}}
+            <tr class="gateway-error-group-row">
+              <td colspan="3" id="gateway-error-group-{{.ID}}">{{.Title}}</td>
+            </tr>
+            {{range .Codes}}
+            <tr>
+              <td><code>{{.Code}}</code></td>
+              <td>{{.Kind}}</td>
+              <td>{{.Meaning}}</td>
+            </tr>
+            {{end}}
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>{{t "recent_gateway_audit"}}</h2>
+        <span class="panel-note">{{tf "recent_gateway_audit_count" (len .State.GatewayAudit)}}</span>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>{{t "status"}}</th>
+              <th>{{t "client"}}</th>
+              <th>{{t "provider"}}</th>
+              <th>{{t "model"}}</th>
+              <th>{{t "latency"}}</th>
+              <th>{{t "at"}}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{range .State.GatewayAudit}}
+            <tr>
+              <td><span class="pill {{if eq .Status "ok"}}tone-good{{else}}tone-bad{{end}}">{{auditStatusText .Status}}</span></td>
+              <td>{{if .ClientName}}{{.ClientName}}{{else}}-{{end}}</td>
+              <td>{{.Provider}}</td>
+              <td>{{.Model}}</td>
+              <td>{{.DurationMS}} ms</td>
+              <td>{{.CreatedAt.Local.Format "2006-01-02 15:04:05"}}</td>
+            </tr>
+            {{else}}
+            <tr><td colspan="6" class="empty">{{t "no_requests"}}</td></tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</section>
+
+{{range .APIGroups}}
+  {{range .Endpoints}}
+  <div class="settings-overlay gateway-api-overlay" id="gateway-api-{{.ID}}" role="dialog" aria-modal="true" aria-labelledby="gateway-api-{{.ID}}-title" hidden>
+    <div class="settings-dialog gateway-api-dialog">
+      <div class="settings-header">
+        <div>
+          <span class="api-dialog-badge">{{.Badge}}</span>
+          <h3 id="gateway-api-{{.ID}}-title">{{.Title}}</h3>
+          <p>{{.Summary}}</p>
+        </div>
+        <button type="button" class="icon-button settings-close" data-group-settings-close aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M18 6 6 18"></path>
+            <path d="m6 6 12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="api-usage-summary">
+        <div>
+          <span>{{t "method"}}</span>
+          <code>{{.Method}} {{.Path}}</code>
+        </div>
+        <div>
+          <span>{{t "authentication"}}</span>
+          <strong>{{.Auth}}</strong>
+        </div>
+        <div>
+          <span>Content-Type</span>
+          <strong>{{.ContentType}}</strong>
+        </div>
+      </div>
+
+      <div class="api-usage-block">
+        <span>{{t "example"}}</span>
+        <pre><code>{{.Example}}</code></pre>
+      </div>
+
+      {{if .Notes}}
+      <div class="api-usage-notes">
+        <span>{{t "notes"}}</span>
+        <ul>
+          {{range .Notes}}<li>{{.}}</li>{{end}}
+        </ul>
+      </div>
+      {{end}}
+
+      <div class="settings-actions">
+        <button type="button" class="ghost" data-group-settings-close>{{t "cancel"}}</button>
+      </div>
+    </div>
+  </div>
+  {{end}}
+{{end}}
+{{end}}

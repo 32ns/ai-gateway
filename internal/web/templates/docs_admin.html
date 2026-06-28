@@ -1,0 +1,45 @@
+{{define "content"}}
+<div data-partial="docs-admin-page">
+<section class="hero compact">
+  <div>
+    <h1>{{t "docs_admin"}}</h1>
+    <p>{{t "docs_admin_hint"}}</p>
+  </div>
+  <div class="hero-actions">
+    <a class="button-link ghost-link" href="/docs">{{t "docs_view_public"}}</a>
+    <a class="button-link ghost-link" href="/admin/mcp-tokens">{{t "mcp_tokens"}}</a>
+    <a class="button-link" href="/admin/docs/new">{{t "document_new"}}</a>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="document-admin-list">
+    {{range $document := .Documents}}
+    <article class="document-admin-row">
+      <div class="document-admin-main">
+        <div class="message-title-row">
+          <h2>{{$document.Title}}</h2>
+          <div class="action-row compact">
+            {{if $document.Pinned}}<span class="pill tone-good">{{t "document_pinned"}}</span>{{end}}
+            <span class="pill {{documentStatusClass $document.Status}}">{{documentStatusText $document.Status}}</span>
+            <span class="pill {{documentIndexingClass $document}}">{{documentIndexingText $document}}</span>
+          </div>
+        </div>
+        <div class="message-meta">/docs/{{$document.Slug}}</div>
+      </div>
+      <div class="message-actions">
+        <a class="button-link ghost-link" href="/docs/{{$document.Slug}}">{{t "preview"}}</a>
+        <a class="button-link ghost-link" href="/admin/docs/{{$document.ID}}/edit">{{t "edit"}}</a>
+        <form method="post" action="/admin/docs/{{$document.ID}}/delete" data-confirm="{{tf "confirm_delete_document" $document.Title}}" data-ajax-form data-ajax-target='[data-partial="docs-admin-page"]'>
+          <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+          <button type="submit" class="danger">{{t "delete"}}</button>
+        </form>
+      </div>
+    </article>
+    {{else}}
+    <div class="empty">{{t "no_documents"}}</div>
+    {{end}}
+  </div>
+</section>
+</div>
+{{end}}

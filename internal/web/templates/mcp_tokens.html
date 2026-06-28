@@ -1,0 +1,154 @@
+{{define "content"}}
+<div data-partial="mcp-tokens-page">
+{{if .Error}}
+<div class="system-notice tone-bad">{{.Error}}</div>
+{{end}}
+
+<div class="settings-overlay" id="mcp-token-create" role="dialog" aria-modal="true" aria-labelledby="mcp-token-create-title" hidden>
+  <div class="settings-dialog mcp-token-dialog">
+    <div class="settings-header">
+      <div>
+        <h3 id="mcp-token-create-title">{{t "mcp_token_create"}}</h3>
+        <p>{{t "mcp_token_create_hint"}}</p>
+      </div>
+      <button type="button" class="icon-button settings-close" data-group-settings-close aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M18 6 6 18"></path>
+          <path d="m6 6 12 12"></path>
+        </svg>
+      </button>
+    </div>
+    <form class="settings-form" method="post" action="/admin/mcp-tokens">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <label>
+        <span>{{t "mcp_token_name"}}</span>
+        <input name="name" placeholder="Codex Docs Operator" required data-modal-autofocus>
+      </label>
+      <label>
+        <span>{{t "mcp_token_expires_days"}}</span>
+        <input name="expires_days" type="number" min="1" max="3660" value="90">
+      </label>
+      <div class="grid-form single-column" data-mcp-scope-list>
+        <div class="form-section-label">{{t "mcp_token_scopes"}}</div>
+        {{range .ScopeOptions}}
+        <label class="checkbox-row mcp-scope-option" data-mcp-scope-option>
+          <input type="checkbox" name="scopes" value="{{.Value}}" {{if eq .Value "docs:read"}}data-mcp-public-read{{end}} {{if .Checked}}checked{{end}}>
+          <span>{{.Label}}</span>
+        </label>
+        <p class="field-note mcp-scope-note" data-mcp-scope-note>{{.Hint}}</p>
+        {{end}}
+      </div>
+      <div class="settings-actions">
+        <button type="submit">{{t "mcp_token_create"}}</button>
+        <button type="button" class="ghost" data-group-settings-close>{{t "cancel"}}</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<section class="panel">
+  <div class="panel-head">
+    <h2>{{t "mcp_token_existing"}}</h2>
+    <button type="button" data-group-settings-open="mcp-token-create">{{t "mcp_token_create"}}</button>
+  </div>
+  {{if .NewToken}}
+  <div class="mcp-token-created" role="status">
+    <strong>{{t "mcp_token_new_token"}}</strong>
+    <p>{{t "mcp_token_copy_once"}}</p>
+    <div class="mcp-config-copy">
+      <div class="mcp-config-head">
+        <strong>{{t "mcp_client_config"}}</strong>
+      </div>
+      <div class="mcp-config-box">
+        <button
+          type="button"
+          class="icon-button copy-secret-button mcp-config-copy-button"
+          data-copy-secret
+          data-copy-value="{{.NewTokenMCPConfigJSON}}"
+          data-copy-label="{{t "copy_mcp_json"}}"
+          data-copy-success="{{t "copied"}}"
+          data-copy-failed="{{t "copy_failed"}}"
+          aria-label="{{t "copy_mcp_json"}}"
+          title="{{t "copy_mcp_json"}}"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="8" y="3" width="8" height="4" rx="1"></rect>
+            <path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"></path>
+          </svg>
+        </button>
+        <textarea readonly rows="9">{{.NewTokenMCPConfigJSON}}</textarea>
+      </div>
+    </div>
+  </div>
+  {{end}}
+  <div class="document-admin-list">
+    {{range $index, $token := .Tokens}}
+    <article class="document-admin-row">
+      <div class="document-admin-main">
+        <div class="message-title-row">
+          <h2>{{$token.Name}}</h2>
+        </div>
+        <div class="docs-row-meta">
+          {{range $scope := $token.Scopes}}<span>{{$scope}}</span>{{end}}
+        </div>
+        <div class="message-meta">
+          ID {{$token.ID}} · {{t "updated_at"}} {{formatTime $token.UpdatedAt}} · {{t "mcp_token_last_used"}} {{formatTime $token.LastUsedAt}} · {{t "mcp_token_expires_at"}} {{formatTime $token.ExpiresAt}}
+        </div>
+      </div>
+      <div class="message-actions">
+        <button type="button" class="ghost" data-group-settings-open="mcp-token-edit-{{$index}}">{{t "edit"}}</button>
+        <form method="post" action="/admin/mcp-tokens/{{pathEscape $token.ID}}/delete" data-confirm="{{tf "confirm_delete_mcp_token" $token.Name}}">
+          <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+          <button type="submit" class="danger">{{t "delete"}}</button>
+        </form>
+      </div>
+      <div class="settings-overlay" id="mcp-token-edit-{{$index}}" role="dialog" aria-modal="true" aria-labelledby="mcp-token-edit-title-{{$index}}" hidden>
+        <div class="settings-dialog mcp-token-dialog">
+          <div class="settings-header">
+            <div>
+              <h3 id="mcp-token-edit-title-{{$index}}">{{t "mcp_token_update"}}</h3>
+              <p>{{$token.Name}}</p>
+            </div>
+            <button type="button" class="icon-button settings-close" data-group-settings-close aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M18 6 6 18"></path>
+                <path d="m6 6 12 12"></path>
+              </svg>
+            </button>
+          </div>
+          <form class="settings-form" method="post" action="/admin/mcp-tokens/{{pathEscape $token.ID}}/update">
+            <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+            <label>
+              <span>{{t "mcp_token_name"}}</span>
+              <input name="name" value="{{$token.Name}}" required data-modal-autofocus>
+            </label>
+            <label>
+              <span>{{t "mcp_token_expires_days"}}</span>
+              <input name="expires_days" type="number" min="1" max="3660" placeholder="{{t "mcp_token_expires_days_keep"}}">
+              <p class="field-note">{{t "mcp_token_expires_days_keep_hint"}}</p>
+            </label>
+            <div class="grid-form single-column" data-mcp-scope-list>
+              <div class="form-section-label">{{t "mcp_token_scopes"}}</div>
+              {{range $.ScopeOptions}}
+              <label class="checkbox-row mcp-scope-option" data-mcp-scope-option>
+                <input type="checkbox" name="scopes" value="{{.Value}}" {{if eq .Value "docs:read"}}data-mcp-public-read{{end}} {{if mcpTokenHasScope $token .Value}}checked{{end}}>
+                <span>{{.Label}}</span>
+              </label>
+              <p class="field-note mcp-scope-note" data-mcp-scope-note>{{.Hint}}</p>
+              {{end}}
+            </div>
+            <div class="settings-actions">
+              <button type="submit">{{t "mcp_token_update"}}</button>
+              <button type="button" class="ghost" data-group-settings-close>{{t "cancel"}}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </article>
+    {{else}}
+    <div class="empty">{{t "mcp_token_no_tokens"}}</div>
+    {{end}}
+  </div>
+</section>
+</div>
+{{end}}

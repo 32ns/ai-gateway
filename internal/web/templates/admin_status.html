@@ -1,0 +1,263 @@
+{{define "content"}}
+{{$page := .Page}}
+{{if .MonitorNotice}}<div class="system-notice tone-good" data-clear-url-params="notice,target">{{.MonitorNotice}}</div>{{end}}
+
+<div class="status-admin-page">
+  {{template "admin_status_summary_fragment" .}}
+
+  <section class="panel monitor-create-panel">
+    <div class="panel-head">
+      <div>
+        <h2>{{t "monitor_create"}}</h2>
+        <p class="panel-note">{{t "monitor_create_hint"}}</p>
+      </div>
+    </div>
+    <form class="monitor-editor monitor-create-form" method="post" action="/admin/status/targets">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <div class="monitor-editor-grid">
+        <label class="monitor-field-name">
+          <span>{{t "monitor_name"}}</span>
+          <input name="name" placeholder="Default / gpt-5">
+        </label>
+        <label class="monitor-field-group">
+          <span>{{t "monitor_group"}}</span>
+          <select name="account_group">
+            {{range $page.AccountGroups}}
+            <option value="{{.Name}}">{{.Name}}</option>
+            {{end}}
+          </select>
+        </label>
+        <label class="monitor-field-model">
+          <span>{{t "monitor_model"}}</span>
+          <select name="model" required>
+            {{range $page.Models}}
+            {{if .Enabled}}<option value="{{.ID}}">{{.ID}}</option>{{end}}
+            {{end}}
+          </select>
+        </label>
+        <label class="monitor-field-prompt">
+          <span>{{t "monitor_prompt"}}</span>
+          <input name="prompt" value="{{t "monitor_default_prompt"}}">
+        </label>
+        <label class="monitor-field-small">
+          <span>{{t "monitor_interval"}}</span>
+          <input type="number" min="30" name="interval_seconds" value="300">
+        </label>
+        <label class="monitor-field-small">
+          <span>{{t "monitor_timeout"}}</span>
+          <input type="number" min="5" name="timeout_seconds" value="30">
+        </label>
+      </div>
+      <div class="monitor-editor-footer">
+        <div class="monitor-toggle-row">
+          <label class="checkbox-row">
+            <input type="checkbox" name="enabled" checked>
+            <span>{{t "monitor_enabled"}}</span>
+          </label>
+          <label class="checkbox-row">
+            <input type="checkbox" name="public_visible" checked>
+            <span>{{t "monitor_public_visible"}}</span>
+          </label>
+        </div>
+        <button type="submit">{{t "monitor_create"}}</button>
+      </div>
+    </form>
+  </section>
+
+{{template "admin_status_targets_fragment" .}}
+</div>
+{{end}}
+
+{{define "admin_status_summary_fragment"}}
+{{$page := .Page}}
+<section class="hero compact" data-partial="admin-status-summary" data-status-auto-refresh data-status-refresh-interval="15000">
+  <div>
+    <h1>{{t "status_admin_heading"}}</h1>
+    <p>{{t "status_admin_summary"}}</p>
+  </div>
+  <div class="hero-actions status-summary-actions">
+    <span class="pill tone-good">{{t "monitor_status_ok"}} {{$page.Summary.OK}}</span>
+    <span class="pill tone-warn">{{t "monitor_status_degraded"}} {{$page.Summary.Degraded}}</span>
+    <span class="pill tone-bad">{{t "monitor_status_failed"}} {{$page.Summary.Failed}}</span>
+    <span class="pill tone-muted">{{t "monitor_status_unknown"}} {{$page.Summary.Unknown}}</span>
+  </div>
+</section>
+{{end}}
+
+{{define "admin_status_targets_fragment"}}
+{{$page := .Page}}
+<section class="panel" data-partial="admin-status-targets" data-status-auto-refresh data-status-refresh-interval="15000">
+  <div class="panel-head">
+    <div>
+      <h2>{{t "monitor_targets"}}</h2>
+      <p class="panel-note">{{t "monitor_targets_hint"}}</p>
+    </div>
+  </div>
+  {{if $page.Targets}}
+  <div class="table-wrap monitor-table-wrap">
+    <table class="data-table monitor-table">
+      <thead>
+        <tr>
+          <th>{{t "monitor_target"}}</th>
+          <th>{{t "status"}}</th>
+          <th>{{t "monitor_last_check"}}</th>
+          <th>{{t "monitor_next_check"}}</th>
+          <th>{{t "monitor_latency"}}</th>
+          <th>{{t "monitor_visibility"}}</th>
+          <th>{{t "action"}}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range $page.Targets}}
+        {{$target := .Target}}
+        {{$status := monitorViewStatus .}}
+        <tr>
+          <td data-label="{{t "monitor_target"}}">
+            <div class="status-monitor-title status-monitor-title-table">
+              <strong>{{$target.Name}}</strong>
+              <span class="status-monitor-subtitle">{{$target.AccountGroup}} / {{$target.Model}}</span>
+            </div>
+          </td>
+          <td data-label="{{t "status"}}"><span class="pill {{monitorStatusClass $status}}">{{monitorStatusText $status}}</span></td>
+          <td data-label="{{t "monitor_last_check"}}">{{if .HasLatest}}{{formatTime .Latest.CheckedAt}}{{else}}-{{end}}</td>
+          <td data-label="{{t "monitor_next_check"}}"><span data-monitor-countdown data-next-check-at="{{monitorNextCheckUnix .}}" class="monitor-next-check" data-monitor-running="{{if .Running}}true{{else}}false{{end}}" data-running-text="{{t "monitor_checking"}}" data-due-text="{{t "monitor_due_now"}}" data-pending-text="{{t "monitor_pending_check"}}">{{if .Running}}<span class="monitor-countdown-spinner" aria-hidden="true"></span><span class="sr-only">{{t "monitor_checking"}}</span>{{else}}{{monitorNextCheckText .}}{{end}}</span></td>
+          <td data-label="{{t "monitor_latency"}}">{{if .HasLatest}}{{.Latest.LatencyMS}}ms{{else}}-{{end}}</td>
+          <td data-label="{{t "monitor_visibility"}}">
+            <div class="cell-stack">
+              <span class="pill {{if $target.Enabled}}tone-good{{else}}tone-muted{{end}}">{{boolStateText $target.Enabled}}</span>
+              <span class="pill {{if $target.PublicVisible}}tone-good{{else}}tone-muted{{end}}">{{if $target.PublicVisible}}{{t "monitor_public"}}{{else}}{{t "monitor_private"}}{{end}}</span>
+            </div>
+          </td>
+          <td data-label="{{t "action"}}">
+            <div class="action-row">
+              {{if .Running}}
+              <div class="monitor-run-indicator" role="status" aria-live="polite">
+                <span class="monitor-run-spinner" aria-hidden="true"></span>
+                <span class="sr-only">{{t "monitor_checking"}}</span>
+              </div>
+              {{else}}
+              <form method="post" action="/admin/status/targets/{{$target.ID}}/run">
+                <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                <button class="ghost monitor-run-button" type="submit" data-running-text="{{t "monitor_checking"}}">{{t "monitor_run_now"}}</button>
+              </form>
+              {{end}}
+              <button type="button" class="ghost" data-group-settings-open="monitor-edit-{{$target.ID}}">{{t "edit"}}</button>
+              <form method="post" action="/admin/status/targets/{{$target.ID}}/delete" data-confirm="{{tf "confirm_delete_monitor" $target.Name}}">
+                <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                <button class="danger" type="submit">{{t "delete"}}</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        <tr class="monitor-detail-row">
+          <td colspan="7">
+            <div class="monitor-details monitor-details-expanded">
+              <div class="monitor-history-head">
+                <span>{{t "monitor_history"}}</span>
+                <strong class="monitor-availability-value {{monitorAvailabilityClass .}}">{{.Availability}}%</strong>
+              </div>
+              <div class="monitor-timeline">
+                {{range monitorHistoryBars .History}}
+                <span class="monitor-timeline-bar {{monitorStatusClass .Status}}" title="{{monitorAdminHistoryTitle .}}"></span>
+                {{end}}
+                {{if not .History}}<span class="panel-note">{{t "monitor_no_history"}}</span>{{end}}
+              </div>
+              {{if .HasLatest}}
+              <div class="monitor-attempt-list" title="{{monitorAdminHistoryTitle .Latest}}">
+                {{range .Latest.Attempts}}
+                <div class="monitor-attempt">
+                  <span class="pill {{if eq .Status "ok"}}tone-good{{else if eq .Status "running"}}tone-muted{{else}}tone-bad{{end}}">{{.Status}}</span>
+                  <span>{{.Provider}}</span>
+                  <span>{{if .AccountLabel}}{{.AccountLabel}}{{else}}{{.AccountID}}{{end}}</span>
+                  {{if .ErrorMessage}}<code>{{if .ErrorCode}}{{.ErrorCode}}: {{end}}{{.ErrorMessage}}</code>{{end}}
+                </div>
+                {{end}}
+                {{if .Latest.ErrorMessage}}<p class="panel-note">{{.Latest.ErrorMessage}}</p>{{end}}
+              </div>
+              {{end}}
+            </div>
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+
+  {{range $page.Targets}}
+  {{$target := .Target}}
+  <div class="settings-overlay" id="monitor-edit-{{$target.ID}}" role="dialog" aria-modal="true" aria-labelledby="monitor-edit-title-{{$target.ID}}" hidden>
+    <div class="settings-dialog monitor-edit-dialog">
+      <div class="settings-header">
+        <div>
+          <h3 id="monitor-edit-title-{{$target.ID}}">{{t "edit"}}</h3>
+          <p>{{$target.Name}}</p>
+        </div>
+        <button type="button" class="icon-button settings-close" data-group-settings-close aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M18 6 6 18"></path>
+            <path d="m6 6 12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <form class="monitor-editor monitor-edit-form" method="post" action="/admin/status/targets/{{$target.ID}}/update">
+        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+        <div class="monitor-editor-grid">
+          <label class="monitor-field-name">
+            <span>{{t "monitor_name"}}</span>
+            <input name="name" value="{{$target.Name}}">
+          </label>
+          <label class="monitor-field-group">
+            <span>{{t "monitor_group"}}</span>
+            <select name="account_group">
+              {{range $page.AccountGroups}}
+              <option value="{{.Name}}" {{if eq .Name $target.AccountGroup}}selected{{end}}>{{.Name}}</option>
+              {{end}}
+            </select>
+          </label>
+          <label class="monitor-field-model">
+            <span>{{t "monitor_model"}}</span>
+            <select name="model" required>
+              {{range $page.Models}}
+              <option value="{{.ID}}" {{if eq .ID $target.Model}}selected{{end}}>{{.ID}}</option>
+              {{end}}
+            </select>
+          </label>
+          <label class="monitor-field-prompt">
+            <span>{{t "monitor_prompt"}}</span>
+            <input name="prompt" value="{{$target.Prompt}}">
+          </label>
+          <label class="monitor-field-small">
+            <span>{{t "monitor_interval"}}</span>
+            <input type="number" min="30" name="interval_seconds" value="{{$target.IntervalSeconds}}">
+          </label>
+          <label class="monitor-field-small">
+            <span>{{t "monitor_timeout"}}</span>
+            <input type="number" min="5" name="timeout_seconds" value="{{$target.TimeoutSeconds}}">
+          </label>
+        </div>
+        <div class="monitor-toggle-row">
+          <label class="checkbox-row">
+            <input type="checkbox" name="enabled" {{if $target.Enabled}}checked{{end}}>
+            <span>{{t "monitor_enabled"}}</span>
+          </label>
+          <label class="checkbox-row">
+            <input type="checkbox" name="public_visible" {{if $target.PublicVisible}}checked{{end}}>
+            <span>{{t "monitor_public_visible"}}</span>
+          </label>
+        </div>
+        <div class="settings-actions">
+          <button type="button" class="ghost" data-group-settings-close>{{t "cancel"}}</button>
+          <button type="submit">{{t "save"}}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {{end}}
+  {{else}}
+  <div class="empty-state">
+    <h2>{{t "monitor_empty_title"}}</h2>
+    <p>{{t "monitor_empty_summary"}}</p>
+  </div>
+  {{end}}
+</section>
+{{end}}

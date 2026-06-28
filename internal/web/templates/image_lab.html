@@ -1,0 +1,153 @@
+{{define "content"}}
+<section
+  class="image-lab"
+  data-image-lab
+  data-csrf-token="{{.CSRFToken}}"
+  data-confirm-remove-run="确认移除这条生成结果？"
+  data-confirm-cancel-run="确认停止当前生成？"
+  data-confirm-remove-input="确认移除这张参考图？"
+  data-confirm-clear-inputs="确认清空所有参考图？"
+  data-confirm-delete-history-item="确认删除这条历史记录？"
+  data-confirm-clear-history="确认清空本次历史记录？"
+  data-confirm-clear-results="确认清理所有生成结果？"
+  aria-label="生图工作台"
+>
+  <form class="image-lab-control panel" data-image-lab-form>
+    <div class="panel-head image-lab-control-head">
+      <div>
+        <h2>生成设置</h2>
+        <span class="panel-note">后台使用 OpenAI 兼容图片接口生成图片，刷新页面后可继续查看当前进度。</span>
+      </div>
+    </div>
+
+    <div class="image-lab-field-grid">
+      <label>
+        <span>API 密钥</span>
+        <select name="client_id" data-image-lab-client disabled>
+          <option value="">加载中</option>
+        </select>
+      </label>
+      <label>
+        <span>模型</span>
+        <select name="model" data-image-lab-model disabled>
+          <option value="">加载中</option>
+        </select>
+      </label>
+    </div>
+
+    <label class="image-lab-prompt">
+      <span>提示词</span>
+      <textarea name="prompt" rows="8" data-image-lab-prompt placeholder="描述主体、环境、构图、材质、光线和需要避免的元素。" required></textarea>
+      <small>建议把画面要求写具体；参考图可选，附加后会作为图片编辑输入发送。</small>
+    </label>
+
+    <div class="image-lab-upload" data-image-lab-upload>
+      <div class="image-lab-upload-head">
+        <div>
+          <strong>参考图（可选）</strong>
+          <span>支持多选或拖拽，最多 8 张，单张不超过 12MB。</span>
+        </div>
+        <div class="image-lab-upload-actions">
+          <button type="button" class="ghost" data-image-lab-clear-inputs disabled>清空参考图</button>
+          <label class="button-link ghost-link image-lab-file-button">
+            选择图片
+            <input type="file" accept="image/png,image/jpeg,image/webp" multiple data-image-lab-file>
+          </label>
+        </div>
+      </div>
+      <div class="image-lab-input-grid" data-image-lab-inputs>
+        <div class="image-lab-upload-empty">拖入 PNG / JPG / WebP，或点击选择图片。</div>
+      </div>
+    </div>
+
+    <div class="image-lab-field-grid image-lab-field-grid-four image-lab-output-controls">
+      <label class="image-lab-picker-field">
+        <span>清晰度</span>
+        <select name="resolution" class="image-lab-native-select" data-image-lab-resolution data-enhanced="true" aria-hidden="true" tabindex="-1">
+          <option value="standard" selected>标准</option>
+          <option value="2k">2K</option>
+          <option value="4k">4K</option>
+          <option value="auto">自动</option>
+        </select>
+        <div class="image-lab-resolution-list" data-image-lab-resolution-options role="radiogroup" aria-label="清晰度">
+          <button type="button" data-resolution="standard" role="radio" aria-checked="true">标准</button>
+          <button type="button" data-resolution="2k" role="radio" aria-checked="false">2K</button>
+          <button type="button" data-resolution="4k" role="radio" aria-checked="false">4K</button>
+          <button type="button" data-resolution="auto" role="radio" aria-checked="false">自动</button>
+        </div>
+      </label>
+      <label class="image-lab-picker-field image-lab-ratio-field">
+        <span>画幅</span>
+        <select name="ratio" class="image-lab-native-select" data-image-lab-ratio data-enhanced="true" aria-hidden="true" tabindex="-1">
+          <option value="1:1" selected>1:1 方图</option>
+          <option value="2:3">2:3 竖图</option>
+          <option value="3:2">3:2 横图</option>
+          <option value="3:4">3:4 竖图</option>
+          <option value="4:3">4:3 横图</option>
+          <option value="9:16">9:16 竖屏</option>
+          <option value="16:9">16:9 宽屏</option>
+          <option value="auto">自动</option>
+        </select>
+        <div class="image-lab-ratio-list" data-image-lab-ratio-options role="radiogroup" aria-label="画幅">
+          <button type="button" data-ratio="1:1" role="radio" aria-checked="true"><span class="image-lab-ratio-icon ratio-1-1"></span><span>1:1</span></button>
+          <button type="button" data-ratio="2:3" role="radio" aria-checked="false"><span class="image-lab-ratio-icon ratio-2-3"></span><span>2:3</span></button>
+          <button type="button" data-ratio="3:2" role="radio" aria-checked="false"><span class="image-lab-ratio-icon ratio-3-2"></span><span>3:2</span></button>
+          <button type="button" data-ratio="3:4" role="radio" aria-checked="false"><span class="image-lab-ratio-icon ratio-3-4"></span><span>3:4</span></button>
+          <button type="button" data-ratio="4:3" role="radio" aria-checked="false"><span class="image-lab-ratio-icon ratio-4-3"></span><span>4:3</span></button>
+          <button type="button" data-ratio="9:16" role="radio" aria-checked="false"><span class="image-lab-ratio-icon ratio-9-16"></span><span>9:16</span></button>
+          <button type="button" data-ratio="16:9" role="radio" aria-checked="false"><span class="image-lab-ratio-icon ratio-16-9"></span><span>16:9</span></button>
+          <button type="button" data-ratio="auto" role="radio" aria-checked="false"><span class="image-lab-ratio-icon ratio-auto"></span><span>自动</span></button>
+        </div>
+      </label>
+      <label class="image-lab-number-field">
+        <span>张数</span>
+        <input type="number" name="count" min="1" max="20" step="1" value="1" data-image-lab-count>
+      </label>
+    </div>
+
+    <div class="image-lab-size-line">
+      <span>输出尺寸</span>
+      <strong data-image-lab-size>1024x1024</strong>
+    </div>
+
+    <p class="form-error image-lab-error" data-image-lab-error hidden></p>
+
+    <div class="form-actions image-lab-actions">
+      <button type="submit" class="primary-link" data-image-lab-submit disabled>开始生成</button>
+    </div>
+  </form>
+
+  <div class="image-lab-results">
+    <section class="panel image-lab-current">
+      <div class="panel-head">
+        <div class="image-lab-section-title">
+          <h2>生成结果</h2>
+          <span class="image-lab-run-note" data-image-lab-run-note></span>
+        </div>
+        <button type="button" class="ghost image-lab-clear-finished" data-image-lab-clear-finished disabled>清理结果</button>
+      </div>
+      <div class="image-lab-empty is-loading" data-image-lab-empty>
+        <span class="image-lab-empty-spinner" aria-hidden="true"></span>
+        <strong>正在加载后台任务</strong>
+        <small>正在检查未完成的生成任务，请不要重复提交。</small>
+      </div>
+      <div class="image-lab-task-list" data-image-lab-tasks></div>
+    </section>
+
+    <section class="panel image-lab-history">
+      <div class="panel-head image-lab-history-head">
+        <div class="image-lab-section-title image-lab-history-title">
+          <h2>本次历史</h2>
+        </div>
+        <div class="image-lab-history-head-actions">
+          <button type="button" class="ghost image-lab-toggle-history" data-image-lab-toggle-history>收起</button>
+          <button type="button" class="ghost image-lab-clear-history" data-image-lab-clear-history>清空</button>
+        </div>
+      </div>
+      <div class="image-lab-history-list" data-image-lab-history>
+        <div class="image-lab-history-empty">暂无历史记录。</div>
+      </div>
+    </section>
+  </div>
+</section>
+{{end}}

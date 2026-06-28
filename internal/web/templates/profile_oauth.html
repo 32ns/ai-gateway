@@ -1,0 +1,44 @@
+{{define "content"}}
+<section class="hero compact">
+  <div>
+    <h1>{{t "oauth_bind_title"}}</h1>
+    <p>{{t "oauth_bind_summary"}}</p>
+  </div>
+</section>
+
+{{if .OAuthNotice}}
+<div class="system-notice tone-good" data-clear-url-params="oauth_linked,oauth_unlinked,oauth_merged">{{.OAuthNotice}}</div>
+{{end}}
+{{if .OAuthError}}
+<div class="system-notice tone-bad" data-clear-url-params="oauth_error">{{.OAuthError}}</div>
+{{end}}
+
+<section class="panel narrow" id="oauth-bind">
+  <div class="stack-list">
+    {{range .OAuthProviders}}
+    <div class="list-row">
+      <div>
+        <strong>{{.Label}}</strong>
+        {{if .Linked}}
+        <p class="muted">{{t "oauth_bind_linked_status"}}{{if .Email}} · {{.Email}}{{else if .Username}} · {{.Username}}{{end}}</p>
+        {{else if .Configured}}
+        <p class="muted">{{t "oauth_bind_unlinked_status"}}</p>
+        {{else}}
+        <p class="muted">{{t "oauth_bind_not_configured"}}</p>
+        {{end}}
+      </div>
+      <div class="row-actions">
+        {{if .Linked}}
+        <form method="post" action="/profile/oauth/{{.Provider}}/unlink">
+          <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+          <button class="danger" type="submit">{{t "oauth_bind_unlink"}}</button>
+        </form>
+        {{else if .Configured}}
+        <a class="button-link" href="/profile/oauth/{{.Provider}}">{{t "oauth_bind_link"}}</a>
+        {{end}}
+      </div>
+    </div>
+    {{end}}
+  </div>
+</section>
+{{end}}

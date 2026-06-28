@@ -1,0 +1,135 @@
+{{define "content"}}
+<section class="hero compact">
+  <div>
+    <h1>{{t "edit_account"}}</h1>
+    <p>{{t "edit_account_summary"}}</p>
+  </div>
+</section>
+
+{{if .Error}}
+<div class="system-notice tone-bad">{{.Error}}</div>
+{{end}}
+{{if .TokenUpdated}}
+<div class="system-notice tone-good" data-clear-url-params="token_updated">{{t "account_token_updated"}}</div>
+{{end}}
+
+<section class="panel wide">
+  <div class="panel-head">
+    <h2>{{accountLabelDisplay .Editor.Account.Label}}</h2>
+    <span class="panel-note">{{tf "account_id" .Editor.Account.ID}}</span>
+  </div>
+  <form class="grid-form" method="post" action="/admin/accounts/{{.Editor.Account.ID}}/edit">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+    <input type="hidden" name="current_group" value="{{.ReturnAccountGroupKey}}">
+    <input type="hidden" name="current_filter" value="{{.ReturnAccountFilterKey}}">
+    <label>
+      <span>{{t "provider"}}</span>
+      <input value="{{.Editor.Account.Provider}}" disabled>
+    </label>
+
+    <label>
+      <span>{{t "account_label"}}</span>
+      <input name="label" value="{{.Editor.Account.Label}}" placeholder="{{t "account_label_placeholder"}}" required>
+    </label>
+
+    <label>
+      <span>{{t "account_group"}}</span>
+      <select name="group">
+        {{range .Editor.AvailableGroups}}
+        <option value="{{.Name}}" {{if eq $.Editor.Account.Group .Name}}selected{{end}}>{{.Name}}</option>
+        {{end}}
+      </select>
+    </label>
+
+    <label>
+      <span>{{t "note"}}</span>
+      <input name="remark" value="{{.Editor.Account.Remark}}">
+    </label>
+
+    <label class="full-span">
+      <span>{{t "credential"}}</span>
+      <input name="access_token" placeholder="{{t "credential_optional_hint"}}">
+    </label>
+
+    <label>
+      <span>{{t "refresh_token"}}</span>
+      <input name="refresh_token" placeholder="{{t "credential_optional_hint"}}">
+    </label>
+
+    <label>
+      <span>{{t "session_token"}}</span>
+      <input name="session_token" placeholder="{{t "credential_optional_hint"}}">
+    </label>
+
+    <label>
+      <span>{{t "expires_at"}}</span>
+      <input name="expires_at" value="{{.Editor.ExpiresAtText}}" placeholder="{{t "expires_at_placeholder"}}">
+    </label>
+
+    <label>
+      <span>{{t "base_url"}}</span>
+      <input name="base_url" value="{{.Editor.BaseURL}}" placeholder="{{t "base_url_placeholder"}}">
+    </label>
+
+    <label class="proxy-field">
+      <span>{{t "proxy_url"}}</span>
+      <span class="proxy-control">
+        <input data-proxy-test-input name="proxy_url" value="{{.Editor.ProxyURL}}" placeholder="{{t "proxy_url_placeholder"}}">
+        <button
+          type="button"
+          class="ghost proxy-test-button"
+          data-proxy-test
+          data-proxy-test-url="/admin/proxy-test"
+          data-proxy-test-running="{{t "proxy_test_running"}}"
+          data-proxy-test-success="{{t "proxy_test_success"}}"
+          data-proxy-test-failed="{{t "proxy_test_failed"}}"
+        >{{t "test_proxy"}}</button>
+      </span>
+      <p class="proxy-test-result" data-proxy-test-result aria-live="polite"></p>
+    </label>
+
+    <label>
+      <span>{{t "priority"}}</span>
+      <input type="number" name="priority" value="{{.Editor.Account.Priority}}">
+    </label>
+    <label>
+      <span>{{t "weight"}}</span>
+      <input type="number" name="weight" value="{{.Editor.Account.Weight}}">
+    </label>
+
+    <label class="account-routing-option full-span">
+      <span class="account-routing-copy">
+        <strong>{{t "account_backup_enabled"}}</strong>
+        <small>{{t "account_backup_hint"}}</small>
+      </span>
+      <span class="switch-control account-routing-switch">
+        <input type="checkbox" name="backup" value="1" {{if .Editor.Account.Backup}}checked{{end}}>
+        <span aria-hidden="true"></span>
+      </span>
+    </label>
+
+    <label>
+      <span>{{t "account_runtime_status"}}</span>
+      <select name="status">
+        {{range .Editor.StatusOptions}}
+        <option value="{{.}}" {{if eq $.Editor.Account.Status .}}selected{{end}}>{{accountStatusText .}}</option>
+        {{end}}
+      </select>
+    </label>
+
+    <label class="checkbox-row full-span">
+      <input type="checkbox" name="control_enabled" value="1" {{if not (accountControlDisabled .Editor.Account)}}checked{{end}}>
+      <span>{{t "account_control_enabled"}}</span>
+    </label>
+
+    <div class="form-actions full-span">
+      <button type="submit">{{t "save_account"}}</button>
+      {{if .OAuthTokenUpdateURL}}
+      <a class="button-link ghost-link" href="{{.OAuthTokenUpdateURL}}">{{t "account_update_token"}}</a>
+      {{end}}
+      <button class="danger" type="submit" formaction="/admin/accounts/{{.Editor.Account.ID}}/delete" formmethod="post" formnovalidate data-confirm="{{tf "confirm_delete_account" .Editor.Account.Label}}">{{t "delete"}}</button>
+      <a class="button-link ghost-link" href="{{accountsGroupFilterHref .ReturnAccountGroupKey .ReturnAccountFilterKey}}">{{t "cancel"}}</a>
+    </div>
+  </form>
+</section>
+{{end}}

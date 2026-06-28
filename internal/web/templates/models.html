@@ -1,0 +1,246 @@
+{{define "content"}}
+<section class="hero compact">
+  <div>
+    <h1>{{t "models"}}</h1>
+    <p>{{t "models_hint"}}</p>
+  </div>
+  <div class="hero-actions">
+    {{range .Page.Providers}}
+    <form method="post" action="/admin/models/sync" data-ajax-form data-ajax-target='[data-partial="models-list"]'>
+      <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+      <input type="hidden" name="provider" value="{{.Kind}}">
+      <button class="ghost" type="submit">{{tf "sync_provider_models" .Label}}</button>
+    </form>
+    {{end}}
+  </div>
+</section>
+
+<div data-partial="models-workspace">
+<div class="settings-overlay model-create-overlay" id="model-create" role="dialog" aria-modal="true" aria-labelledby="model-create-title" hidden>
+  <div class="settings-dialog model-create-dialog">
+  <div class="panel-head">
+    <div>
+      <h2 id="model-create-title">{{t "custom_model"}}</h2>
+      <p class="panel-note">{{t "custom_model_hint"}}</p>
+    </div>
+    <button type="button" class="icon-button settings-close" data-group-settings-close aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M18 6 6 18"></path>
+        <path d="m6 6 12 12"></path>
+      </svg>
+    </button>
+  </div>
+
+  <form class="model-editor" method="post" action="/admin/models/new" data-ajax-form data-ajax-target='[data-partial="models-workspace"]'>
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+    <div class="model-editor-grid">
+      <label>
+        <span>{{t "model_id"}}</span>
+        <input name="id" placeholder="{{t "model_id_placeholder"}}" required>
+      </label>
+      <label>
+        <span>{{t "provider"}}</span>
+        <select name="provider">
+          {{range .Page.Providers}}
+          <option value="{{.Kind}}" {{if eq $.Page.ActiveProvider .Kind}}selected{{end}}>{{.Label}}</option>
+          {{end}}
+        </select>
+      </label>
+      <label>
+        <span>{{t "model_type"}}</span>
+        <select name="type">
+          <option value="" selected>{{t "model_type_auto"}}</option>
+          <option value="text">{{t "model_type_text"}}</option>
+          <option value="image">{{t "model_type_image"}}</option>
+          <option value="embedding">{{t "model_type_embedding"}}</option>
+          <option value="audio">{{t "model_type_audio"}}</option>
+          <option value="video">{{t "model_type_video"}}</option>
+        </select>
+      </label>
+      <label>
+        <span>{{t "upstream_model_id"}}</span>
+        <input name="upstream_id" placeholder="{{t "upstream_model_id_placeholder"}}">
+      </label>
+      <label>
+        <span>{{t "display_name"}}</span>
+        <input name="display_name" placeholder="{{t "display_name_placeholder"}}">
+      </label>
+      <label>
+        <span>{{t "owned_by"}}</span>
+        <input name="owned_by" placeholder="{{t "owned_by_placeholder"}}">
+      </label>
+      <div class="model-group-field">
+        <span>{{t "visible_groups"}}</span>
+        <details class="model-group-popover" data-empty-label="{{t "no_visible_groups"}}">
+          <summary>
+            <strong data-model-groups-summary>{{t "select_groups"}}</strong>
+          </summary>
+          <div class="model-group-panel">
+            <div class="model-group-panel-actions">
+              <button class="ghost" type="button" data-model-groups-select="all">{{t "select_all"}}</button>
+              <button class="ghost" type="button" data-model-groups-select="none">{{t "clear_selection"}}</button>
+            </div>
+            {{range .Page.AccountGroups}}
+            {{if .Name}}
+            <label class="checkbox-row">
+              <input type="checkbox" name="visible_group" value="{{.Name}}">
+              <span>{{.Name}}</span>
+            </label>
+            {{end}}
+            {{end}}
+          </div>
+        </details>
+      </div>
+    </div>
+    {{template "pricingEditor" dict "Mode" "token" "Fixed" false "Input" 0 "CachedInput" 0 "Output" 0 "ImageOutput" 0 "Request" 0 "Tiers" nil "Expression" ""}}
+    <div class="form-actions model-create-actions">
+      <button type="submit">{{t "create_model"}}</button>
+    </div>
+  </form>
+  </div>
+</div>
+
+<section class="panel model-list-panel" data-partial="models-list">
+  <div class="panel-head">
+    <div>
+      <h2>{{t "model_list"}}</h2>
+      <p class="panel-note">{{.Page.Stats.Enabled}} / {{.Page.Stats.Total}} {{t "enabled"}} · {{.Page.Stats.Disabled}} {{t "disabled"}}</p>
+    </div>
+  </div>
+  {{if .Page.ProviderSections}}
+  {{$activeSection := .Page.ActiveSection}}
+  <div class="group-bar model-provider-bar">
+    <nav class="group-tabs" aria-label="{{t "provider"}}">
+      {{range .Page.ProviderSections}}
+      <a
+        class="group-tab {{if eq $.Page.ActiveProvider .Provider}}active{{end}}"
+        href="/admin/models?provider={{.Provider}}"
+        aria-selected="{{if eq $.Page.ActiveProvider .Provider}}true{{else}}false{{end}}"
+      >{{.Label}}</a>
+      {{end}}
+    </nav>
+    <div class="group-summary">
+      <span class="panel-note">{{$activeSection.Stats.Enabled}} / {{$activeSection.Stats.Total}} {{t "enabled"}} · {{$activeSection.Stats.Disabled}} {{t "disabled"}}</span>
+      <button type="button" class="ghost" data-group-settings-open="model-create">{{t "create_model"}}</button>
+    </div>
+  </div>
+  {{if $activeSection.Rows}}
+  <div class="table-wrap model-table-wrap">
+    <table class="data-table model-table">
+      <thead>
+        <tr>
+          <th>{{t "model"}}</th>
+          <th>{{t "provider"}}</th>
+          <th>{{t "upstream_model_id"}}</th>
+          <th>{{t "visible_groups"}}</th>
+          <th>{{t "billing_settings"}}</th>
+          <th>{{t "last_sync"}}</th>
+          <th>{{t "status"}}</th>
+          <th>{{t "action"}}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range $activeSection.Rows}}
+        {{$index := .Index}}
+        {{$model := .Model}}
+        <tr>
+          <td>
+            <div class="cell-stack">
+              <strong>{{$model.ID}}</strong>
+              {{if and $model.DisplayName (ne $model.DisplayName $model.ID)}}<span class="muted">{{$model.DisplayName}}</span>{{end}}
+            </div>
+          </td>
+          <td>{{$model.Provider}}</td>
+          <td><code>{{if $model.UpstreamID}}{{$model.UpstreamID}}{{else}}{{$model.ID}}{{end}}</code></td>
+          <td>
+            <form class="model-groups-form" method="post" action="/admin/models/{{$model.ID}}/groups" data-ajax-form data-ajax-target='[data-partial="models-list"]'>
+              <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+              <input type="hidden" name="current_provider" value="{{$.Page.ActiveProvider}}">
+              <details class="model-group-popover table-popover model-group-compact" data-empty-label="{{t "no_visible_groups"}}">
+                <summary>
+                  <strong data-model-groups-summary>{{modelGroupsText $model}}</strong>
+                </summary>
+                <div class="model-group-panel">
+                  <div class="model-group-panel-actions">
+                    <button class="ghost" type="button" data-model-groups-select="all">{{t "select_all"}}</button>
+                    <button class="ghost" type="button" data-model-groups-select="none">{{t "clear_selection"}}</button>
+                  </div>
+                  {{range $.Page.AccountGroups}}
+                  {{if .Name}}
+                  <label class="checkbox-row">
+                    <input type="checkbox" name="visible_group" value="{{.Name}}" {{if modelGroupSelected $model .Name}}checked{{end}}>
+                    <span>{{.Name}}</span>
+                  </label>
+                  {{end}}
+                  {{end}}
+                  <button class="ghost" type="submit">{{t "save_visibility"}}</button>
+                </div>
+              </details>
+            </form>
+          </td>
+          <td>
+            <div class="cell-stack model-pricing-summary">
+              {{$pricing := modelPricingBreakdown $model}}
+              <span class="model-pricing-line">{{$pricing.Line1}}</span>
+              <span class="model-pricing-line">{{$pricing.Line2}}</span>
+            </div>
+          </td>
+          <td>{{formatTime $model.LastSyncedAt}}</td>
+          <td><span class="pill {{if $model.Enabled}}tone-good{{else}}tone-muted{{end}}">{{boolStateText $model.Enabled}}</span></td>
+          <td>
+            <div class="action-row model-row-actions">
+              <button type="button" class="ghost model-billing-edit-button" data-group-settings-open="model-billing-{{$index}}">{{t "edit_billing"}}</button>
+              <form method="post" action="/admin/models/{{$model.ID}}/toggle" data-ajax-form data-ajax-target='[data-partial="models-list"]'>
+                <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                <input type="hidden" name="current_provider" value="{{$.Page.ActiveProvider}}">
+                <button class="ghost" type="submit">{{if $model.Enabled}}{{t "disable"}}{{else}}{{t "enable"}}{{end}}</button>
+              </form>
+              <form method="post" action="/admin/models/{{$model.ID}}/delete" data-confirm="{{tf "confirm_delete_model" $model.ID}}" data-ajax-form data-ajax-target='[data-partial="models-list"]'>
+                <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                <input type="hidden" name="current_provider" value="{{$.Page.ActiveProvider}}">
+                <button class="danger" type="submit">{{t "delete"}}</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{range $activeSection.Rows}}
+  {{$index := .Index}}
+  {{$model := .Model}}
+  <div class="settings-overlay model-billing-overlay" id="model-billing-{{$index}}" role="dialog" aria-modal="true" aria-labelledby="model-billing-title-{{$index}}" hidden>
+    <div class="settings-dialog model-billing-dialog">
+      <div class="settings-header">
+        <div>
+          <h3 id="model-billing-title-{{$index}}">{{t "edit_billing"}}</h3>
+          <p>{{$model.ID}}</p>
+        </div>
+        <button type="button" class="icon-button settings-close" data-group-settings-close aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M18 6 6 18"></path>
+            <path d="m6 6 12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <form class="price-form-v2" method="post" action="/admin/models/{{$model.ID}}/price" data-ajax-form data-ajax-target='[data-partial="models-list"]'>
+        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+        <input type="hidden" name="current_provider" value="{{$.Page.ActiveProvider}}">
+        {{template "pricingEditor" dict "Mode" (billingModeText $model.BillingMode) "Fixed" $model.BillingFixed "Input" $model.InputPriceNanoUSDPer1M "CachedInput" $model.CachedInputPriceNanoUSDPer1M "Output" $model.OutputPriceNanoUSDPer1M "ImageOutput" $model.ImageOutputPriceNanoUSDPer1M "Request" $model.RequestPriceNanoUSD "Tiers" $model.PricingTiers "Expression" (pricingExpression $model)}}
+        <div class="form-actions">
+          <button class="ghost" type="submit">{{t "save_price"}}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {{end}}
+  {{else}}
+  <div class="empty">{{t "no_models"}}</div>
+  {{end}}
+  {{else}}
+  <div class="empty">{{t "no_models"}}</div>
+  {{end}}
+</section>
+</div>
+{{end}}

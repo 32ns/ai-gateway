@@ -1,0 +1,230 @@
+{{define "content"}}
+<section class="hero compact">
+  <div>
+    <div class="hero-title-row">
+      <h1>{{t "plans"}}</h1>
+      <span class="hero-subtitle">{{tf "plans_exchange_rate" .PaymentCNYPerUSD}}</span>
+    </div>
+    <p>{{t "plans_hint"}}</p>
+  </div>
+</section>
+
+{{if .PurchaseNotice}}<p class="notice success" data-clear-url-params="notice">{{t "plan_purchase_success"}}</p>{{end}}
+{{if .PurchaseBlocked}}<p class="notice warning" data-clear-url-params="notice">{{t "plan_purchase_active_blocked"}}</p>{{end}}
+{{if .InsufficientCash}}<p class="notice error" data-clear-url-params="notice">{{t "plan_purchase_insufficient_balance"}}</p>{{end}}
+
+{{if .CanPurchase}}
+<section class="panel">
+  <div class="panel-head">
+    <div>
+      <h2>{{t "active_plan"}}</h2>
+      <p class="panel-note">{{t "active_plan_hint"}}</p>
+    </div>
+  </div>
+  {{if .HasActivePlan}}
+  <div class="plan-quota-list">
+  {{$activePlanCount := len .ActivePlans}}
+  {{range $index, $plan := .ActivePlans}}
+  <div class="plan-quota-card" style="--plan-quota-remaining: {{planQuotaRemainingPercent $plan}}%">
+    <div class="plan-priority-row">
+      <span class="pill">{{if eq $index 0}}{{t "plan_priority_current"}}{{else}}{{tf "plan_priority_rank" (add $index 1)}}{{end}}</span>
+    </div>
+    <div class="plan-quota-head">
+      <div>
+        <span>{{t "plan_daily_quota"}}</span>
+        <strong>${{formatNanoUSD (planQuotaRemaining $plan)}} / ${{formatNanoUSD (planCurrentQuotaLimit $plan)}}</strong>
+      </div>
+      <div>
+        <span>{{t "plan_next_reset"}}</span>
+        <strong>{{formatTime $plan.CurrentPeriodEndsAt}}</strong>
+      </div>
+    </div>
+    <div class="plan-quota-progress" aria-label="{{t "plan_current_quota"}} {{planQuotaRemainingPercent $plan}}%">
+      <span></span>
+    </div>
+    <p class="plan-quota-caption">{{t "plan_quota_used_percent"}} {{planQuotaUsedPercent $plan}}%</p>
+    <div class="plan-quota-metrics">
+      <div>
+        <span>{{t "plan_name"}}</span>
+        <strong>{{$plan.PlanName}}</strong>
+      </div>
+      <div>
+        <span>{{t "plan_period_quota"}}</span>
+        <strong>${{formatNanoUSD $plan.PeriodQuotaNanoUSD}}</strong>
+      </div>
+      <div>
+        <span>{{t "plan_quota_used"}}</span>
+        <strong>${{formatNanoUSD (planQuotaUsed $plan)}}</strong>
+      </div>
+      <div>
+        <span>{{t "plan_remaining_periods"}}</span>
+        <strong>{{$plan.RemainingPeriods}}</strong>
+      </div>
+      {{if gt $activePlanCount 1}}
+      <div class="plan-priority-cell">
+        <div class="plan-priority-actions">
+          <form method="post" action="/plans/entitlements/priority">
+            <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+            <input type="hidden" name="entitlement_id" value="{{$plan.ID}}">
+            <input type="hidden" name="direction" value="up">
+            <button type="submit" title="{{t "plan_priority_up"}}" aria-label="{{t "plan_priority_up"}}" {{if eq $index 0}}disabled{{end}}><span aria-hidden="true" class="plan-priority-triangle up"></span></button>
+          </form>
+          <form method="post" action="/plans/entitlements/priority">
+            <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+            <input type="hidden" name="entitlement_id" value="{{$plan.ID}}">
+            <input type="hidden" name="direction" value="down">
+            <button type="submit" title="{{t "plan_priority_down"}}" aria-label="{{t "plan_priority_down"}}" {{if eq (add $index 1) $activePlanCount}}disabled{{end}}><span aria-hidden="true" class="plan-priority-triangle down"></span></button>
+          </form>
+        </div>
+      </div>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
+  </div>
+  {{else}}
+  <p class="empty-state">{{t "no_active_plan"}}</p>
+  {{end}}
+</section>
+{{end}}
+
+<section class="panel">
+  <div class="panel-head">
+    <div>
+      <h2>{{t "available_plans"}}</h2>
+      <p class="panel-note">{{t "available_plans_hint"}}</p>
+    </div>
+  </div>
+  {{if .PlanGroups}}
+  <div class="plan-groups">
+    {{range .PlanGroups}}
+    <section class="plan-group-section">
+      <div class="plan-group-head">
+        <h3>{{.Name}}</h3>
+      </div>
+      <div class="plan-card-grid">
+        {{range .Plans}}
+        <article class="plan-offer-card">
+          <div class="plan-offer-topline">
+            <span>{{t "plan_purchase"}}</span>
+            <strong>{{.PeriodCount}} {{t "plan_periods_unit"}}</strong>
+          </div>
+          <div class="plan-offer-title">
+            <h3>{{.Name}}</h3>
+            {{if .Description}}<p>{{.Description}}</p>{{end}}
+          </div>
+          <div class="plan-offer-price">
+            <span>{{t "plan_price"}}</span>
+            <strong>${{formatNanoUSD .PriceNanoUSD}}</strong>
+          </div>
+          <dl class="plan-offer-metrics">
+            <div>
+              <dt>{{t "plan_period_quota"}}</dt>
+              <dd>${{formatNanoUSD .PeriodQuotaNanoUSD}}</dd>
+            </div>
+            <div>
+              <dt>{{t "plan_period_hours"}}</dt>
+              <dd>{{planPeriodHours .}}h</dd>
+            </div>
+          </dl>
+          <div class="plan-offer-action">
+            {{if $.CanPurchase}}
+            {{$offer := .}}
+            <form
+              method="post"
+              action="/plans/purchase"
+              data-plan-purchase-form
+              data-plan-id="{{.ID}}"
+              data-plan-name="{{.Name}}"
+              data-plan-price="{{formatNanoUSD .PriceNanoUSD}}"
+              data-has-active-plan="{{if $.HasActivePlan}}true{{else}}false{{end}}"
+              data-has-matching-active-plan="{{if activePlansHasPlanID $.ActivePlans .ID}}true{{else}}false{{end}}"
+              data-purchase-title="{{t "plan_purchase"}}"
+              data-purchase-confirm="{{tf "confirm_buy_plan" .Name (formatNanoUSD .PriceNanoUSD)}}"
+              data-purchase-active-message="{{t "plan_purchase_mode_message"}}"
+              data-mode-separate="{{t "plan_purchase_mode_separate"}}"
+              data-mode-separate-hint="{{t "plan_purchase_mode_separate_hint"}}"
+              data-mode-merge="{{t "plan_purchase_mode_merge"}}"
+              data-mode-merge-hint="{{t "plan_purchase_mode_merge_hint"}}"
+              data-mode-extend="{{t "plan_purchase_mode_extend"}}"
+              data-mode-extend-hint="{{t "plan_purchase_mode_extend_hint"}}"
+              data-target-title="{{t "plan_purchase_target_title"}}"
+              data-target-quota-label="{{t "plan_purchase_target_quota"}}"
+              data-target-period-label="{{t "plan_purchase_target_period"}}"
+              data-mode-confirm="{{t "confirm"}}"
+              data-mode-cancel="{{t "cancel"}}"
+            >
+              <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+              <input type="hidden" name="plan_id" value="{{.ID}}">
+              <input type="hidden" name="purchase_mode" value="separate">
+              <input type="hidden" name="target_entitlement_id" value="">
+              <div class="plan-purchase-targets" hidden>
+                {{range $targetIndex, $targetPlan := activePlansForPlanID $.ActivePlans $offer.ID}}
+                <span
+                  data-plan-purchase-target
+                  data-id="{{$targetPlan.ID}}"
+                  data-label="{{$targetPlan.PlanName}}"
+                  data-quota="${{formatNanoUSD (planQuotaRemaining $targetPlan)}}"
+                  data-period="{{formatTime $targetPlan.CurrentPeriodEndsAt}}"
+                  data-rank="{{if gt $targetPlan.Priority 0}}{{$targetPlan.Priority}}{{else}}{{add $targetIndex 1}}{{end}}"
+                  data-can-merge="{{if and (eq $targetPlan.BasePeriodQuotaNanoUSD $offer.PeriodQuotaNanoUSD) (eq $targetPlan.PeriodDurationSec $offer.PeriodDurationSec)}}true{{else}}false{{end}}"
+                  data-can-extend="{{if and (eq $targetPlan.BasePeriodQuotaNanoUSD $offer.PeriodQuotaNanoUSD) (eq $targetPlan.PeriodQuotaNanoUSD $offer.PeriodQuotaNanoUSD) (eq $targetPlan.PeriodDurationSec $offer.PeriodDurationSec)}}true{{else}}false{{end}}"
+                ></span>
+                {{end}}
+              </div>
+              <button type="submit">{{t "buy_plan"}}</button>
+            </form>
+            {{else}}
+            <a class="button-link plan-login-action" href="{{$.PlanLoginURL}}">{{t "plan_login_to_buy"}}</a>
+            {{end}}
+          </div>
+        </article>
+        {{end}}
+      </div>
+    </section>
+    {{end}}
+  </div>
+  {{else}}
+  <p class="empty-state">{{t "no_available_plans"}}</p>
+  {{end}}
+</section>
+
+{{if .CanPurchase}}
+<section class="panel plan-history-panel">
+  <div class="panel-head">
+    <div>
+      <h2>{{t "plan_history"}}</h2>
+      <p class="panel-note">{{t "plan_history_hint"}}</p>
+    </div>
+  </div>
+  {{if .Entitlements}}
+  <div class="table-wrap plan-history-table-wrap">
+    <table class="data-table plan-table plan-history-table">
+      <thead>
+        <tr>
+          <th>{{t "plan_name"}}</th>
+          <th>{{t "status"}}</th>
+          <th>{{t "plan_current_quota"}}</th>
+          <th>{{t "plan_remaining_periods"}}</th>
+          <th>{{t "created_at"}}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Entitlements}}
+        <tr>
+          <td>{{.PlanName}}</td>
+          <td><span class="pill {{planEntitlementStatusClass .Status}}">{{planEntitlementStatusText .Status}}</span></td>
+          <td>${{formatNanoUSD (planQuotaRemaining .)}}</td>
+          <td>{{.RemainingPeriods}}</td>
+          <td>{{formatTime .PurchasedAt}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else}}
+  <p class="empty-state">{{t "no_plan_history"}}</p>
+  {{end}}
+</section>
+{{end}}
+{{end}}

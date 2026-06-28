@@ -1,0 +1,37 @@
+{{define "documentFormFields"}}
+{{$document := .Document}}
+<div class="document-form-grid">
+  <label>
+    <span>{{t "document_title"}}</span>
+    <input name="title" value="{{$document.Title}}" required>
+  </label>
+  <label>
+    <span>{{t "document_status"}}</span>
+    <select name="status">
+      <option value="draft" {{if eq $document.Status "draft"}}selected{{end}}>{{t "document_status_draft"}}</option>
+      <option value="published" {{if eq $document.Status "published"}}selected{{end}}>{{t "document_status_published"}}</option>
+      <option value="archived" {{if eq $document.Status "archived"}}selected{{end}}>{{t "document_status_archived"}}</option>
+    </select>
+  </label>
+</div>
+
+<label>
+  <span>{{t "document_body"}}</span>
+  <textarea name="body" rows="16" required>{{$document.Body}}</textarea>
+</label>
+
+<div class="settings-subhead document-seo-subhead">
+  <div>
+    <strong>{{t "document_seo"}}</strong>
+    <span>{{t "document_seo_hint"}}</span>
+  </div>
+</div>
+<label class="checkbox-row">
+  <input type="checkbox" name="pinned" {{if $document.Pinned}}checked{{end}}>
+  <span>{{t "document_pinned_checkbox"}}</span>
+</label>
+<label class="checkbox-row">
+  <input type="checkbox" name="noindex" {{if $document.NoIndex}}checked{{end}}>
+  <span>{{t "document_noindex_checkbox"}}</span>
+</label>
+{{end}}

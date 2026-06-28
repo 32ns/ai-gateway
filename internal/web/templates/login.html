@@ -1,0 +1,66 @@
+{{define "content"}}
+<section class="auth-panel login-screen">
+  <div class="panel auth-card">
+    <div class="panel-head">
+      <div>
+        <h2>{{t "login_heading"}}</h2>
+        <p class="panel-note">{{t "login_summary"}}</p>
+      </div>
+    </div>
+    {{if .Message}}<div class="notice error">{{.Message}}</div>{{end}}
+    <form class="grid-form single-column" method="post" action="/login">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <input type="hidden" name="next" value="{{.Next}}">
+      <label>
+        <span>{{t "username"}}</span>
+        <input name="username" autocomplete="username" value="{{.Username}}" required>
+      </label>
+      <label>
+        <span>{{t "password"}}</span>
+        <span class="password-field">
+          <input type="password" name="password" autocomplete="current-password" required data-password-toggle-input>
+          <button
+            class="icon-button password-toggle-button"
+            type="button"
+            data-password-toggle
+            tabindex="-1"
+            data-show-label="{{t "show_password"}}"
+            data-hide-label="{{t "hide_password"}}"
+            aria-label="{{t "show_password"}}"
+            title="{{t "show_password"}}"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <g data-password-icon-show>
+                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </g>
+              <g data-password-icon-hide hidden>
+                <path d="M2 12s3.5-6 10-6c1.8 0 3.4.45 4.8 1.1"></path>
+                <path d="M22 12s-3.5 6-10 6c-1.8 0-3.4-.45-4.8-1.1"></path>
+                <path d="M4 4l16 16"></path>
+                <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"></path>
+              </g>
+            </svg>
+          </button>
+        </span>
+      </label>
+      <div class="form-actions full-span auth-actions">
+        <button type="submit">{{t "login"}}</button>
+        {{if .AllowPublicRegistration}}
+        <a class="button-link ghost-link" href="/register">{{t "register"}}</a>
+        {{end}}
+      </div>
+    </form>
+    {{if or .GitHubLoginEnabled .GoogleLoginEnabled}}
+    <div class="oauth-login-actions">
+      {{if .GitHubLoginEnabled}}
+      <a class="button-link ghost-link" href="/login/oauth/github?next={{urlquery .Next}}">{{t "login_with_github"}}</a>
+      {{end}}
+      {{if .GoogleLoginEnabled}}
+      <a class="button-link ghost-link" href="/login/oauth/google?next={{urlquery .Next}}">{{t "login_with_google"}}</a>
+      {{end}}
+    </div>
+    {{end}}
+  </div>
+</section>
+{{end}}

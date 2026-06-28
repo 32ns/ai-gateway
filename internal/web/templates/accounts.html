@@ -1,0 +1,789 @@
+{{define "content"}}
+<section class="hero compact">
+  <div>
+    <h1>{{t "accounts"}}</h1>
+    <p>{{t "accounts_hint"}}</p>
+  </div>
+  <div class="hero-actions">
+    <button
+      type="button"
+      class="ghost"
+      data-group-settings-open="account-group-create-modal"
+    >{{t "create_group"}}</button>
+    {{if .OpenAIConnectAvailable}}<button type="button" class="ghost" data-group-settings-open="connect-openai-modal">{{t "nav_connect_openai"}}</button>{{end}}
+    {{if .ClaudeConnectAvailable}}<button type="button" class="ghost" data-group-settings-open="connect-claude-modal">{{t "nav_connect_claude"}}</button>{{end}}
+  </div>
+</section>
+
+{{if .AccountTestMessage}}
+<div class="system-notice {{if eq .AccountTestTone "good"}}tone-good{{else}}tone-bad{{end}}" data-clear-url-params="test_tone,test_message">{{.AccountTestMessage}}</div>
+{{end}}
+{{if .AccountBatchMessage}}
+<div class="system-notice {{if eq .AccountBatchTone "good"}}tone-good{{else}}tone-bad{{end}}" data-clear-url-params="batch_tone,batch_message">{{.AccountBatchMessage}}</div>
+{{end}}
+{{if .AccountCreated}}
+<div class="system-notice tone-good" data-clear-url-params="created,imported">{{t "account_created"}}</div>
+{{end}}
+
+<section class="panel account-pool-overview" data-partial="account-pool">
+  <div class="account-pool-overview-head">
+    <div>
+      <h2>{{t "accounts_pool_overview"}}</h2>
+      <p>{{t "accounts_pool_overview_hint"}}</p>
+    </div>
+    <form method="post" action="/admin/accounts/reconcile" data-ajax-form data-ajax-target='[data-partial="account-pool"], [data-partial="accounts-panel"]'>
+      <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+      <input type="hidden" name="current_group" value="{{$.ActiveAccountGroupKey}}">
+      <input type="hidden" name="current_filter" value="{{$.ActiveAccountFilter}}">
+      <button class="ghost" type="submit">{{t "accounts_pool_reconcile"}}</button>
+    </form>
+  </div>
+  <div class="account-pool-grid">
+    <a class="resource-card account-pool-card account-pool-normal" href="{{accountsGroupFilterHref $.ActiveAccountGroupKey "normal"}}">
+      <strong>{{t "accounts_pool_normal"}}</strong>
+      <span>{{len .State.AccountPools.Normal}}</span>
+      <small>{{t "account_filter_normal"}}</small>
+    </a>
+    <a class="resource-card account-pool-card account-pool-cooling" href="{{accountsGroupFilterHref $.ActiveAccountGroupKey "cooling"}}">
+      <strong>{{t "accounts_pool_cooling"}}</strong>
+      <span>{{len .State.AccountPools.Cooling}}</span>
+      <small>{{t "account_filter_time_limit"}} + {{t "account_filter_week_limit"}}</small>
+    </a>
+    <a class="resource-card account-pool-card account-pool-abnormal" href="{{accountsGroupFilterHref $.ActiveAccountGroupKey "exception"}}">
+      <strong>{{t "accounts_pool_abnormal"}}</strong>
+      <span>{{len .State.AccountPools.Abnormal}}</span>
+      <small>{{t "account_filter_exception"}}</small>
+    </a>
+  </div>
+</section>
+
+{{if .OpenAIConnectAvailable}}
+<div class="settings-overlay" id="connect-openai-modal" role="dialog" aria-modal="true" aria-labelledby="connect-openai-modal-title" hidden>
+  <div class="settings-dialog account-connect-dialog">
+    <div class="settings-header">
+      <div>
+        <h3 id="connect-openai-modal-title">{{t "nav_connect_openai"}}</h3>
+        <p>{{t "connect_summary"}}</p>
+      </div>
+      <button type="button" class="icon-button settings-close" data-group-settings-close aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M18 6 6 18"></path>
+          <path d="m6 6 12 12"></path>
+        </svg>
+      </button>
+    </div>
+    {{template "accountConnectPanel" dict "Start" .OpenAIConnectStart "CSRFToken" .CSRFToken "Error" "" "Modal" true}}
+  </div>
+</div>
+{{end}}
+
+{{if .ClaudeConnectAvailable}}
+<div class="settings-overlay" id="connect-claude-modal" role="dialog" aria-modal="true" aria-labelledby="connect-claude-modal-title" hidden>
+  <div class="settings-dialog account-connect-dialog">
+    <div class="settings-header">
+      <div>
+        <h3 id="connect-claude-modal-title">{{t "nav_connect_claude"}}</h3>
+        <p>{{t "connect_summary"}}</p>
+      </div>
+      <button type="button" class="icon-button settings-close" data-group-settings-close aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M18 6 6 18"></path>
+          <path d="m6 6 12 12"></path>
+        </svg>
+      </button>
+    </div>
+    {{template "accountConnectPanel" dict "Start" .ClaudeConnectStart "CSRFToken" .CSRFToken "Error" "" "Modal" true}}
+  </div>
+</div>
+{{end}}
+
+<div class="settings-overlay" id="account-group-create-modal" role="dialog" aria-modal="true" aria-labelledby="account-group-create-modal-title" hidden>
+  <div class="settings-dialog">
+    <div class="settings-header">
+      <div>
+        <h3 id="account-group-create-modal-title">{{t "create_group"}}</h3>
+        <p>{{t "account_group_type_hint"}}</p>
+      </div>
+      <button type="button" class="icon-button settings-close" data-group-settings-close aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M18 6 6 18"></path>
+          <path d="m6 6 12 12"></path>
+        </svg>
+      </button>
+    </div>
+    <form id="account-group-create-form" class="settings-form" method="post" action="/admin/account-groups" data-ajax-form data-ajax-target='[data-partial="account-pool"], [data-partial="accounts-panel"]'>
+      <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+      <label>
+        <span>{{t "account_group_name"}}</span>
+        <input name="name" value="" placeholder="{{t "account_group_placeholder"}}" required data-modal-autofocus>
+      </label>
+      <label>
+        <span>{{t "account_group_remark"}}</span>
+        <input name="remark" value="" maxlength="120" placeholder="{{t "account_group_remark_placeholder"}}">
+      </label>
+      <label>
+        <span>{{t "account_group_type"}}</span>
+        <select name="type">
+          {{range accountGroupTypeOptions}}
+          <option value="{{.Value}}">{{.Label}}</option>
+          {{end}}
+        </select>
+      </label>
+      <p class="field-note">{{t "account_group_type_hint"}}</p>
+      <div class="settings-actions">
+        <button type="button" class="ghost" data-group-settings-close>{{t "cancel"}}</button>
+        <button type="submit">{{t "create_group"}}</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<section class="panel accounts-panel" data-partial="accounts-panel">
+  {{if .State.AccountGroups}}
+  <div class="group-bar">
+    <nav class="group-tabs" aria-label="{{t "account_groups"}}">
+      {{range .State.AccountGroups}}
+      <a
+        class="group-tab {{if eq $.ActiveAccountGroupKey (accountGroupQueryKey .Key)}}active{{end}}"
+        href="{{accountGroupTabHref .Key}}"
+        aria-selected="{{if eq $.ActiveAccountGroupKey (accountGroupQueryKey .Key)}}true{{else}}false{{end}}"
+      >{{accountGroupLabel .Label}}</a>
+      {{end}}
+    </nav>
+    <div class="group-summary">
+      <span class="account-group-type-pill">{{accountGroupTypeText .ActiveAccountGroup.Type}}</span>
+      <span class="panel-note">{{len .ActiveAccountGroup.Accounts}} {{t "accounts"}}</span>
+      <label class="account-filter-control">
+        <span class="sr-only">{{t "account_filter"}}</span>
+        <select data-account-filter-select>
+          <option value="all" {{if eq .ActiveAccountFilter "all"}}selected{{end}}>{{t "account_filter_all"}}</option>
+          <option value="normal" {{if eq .ActiveAccountFilter "normal"}}selected{{end}}>{{t "account_filter_normal"}}</option>
+          <option value="cooling" {{if eq .ActiveAccountFilter "cooling"}}selected{{end}}>{{t "account_filter_cooling"}}</option>
+          <option value="time_limit" {{if eq .ActiveAccountFilter "time_limit"}}selected{{end}}>{{t "account_filter_time_limit"}}</option>
+          <option value="week_limit" {{if eq .ActiveAccountFilter "week_limit"}}selected{{end}}>{{t "account_filter_week_limit"}}</option>
+          <option value="exception" {{if eq .ActiveAccountFilter "exception"}}selected{{end}}>{{t "account_filter_exception"}}</option>
+          <option value="disabled" {{if eq .ActiveAccountFilter "disabled"}}selected{{end}}>{{t "account_filter_disabled"}}</option>
+        </select>
+      </label>
+      <form
+        id="account-batch-form"
+        class="account-batch-toolbar"
+        method="post"
+        action="/admin/accounts/batch"
+        data-account-batch-form
+        data-ajax-form
+        data-ajax-target='[data-partial="account-pool"], [data-partial="accounts-panel"]'
+        data-no-selection-message="{{t "account_batch_no_selection"}}"
+      >
+        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+        <input type="hidden" name="current_group" value="{{$.ActiveAccountGroupKey}}">
+        <input type="hidden" name="current_filter" value="{{$.ActiveAccountFilter}}" data-account-current-filter>
+        <span
+          class="account-batch-summary"
+          data-account-batch-summary
+          data-summary-template="{{t "account_batch_summary_template"}}"
+        >{{accountBatchSummaryText 0 (len .ActiveAccountGroup.Accounts)}}</span>
+        <button class="ghost" type="button" data-account-select-visible>{{t "account_batch_select_visible"}}</button>
+        <button class="ghost" type="button" data-account-clear-visible>{{t "account_batch_clear_visible"}}</button>
+        <button class="ghost" type="submit" name="action" value="enable" data-account-batch-action>{{t "account_batch_action_enable"}}</button>
+        <button class="ghost" type="submit" name="action" value="disable" data-account-batch-action>{{t "account_batch_action_disable"}}</button>
+        <button class="ghost" type="submit" name="action" value="refresh_quota" data-account-batch-action>{{t "account_batch_action_refresh_quota"}}</button>
+        <button class="ghost" type="submit" name="action" value="test" data-account-batch-action>{{t "account_batch_action_test"}}</button>
+        <button class="ghost" type="button" data-account-batch-action data-group-settings-open="account-batch-move-group">{{t "account_batch_action_move_group"}}</button>
+        <button
+          class="danger"
+          type="submit"
+          name="action"
+          value="delete"
+          data-account-batch-action
+          data-confirm="{{t "confirm_delete_accounts"}}"
+          data-confirm-template="{{t "confirm_delete_accounts_count"}}"
+        >{{t "account_batch_action_delete"}}</button>
+        <div class="settings-overlay" id="account-batch-move-group" role="dialog" aria-modal="true" aria-labelledby="account-batch-move-group-title" hidden>
+          <div class="settings-dialog">
+            <div class="settings-header">
+              <div>
+                <h3 id="account-batch-move-group-title">{{t "account_batch_move_group_title"}}</h3>
+                <p>{{t "account_batch_move_group_hint"}}</p>
+              </div>
+              <button type="button" class="icon-button settings-close" data-group-settings-close aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M18 6 6 18"></path>
+                  <path d="m6 6 12 12"></path>
+                </svg>
+              </button>
+            </div>
+            <div class="settings-form">
+              <label>
+                <span>{{t "account_batch_move_group_target"}}</span>
+                <select name="target_group" data-modal-autofocus>
+                  {{range .State.AccountGroups}}
+                  <option value="{{accountGroupQueryKey .Key}}" {{if eq $.ActiveAccountGroupKey (accountGroupQueryKey .Key)}}selected{{end}}>{{accountGroupLabel .Label}}</option>
+                  {{end}}
+                </select>
+              </label>
+              <div class="settings-actions">
+                <button type="button" class="ghost" data-group-settings-close>{{t "cancel"}}</button>
+                <button type="submit" name="action" value="move_group" data-account-batch-action>{{t "account_batch_move_group_confirm"}}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </form>
+      <button
+        type="button"
+        class="icon-button group-settings-trigger"
+        data-group-settings-open="account-group-settings"
+        aria-label="{{t "group_settings"}}"
+        title="{{t "group_settings"}}"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.09a2 2 0 0 1 1 1.74v.5a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"></path>
+          <circle cx="12" cy="12" r="3"></circle>
+        </svg>
+      </button>
+    </div>
+  </div>
+  <div
+    class="account-batch-job"
+    data-account-batch-job
+    data-active-url="/admin/accounts/batch/jobs/active"
+    data-status-url-template="/admin/accounts/batch/jobs/%id%"
+    data-cancel-url-template="/admin/accounts/batch/jobs/%id%/cancel"
+    data-refresh-url="{{accountsGroupFilterHref $.ActiveAccountGroupKey $.ActiveAccountFilter}}"
+    data-count-template="{{t "account_batch_job_counts"}}"
+    data-current-template="{{t "account_batch_job_current"}}"
+    data-refreshing-message="{{t "account_batch_job_refreshing"}}"
+    hidden
+  >
+    <div class="account-batch-job-head">
+      <div>
+        <strong data-account-batch-job-title>{{t "account_batch_job_title"}}</strong>
+        <span data-account-batch-job-meta></span>
+      </div>
+      <button class="ghost" type="button" data-account-batch-job-cancel>{{t "cancel"}}</button>
+    </div>
+    <div class="account-batch-job-progress" aria-hidden="true">
+      <span data-account-batch-job-progress></span>
+    </div>
+    <div class="account-batch-job-body">
+      <p data-account-batch-job-message></p>
+      <small data-account-batch-job-current></small>
+    </div>
+  </div>
+  <div class="settings-overlay" id="account-group-settings" role="dialog" aria-modal="true" aria-labelledby="account-group-settings-title" hidden>
+    <div class="settings-dialog">
+      <div class="settings-header">
+        <div>
+          <h3 id="account-group-settings-title">{{t "group_settings"}}</h3>
+          <p>{{accountGroupLabel .ActiveAccountGroup.Label}} · {{accountGroupTypeText .ActiveAccountGroup.Type}}</p>
+        </div>
+        <button type="button" class="icon-button settings-close" data-group-settings-close aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M18 6 6 18"></path>
+            <path d="m6 6 12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="settings-form account-import-export-settings">
+        <p class="field-note">{{t "account_import_export_hint"}}</p>
+        <div class="settings-actions account-export-actions">
+          <button
+            class="ghost"
+            type="submit"
+            name="scope"
+            value="selected"
+            form="account-batch-form"
+            formaction="/admin/accounts/export"
+            data-account-batch-action
+            data-account-batch-export-selected
+            data-download-form
+            data-long-running-message="{{t "account_export_running"}}"
+            data-download-filename="ai-gateway-accounts.json"
+            data-ajax-skip
+          >{{t "account_export_selected"}}</button>
+          <form class="account-export-form" method="post" action="/admin/accounts/export" data-download-form data-long-running-message="{{t "account_export_running"}}" data-download-filename="ai-gateway-accounts.json">
+            <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+            <button class="ghost" type="submit" name="scope" value="all">{{t "account_export_all"}}</button>
+          </form>
+        </div>
+      </div>
+
+      <form class="settings-form" method="post" action="/admin/accounts/import" enctype="multipart/form-data" data-long-running-form data-long-running-message="{{t "account_import_running"}}">
+        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+        <input type="hidden" name="current_group" value="{{$.ActiveAccountGroupKey}}">
+        <input type="hidden" name="current_filter" value="{{$.ActiveAccountFilter}}" data-account-current-filter>
+        <label>
+          <span>{{t "account_import_file"}}</span>
+          <input type="file" name="account_file" accept=".json,application/json" required>
+        </label>
+        <label>
+          <span>{{t "account_import_group_mode"}}</span>
+          <select name="group_mode">
+            <option value="preserve">{{t "account_import_group_mode_preserve"}}</option>
+            <option value="current">{{tf "account_import_group_mode_current" (accountGroupLabel .ActiveAccountGroup.Label)}}</option>
+          </select>
+        </label>
+        <label class="checkbox-row compact">
+          <input type="checkbox" name="replace_existing" value="1">
+          <span>{{t "account_import_replace_existing"}}</span>
+        </label>
+        <div class="settings-actions">
+          <button type="submit">{{t "account_import_submit"}}</button>
+        </div>
+      </form>
+
+      <form class="settings-form" method="post" action="/admin/account-groups/{{.ActiveAccountGroup.ID}}/profile" data-ajax-form data-ajax-target='[data-partial="account-pool"], [data-partial="accounts-panel"]'>
+        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+        <input type="hidden" name="current_group" value="{{$.ActiveAccountGroupKey}}">
+        <input type="hidden" name="current_filter" value="{{$.ActiveAccountFilter}}" data-account-current-filter>
+        {{if ne .ActiveAccountGroup.ID "default"}}
+        <label>
+          <span>{{t "account_group_name"}}</span>
+          <input name="name" value="{{.ActiveAccountGroup.Label}}" placeholder="{{t "account_group_placeholder"}}" required data-modal-autofocus>
+        </label>
+        {{else}}
+        <input type="hidden" name="name" value="{{.ActiveAccountGroup.Label}}">
+        {{end}}
+        <label>
+          <span>{{t "account_group_type"}}</span>
+          <select name="type" {{if eq .ActiveAccountGroup.ID "default"}}data-modal-autofocus{{end}}>
+            {{range accountGroupTypeOptions}}
+            <option value="{{.Value}}" {{if accountGroupTypeSelected $.ActiveAccountGroup.Type .Value}}selected{{end}}>{{.Label}}</option>
+            {{end}}
+          </select>
+        </label>
+        <p class="field-note">{{t "account_group_type_hint"}}</p>
+        <label>
+          <span>{{t "account_group_remark"}}</span>
+          <input name="remark" value="{{.ActiveAccountGroup.Remark}}" maxlength="120" placeholder="{{t "account_group_remark_placeholder"}}">
+        </label>
+        <p class="field-note">{{t "account_group_remark_hint"}}</p>
+        <div class="settings-actions">
+          <button type="submit">{{t "save"}}</button>
+        </div>
+      </form>
+
+      <form class="settings-form" method="post" action="/admin/account-groups/{{.ActiveAccountGroup.ID}}/proxy" data-ajax-form data-ajax-target='[data-partial="account-pool"], [data-partial="accounts-panel"]'>
+        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+        <input type="hidden" name="current_group" value="{{$.ActiveAccountGroupKey}}">
+        <input type="hidden" name="current_filter" value="{{$.ActiveAccountFilter}}" data-account-current-filter>
+        <label>
+          <span>{{t "group_proxy"}}</span>
+          <input data-proxy-test-input name="proxy_url" value="{{.ActiveAccountGroup.ProxyURL}}" placeholder="{{t "proxy_url_placeholder"}}">
+        </label>
+        <div class="settings-actions">
+          <button
+            type="button"
+            class="ghost"
+            data-proxy-test
+            data-proxy-test-url="/admin/proxy-test"
+            data-proxy-test-running="{{t "proxy_test_running"}}"
+            data-proxy-test-success="{{t "proxy_test_success"}}"
+            data-proxy-test-failed="{{t "proxy_test_failed"}}"
+          >{{t "test_proxy"}}</button>
+          <button type="submit">{{t "save_proxy"}}</button>
+        </div>
+        <p class="proxy-test-result" data-proxy-test-result aria-live="polite"></p>
+      </form>
+
+      {{if ne .ActiveAccountGroup.ID "default"}}
+        <form class="settings-form account-group-visibility-form" method="post" action="/admin/account-groups/{{.ActiveAccountGroup.ID}}/visibility" data-ajax-form data-ajax-target='[data-partial="account-pool"], [data-partial="accounts-panel"]'>
+          <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+          <input type="hidden" name="current_group" value="{{$.ActiveAccountGroupKey}}">
+          <input type="hidden" name="current_filter" value="{{$.ActiveAccountFilter}}" data-account-current-filter>
+          <div class="account-group-visibility-head">
+            <label class="checkbox-row compact">
+              <input
+                type="checkbox"
+                name="show_in_client_editor"
+                value="1"
+                {{if accountGroupShowInClientEditor .ActiveAccountGroup}}checked{{end}}
+              >
+              <span>{{t "account_group_show_in_client_editor"}}</span>
+            </label>
+          </div>
+          <div class="account-group-visible-users" data-message-target>
+            <label class="account-group-user-search">
+              <span>{{t "account_group_visible_users"}}</span>
+              <div class="message-user-picker account-group-user-picker">
+                <input type="search" data-message-user-search data-message-user-search-url="/messages/users/search" placeholder="{{t "message_user_search_placeholder"}}" autocomplete="off">
+                <button type="button" class="ghost" data-message-user-add>{{t "add"}}</button>
+              </div>
+            </label>
+            <div class="account-group-user-results">
+              <div class="message-user-results" data-message-user-results hidden></div>
+            </div>
+            <div hidden>
+              {{range $.State.Users}}
+              <span data-message-user-option data-user-id="{{.ID}}" data-user-name="{{.Username}}"></span>
+              {{end}}
+            </div>
+            <div class="message-selected-users" data-message-selected-users data-user-input-name="visible_user_id">
+              {{range $.State.Users}}
+              {{if accountGroupVisibleUserSelected $.ActiveAccountGroup .ID}}
+              <span class="message-selected-user" data-user-id="{{.ID}}">
+                <input type="hidden" name="visible_user_id" value="{{.ID}}">
+                <span>{{.Username}}</span>
+                <button type="button" data-message-user-remove aria-label="{{t "delete"}}" title="{{t "delete"}}">×</button>
+              </span>
+              {{end}}
+              {{end}}
+            </div>
+            <p class="field-note">{{t "account_group_visible_users_hint"}}</p>
+          </div>
+          <div class="settings-actions account-group-visibility-actions">
+            <button type="submit">{{t "save_visibility"}}</button>
+          </div>
+        </form>
+      {{end}}
+
+      <form class="settings-form" method="post" action="/admin/account-groups/{{.ActiveAccountGroup.ID}}/billing" data-ajax-form data-ajax-target='[data-partial="account-pool"], [data-partial="accounts-panel"]'>
+        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+        <input type="hidden" name="current_group" value="{{$.ActiveAccountGroupKey}}">
+        <input type="hidden" name="current_filter" value="{{$.ActiveAccountFilter}}" data-account-current-filter>
+        <label>
+          <span>{{t "billing_multiplier"}}</span>
+          <input name="billing_multiplier" inputmode="decimal" min="0" step="0.0001" value="{{formatMultiplier .ActiveAccountGroup.BillingMultiplierBps}}" placeholder="1">
+        </label>
+        <label>
+          <span>{{t "plan_billing_multiplier"}}</span>
+          <input name="plan_billing_multiplier" inputmode="decimal" min="0" step="0.0001" value="{{formatMultiplier .ActiveAccountGroup.PlanBillingMultiplierBps}}" placeholder="1">
+        </label>
+        <label class="checkbox-row compact">
+          <input type="checkbox" name="plan_billing_enabled" value="1" {{if accountGroupPlanBillingEnabled .ActiveAccountGroup}}checked{{end}}>
+          <span>{{t "account_group_plan_billing_enabled"}}</span>
+        </label>
+        <label>
+          <span>{{t "group_input_price_usd_per_1m"}}</span>
+          <input name="input_price_usd_per_1m" inputmode="decimal" value="{{formatNanoUSD .ActiveAccountGroup.InputPriceNanoUSDPer1M}}" placeholder="0">
+        </label>
+        <label>
+          <span>{{t "group_cached_input_price_usd_per_1m"}}</span>
+          <input name="cached_input_price_usd_per_1m" inputmode="decimal" value="{{formatNanoUSD .ActiveAccountGroup.CachedInputPriceNanoUSDPer1M}}" placeholder="0">
+        </label>
+        <label>
+          <span>{{t "group_cache_write_price_usd_per_1m"}}</span>
+          <input name="cache_write_price_usd_per_1m" inputmode="decimal" value="{{formatNanoUSD .ActiveAccountGroup.CacheWritePriceNanoUSDPer1M}}" placeholder="0">
+        </label>
+        <label>
+          <span>{{t "group_cache_write_5m_price_usd_per_1m"}}</span>
+          <input name="cache_write_5m_price_usd_per_1m" inputmode="decimal" value="{{formatNanoUSD .ActiveAccountGroup.CacheWrite5mPriceNanoUSDPer1M}}" placeholder="0">
+        </label>
+        <label>
+          <span>{{t "group_cache_write_1h_price_usd_per_1m"}}</span>
+          <input name="cache_write_1h_price_usd_per_1m" inputmode="decimal" value="{{formatNanoUSD .ActiveAccountGroup.CacheWrite1hPriceNanoUSDPer1M}}" placeholder="0">
+        </label>
+        <label>
+          <span>{{t "group_output_price_usd_per_1m"}}</span>
+          <input name="output_price_usd_per_1m" inputmode="decimal" value="{{formatNanoUSD .ActiveAccountGroup.OutputPriceNanoUSDPer1M}}" placeholder="0">
+        </label>
+        <label>
+          <span>{{t "group_image_output_price_usd_per_1m"}}</span>
+          <input name="image_output_price_usd_per_1m" inputmode="decimal" value="{{formatNanoUSD .ActiveAccountGroup.ImageOutputPriceNanoUSDPer1M}}" placeholder="0">
+        </label>
+        <div class="timed-multiplier-section">
+          <div class="settings-subhead">
+            <div>
+              <strong>{{t "timed_multipliers"}}</strong>
+              <span>{{t "timed_multipliers_hint"}}</span>
+            </div>
+            <button
+              type="button"
+              class="ghost"
+              data-timed-multiplier-open="new"
+            >{{t "timed_multiplier_add"}}</button>
+          </div>
+          <div
+            class="timed-multiplier-list"
+            data-timed-multiplier-list
+            data-empty-label="{{t "timed_multiplier_empty"}}"
+            data-unnamed-label="{{t "timed_multiplier_unnamed"}}"
+            data-enabled-label="{{t "timed_multiplier_status_enabled"}}"
+            data-disabled-label="{{t "timed_multiplier_status_disabled"}}"
+            data-expired-label="{{t "timed_multiplier_status_expired"}}"
+            data-everyday-label="{{t "timed_multiplier_everyday"}}"
+            data-any-date-label="{{t "timed_multiplier_any_date"}}"
+            data-all-day-label="{{t "timed_multiplier_all_day"}}"
+            data-start-label="{{t "timed_multiplier_unbounded_start"}}"
+            data-end-label="{{t "timed_multiplier_unbounded_end"}}"
+            data-edit-label="{{t "timed_multiplier_edit"}}"
+            data-delete-label="{{t "timed_multiplier_delete"}}"
+            data-confirm-delete-label="{{t "confirm_delete_timed_multiplier"}}"
+          >
+          {{range .ActiveAccountGroup.TimedMultipliers}}
+          {{$ruleID := .ID}}
+          {{$ruleWeekdays := .Weekdays}}
+          <div class="timed-multiplier-item {{if timedMultiplierExpired .}}is-expired{{end}}" data-timed-multiplier-rule data-rule-id="{{$ruleID}}">
+            <input type="hidden" name="timed_multiplier_id" value="{{$ruleID}}">
+            <input type="hidden" name="timed_multiplier_name_{{$ruleID}}" value="{{.Name}}" data-rule-hidden="name">
+            <input type="hidden" name="timed_multiplier_value_{{$ruleID}}" value="{{formatMultiplier .MultiplierBps}}" data-rule-hidden="value">
+            <input type="hidden" name="timed_multiplier_start_date_{{$ruleID}}" value="{{.StartDate}}" data-rule-hidden="startDate">
+            <input type="hidden" name="timed_multiplier_end_date_{{$ruleID}}" value="{{.EndDate}}" data-rule-hidden="endDate">
+            <input type="hidden" name="timed_multiplier_start_time_{{$ruleID}}" value="{{.StartTime}}" data-rule-hidden="startTime">
+            <input type="hidden" name="timed_multiplier_end_time_{{$ruleID}}" value="{{.EndTime}}" data-rule-hidden="endTime">
+            <input type="hidden" name="timed_multiplier_priority_{{$ruleID}}" value="{{.Priority}}" data-rule-hidden="priority">
+            {{if and .Enabled (not (timedMultiplierExpired .))}}<input type="hidden" name="timed_multiplier_enabled" value="{{$ruleID}}" data-rule-hidden="enabled">{{end}}
+            {{range timedMultiplierWeekdays}}{{if timedMultiplierWeekdaySelected $ruleWeekdays .Value}}<input type="hidden" name="timed_multiplier_weekday_{{$ruleID}}" value="{{.Value}}" data-rule-hidden="weekday">{{end}}{{end}}
+            <div class="timed-multiplier-item-main">
+              <div class="timed-multiplier-item-head">
+                <strong data-rule-display="name">{{if .Name}}{{.Name}}{{else}}{{t "timed_multiplier_unnamed"}}{{end}}</strong>
+                <span class="pill {{timedMultiplierStatusClass .}}" data-rule-display="status">{{timedMultiplierStatusText .}}</span>
+              </div>
+              <div class="timed-multiplier-meta">
+                <span data-rule-display="multiplier">{{formatMultiplier .MultiplierBps}}x</span>
+                <span data-rule-display="weekdays">{{timedMultiplierWeekdaySummary .Weekdays}}</span>
+                <span data-rule-display="dates">{{timedMultiplierDateSummary .}}</span>
+                <span data-rule-display="times">{{timedMultiplierTimeSummary .}}</span>
+                <span data-rule-display="priority">{{t "timed_multiplier_priority"}} {{.Priority}}</span>
+              </div>
+            </div>
+            <div class="timed-multiplier-item-actions">
+              <button type="button" class="ghost" data-timed-multiplier-open="edit">{{t "timed_multiplier_edit"}}</button>
+              <button type="button" class="ghost danger" data-timed-multiplier-remove>{{t "timed_multiplier_delete"}}</button>
+            </div>
+          </div>
+          {{else}}
+          <div class="timed-multiplier-empty" data-timed-multiplier-empty>{{t "timed_multiplier_empty"}}</div>
+          {{end}}
+          </div>
+        </div>
+        <div class="settings-overlay timed-multiplier-editor-overlay" id="timed-multiplier-editor" role="dialog" aria-modal="true" aria-labelledby="timed-multiplier-editor-title" hidden>
+          <div class="settings-dialog timed-multiplier-dialog">
+            <div class="settings-header">
+              <div>
+                <h3 id="timed-multiplier-editor-title" data-timed-multiplier-title>{{t "timed_multiplier_new"}}</h3>
+                <p>{{t "timed_multipliers_hint"}}</p>
+              </div>
+              <button type="button" class="icon-button settings-close" data-timed-multiplier-close aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M18 6 6 18"></path>
+                  <path d="m6 6 12 12"></path>
+                </svg>
+              </button>
+            </div>
+            <div class="settings-form timed-multiplier-editor-form" data-timed-multiplier-editor>
+              <input type="hidden" data-rule-input="id">
+              <input type="hidden" data-new-title="{{t "timed_multiplier_new"}}" data-edit-title="{{t "timed_multiplier_edit"}}" data-rule-input="mode">
+              <label>
+                <span>{{t "timed_multiplier_name"}}</span>
+                <input data-rule-input="name" placeholder="{{t "timed_multiplier_name_placeholder"}}" data-modal-autofocus>
+              </label>
+              <label>
+                <span>{{t "timed_multiplier_value"}}</span>
+                <input data-rule-input="value" inputmode="decimal" min="0" step="0.0001" placeholder="1">
+              </label>
+              <label>
+                <span>{{t "timed_multiplier_start_date"}}</span>
+                <input type="date" data-rule-input="startDate">
+              </label>
+              <label>
+                <span>{{t "timed_multiplier_end_date"}}</span>
+                <input type="date" data-rule-input="endDate">
+              </label>
+              <label>
+                <span>{{t "timed_multiplier_start_time"}}</span>
+                <input type="time" data-rule-input="startTime">
+              </label>
+              <label>
+                <span>{{t "timed_multiplier_end_time"}}</span>
+                <input type="time" data-rule-input="endTime">
+              </label>
+              <label>
+                <span>{{t "timed_multiplier_priority"}}</span>
+                <input type="number" data-rule-input="priority" placeholder="0" step="1">
+              </label>
+              <div class="weekday-picker" aria-label="{{t "timed_multiplier_weekdays"}}">
+                {{range timedMultiplierWeekdays}}
+                <label class="checkbox-row compact">
+                  <input type="checkbox" data-rule-input="weekday" value="{{.Value}}">
+                  <span>{{.Label}}</span>
+                </label>
+                {{end}}
+              </div>
+              <label class="checkbox-row compact">
+                <input type="checkbox" data-rule-input="enabled" value="on">
+                <span>{{t "timed_multiplier_enabled"}}</span>
+              </label>
+              <div class="settings-actions">
+                <button type="button" class="ghost" data-timed-multiplier-close>{{t "cancel"}}</button>
+                <button type="button" data-timed-multiplier-save>{{t "timed_multiplier_save_rule"}}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="settings-actions">
+          <button type="submit">{{t "save_billing"}}</button>
+        </div>
+      </form>
+
+      {{if ne .ActiveAccountGroup.ID "default"}}
+      <div class="settings-danger-zone">
+        <div>
+          <strong>{{t "delete_group"}}</strong>
+          <span>{{t "delete_group_hint"}}</span>
+        </div>
+        <form method="post" action="/admin/account-groups/{{.ActiveAccountGroup.ID}}/delete" data-confirm="{{tf "confirm_delete_group" .ActiveAccountGroup.Label}}" data-ajax-form data-ajax-target='[data-partial="account-pool"], [data-partial="accounts-panel"]'>
+          <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+          <input type="hidden" name="current_group" value="{{$.ActiveAccountGroupKey}}">
+          <input type="hidden" name="current_filter" value="{{$.ActiveAccountFilter}}" data-account-current-filter>
+          <button class="danger" type="submit">{{t "delete_group"}}</button>
+        </form>
+      </div>
+      {{end}}
+    </div>
+  </div>
+
+  <div class="card-grid account-card-grid">
+    {{range .ActiveAccountGroup.Accounts}}
+    {{$quota := accountQuota .}}
+    <article class="resource-card account-card{{if and $quota $quota.Plan}} has-plan{{end}}" data-account-card data-account-id="{{.ID}}" data-account-filter="{{accountFilterStatus .}}" data-account-control-filter="{{if accountControlDisabled .}}disabled{{else}}enabled{{end}}">
+      <label class="account-select-control" title="{{t "account_batch_select_account"}}">
+        <input type="checkbox" name="account_id" value="{{.ID}}" form="account-batch-form" data-account-select>
+        <span class="sr-only">{{t "account_batch_select_account"}}</span>
+      </label>
+      <div class="card-head">
+        <div class="cell-stack">
+          {{if and $quota $quota.Plan}}<span class="account-plan-token account-plan-corner" title="{{$quota.Plan}}">{{$quota.Plan}}</span>{{end}}
+          <h3>{{accountLabelDisplay .Label}}</h3>
+          <div class="account-card-meta">
+            {{if .Backup}}
+            <span class="account-status-inline tone-warn">{{t "account_backup_badge"}}</span>
+            <span class="account-status-inline tone-muted">{{t "account_today_calls"}} {{formatInteger (accountTodayCalls $.State.AccountDailyCallCounts .ID)}}</span>
+            {{end}}
+            {{if accountControlDisabled .}}<span class="account-status-inline tone-bad">{{t "disabled"}}</span>{{end}}
+            <span class="account-status-inline {{accountRuntimeStatusTone .}}">{{accountRuntimeStatusText .}}</span>
+          </div>
+        </div>
+        <div class="account-card-actions">
+          <details class="account-details">
+            <summary class="icon-button" aria-label="{{t "details"}}" title="{{t "details"}}">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M12 16v-4"></path>
+                <path d="M12 8h.01"></path>
+              </svg>
+            </summary>
+            <div class="account-detail-panel">
+              <div class="kv"><span>{{t "label"}}</span><strong>{{accountLabelDisplay .Label}}</strong></div>
+              <div class="kv"><span>{{t "account_control_status"}}</span><span class="pill {{accountControlStatusTone .}}">{{if accountControlDisabled .}}{{t "disabled"}}{{else}}{{t "enabled"}}{{end}}</span></div>
+              <div class="kv"><span>{{t "account_runtime_status"}}</span><span class="pill {{accountRuntimeStatusTone .}}">{{accountRuntimeStatusText .}}</span></div>
+              <div class="kv"><span>{{t "account_backup_enabled"}}</span><span class="pill {{if .Backup}}tone-warn{{else}}tone-muted{{end}}">{{if .Backup}}{{t "enabled"}}{{else}}{{t "disabled"}}{{end}}</span></div>
+              <div class="kv"><span>{{t "priority"}} / {{t "weight"}}</span><strong>{{.Priority}} / {{.Weight}}</strong></div>
+              <div class="kv"><span>{{t "failures"}}</span><strong>{{.ConsecutiveFails}} / {{.TotalFails}}</strong></div>
+              {{if $quota}}
+              <div class="kv"><span>{{t "quota_credits"}}</span><span>{{quotaCreditsSummary $quota.Credits}}</span></div>
+              {{end}}
+              <div class="kv"><span>{{t "token"}}</span><code>{{maskToken .}}</code></div>
+              <div class="kv"><span>{{t "base_url"}}</span><code>{{baseURLForAccount .}}</code></div>
+              {{$accountProxy := proxyURLForAccount .}}
+              {{$groupProxy := $.ActiveAccountGroup.ProxyURL}}
+              {{$systemProxy := $.State.SystemProxyURL}}
+              <div class="kv"><span>{{t "proxy_url"}}</span><code>{{if $accountProxy}}{{maskProxyURL $accountProxy}}{{else if $groupProxy}}{{maskProxyURL $groupProxy}}{{else if $systemProxy}}{{maskProxyURL $systemProxy}}{{else}}{{t "no_proxy"}}{{end}}</code></div>
+              {{if $quota}}
+              {{if showQuotaImage $quota}}<div class="kv"><span>{{t "quota_image_generation"}}</span><span>{{quotaImageSummary $quota.Image}}</span></div>{{end}}
+              <div class="kv"><span>{{t "quota_reached_type"}}</span><span>{{if $quota.ReachedType}}{{$quota.ReachedType}}{{else}}-{{end}}</span></div>
+              {{else if accountSupportsQuotaRefresh .}}
+              <div class="kv"><span>{{t "quota_plan"}}</span><span>{{t "quota_unavailable"}}</span></div>
+              {{end}}
+              {{if accountQuotaError .}}
+              <div class="kv"><span>{{t "quota_refresh_error"}}</span><span>{{accountQuotaError .}}</span></div>
+              {{end}}
+              <div class="account-detail-time-group">
+                <div class="kv"><span>{{t "account_added_at"}}</span><span>{{formatTime .CreatedAt}}</span></div>
+                <div class="kv"><span>{{t "updated_at"}}</span><span>{{formatTime .UpdatedAt}}</span></div>
+                <div class="kv"><span>{{t "last_used"}}</span><span>{{formatTime .LastUsedAt}}</span></div>
+                <div class="kv"><span>{{t "expires_at"}}</span><span>{{formatTime .Credential.ExpiresAt}}</span></div>
+                <div class="kv"><span>{{t "cooldown"}}</span><strong>{{cooldownText .}}</strong></div>
+                {{if $quota}}
+                <div class="kv"><span>{{t "quota_refreshed_at"}}</span><span>{{formatTime $quota.RefreshedAt}}</span></div>
+                {{end}}
+                {{if accountQuotaError .}}
+                <div class="kv"><span>{{t "quota_error_at"}}</span><span>{{formatTime (accountQuotaErrorAt .)}}</span></div>
+                {{end}}
+              </div>
+            </div>
+          </details>
+        </div>
+      </div>
+      <div class="account-summary">
+        {{if accountUsesManualKey .}}
+        <div class="kv"><span>{{t "quota_credits"}}</span><span>{{if $quota}}{{quotaCreditsSummary $quota.Credits}}{{else}}{{t "quota_unavailable"}}{{end}}</span></div>
+        <div class="kv"><span>{{t "token"}}</span><code>{{maskToken .}}</code></div>
+        <div class="kv"><span>{{t "base_url"}}</span><code>{{if baseURLForAccount .}}{{baseURLForAccount .}}{{else}}-{{end}}</code></div>
+        {{else if $quota}}
+        <div class="quota-window-row">
+          <div class="kv quota-progress" style="--quota-progress: {{quotaWindowPercent $quota.Primary}}%">
+            <span>{{t "quota_primary_window"}}</span>
+            <span>{{quotaWindowSummary $quota.Primary}}</span>
+          </div>
+          <div class="kv quota-progress" style="--quota-progress: {{quotaWindowPercent $quota.Secondary}}%">
+            <span>{{t "quota_secondary_window"}}</span>
+            <span>{{quotaWindowSummary $quota.Secondary}}</span>
+          </div>
+        </div>
+        {{if showQuotaImage $quota}}
+        <div class="kv">
+          <span>{{t "quota_image_generation"}}</span>
+          <span>{{quotaImageSummary $quota.Image}}</span>
+        </div>
+        {{end}}
+        {{else if accountSupportsQuotaRefresh .}}
+        <div class="kv"><span>{{t "quota_plan"}}</span><span>{{t "quota_unavailable"}}</span></div>
+        <div class="kv"><span>{{t "quota_primary_window"}}</span><span>-</span></div>
+        <div class="kv"><span>{{t "quota_secondary_window"}}</span><span>-</span></div>
+        {{else}}
+        <div class="kv"><span>{{t "quota_plan"}}</span><span>-</span></div>
+        <div class="kv"><span>{{t "quota_primary_window"}}</span><span>-</span></div>
+        <div class="kv"><span>{{t "quota_secondary_window"}}</span><span>-</span></div>
+        {{end}}
+      </div>
+      <div class="action-row">
+        {{if accountSupportsQuotaRefresh .}}
+        <form method="post" action="/admin/accounts/{{.ID}}/refresh-quota" data-ajax-form data-ajax-target='[data-partial="account-pool"], [data-partial="accounts-panel"]'>
+          <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+          <input type="hidden" name="current_group" value="{{$.ActiveAccountGroupKey}}">
+          <input type="hidden" name="current_filter" value="{{$.ActiveAccountFilter}}" data-account-current-filter>
+          <button class="ghost" type="submit">{{t "refresh_quota"}}</button>
+        </form>
+        {{end}}
+        <a class="button-link ghost-link" href="{{accountEditHref .ID $.ActiveAccountGroupKey $.ActiveAccountFilter}}">{{t "edit"}}</a>
+        <form method="post" action="/admin/accounts/{{.ID}}/toggle" data-ajax-form data-ajax-target='[data-partial="account-pool"], [data-partial="accounts-panel"]'>
+          <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+          <input type="hidden" name="current_group" value="{{$.ActiveAccountGroupKey}}">
+          <input type="hidden" name="current_filter" value="{{$.ActiveAccountFilter}}" data-account-current-filter>
+          <button class="ghost" type="submit">{{if accountControlDisabled .}}{{t "enable"}}{{else}}{{t "disable"}}{{end}}</button>
+        </form>
+        {{if accountRecoverable .}}
+        <form method="post" action="/admin/accounts/{{.ID}}/recover" data-ajax-form data-ajax-target='[data-partial="account-pool"], [data-partial="accounts-panel"]'>
+          <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+          <input type="hidden" name="current_group" value="{{$.ActiveAccountGroupKey}}">
+          <input type="hidden" name="current_filter" value="{{$.ActiveAccountFilter}}" data-account-current-filter>
+          <button class="ghost" type="submit">{{t "recover"}}</button>
+        </form>
+        {{end}}
+        <form method="post" action="/admin/accounts/{{.ID}}/delete" data-confirm="{{tf "confirm_delete_account" .Label}}" data-ajax-form data-ajax-target='[data-partial="account-pool"], [data-partial="accounts-panel"]'>
+          <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+          <input type="hidden" name="current_group" value="{{$.ActiveAccountGroupKey}}">
+          <input type="hidden" name="current_filter" value="{{$.ActiveAccountFilter}}" data-account-current-filter>
+          <button class="danger" type="submit">{{t "delete"}}</button>
+        </form>
+        <form method="post" action="/admin/accounts/{{.ID}}/test" data-ajax-form data-ajax-target='[data-partial="account-pool"], [data-partial="accounts-panel"]'>
+          <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+          <input type="hidden" name="current_group" value="{{$.ActiveAccountGroupKey}}">
+          <input type="hidden" name="current_filter" value="{{$.ActiveAccountFilter}}" data-account-current-filter>
+          <button class="ghost" type="submit">{{t "test_account"}}</button>
+        </form>
+      </div>
+    </article>
+    {{else}}
+    <div class="empty">{{t "no_accounts_in_group"}}</div>
+    {{end}}
+    <div class="empty" data-account-filter-empty hidden>{{t "no_accounts_match_filter"}}</div>
+  </div>
+  {{else}}
+  <div class="empty">{{t "no_accounts_available"}}</div>
+  {{end}}
+</section>
+{{end}}

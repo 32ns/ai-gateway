@@ -1,0 +1,294 @@
+{{define "layout"}}
+<!DOCTYPE html>
+<html lang="{{.Locale}}" data-theme="dark-neutral">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{if .PageTitle}}{{.PageTitle}}{{else}}{{t .TitleKey}}{{end}}</title>
+  {{if .MetaDescription}}<meta name="description" content="{{.MetaDescription}}">{{end}}
+  {{if .Robots}}<meta name="robots" content="{{.Robots}}">{{end}}
+  {{if .CanonicalURL}}<link rel="canonical" href="{{.CanonicalURL}}">{{end}}
+  {{if .PageTitle}}<meta property="og:title" content="{{.PageTitle}}">{{end}}
+  {{if .MetaDescription}}<meta property="og:description" content="{{.MetaDescription}}">{{end}}
+  {{if .CanonicalURL}}<meta property="og:url" content="{{.CanonicalURL}}">{{end}}
+  <meta name="twitter:card" content="summary">
+  {{if .StructuredDataJSON}}<script type="application/ld+json">{{.StructuredDataJSON}}</script>{{end}}
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/static/app.css?v=2026062501">
+  <script type="module" src="/static/app.js?v=2026062501"></script>
+</head>
+<body
+  data-confirm-title="{{t "confirm_action_title"}}"
+  data-confirm-caption="{{t "confirm_action_caption"}}"
+  data-confirm-accept="{{t "confirm"}}"
+  data-confirm-cancel="{{t "cancel"}}"
+  data-long-running-message="{{t "long_running_message"}}"
+  data-long-running-detail="{{t "long_running_detail"}}"
+>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand brand-link" href="/">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 40 32">
+            <text class="brand-mark-letter-primary" x="3.5" y="25.2">A</text>
+            <text class="brand-mark-letter-secondary" x="19.5" y="25.2">G</text>
+            <path class="brand-mark-accent-stroke" d="M15.2 9.8 20.2 24.3"></path>
+          </svg>
+        </div>
+        <div>
+          {{with .Home}}
+          <div class="brand-title">{{.BrandTitle}}</div>
+          <div class="brand-subtitle">{{.BrandSubtitle}}</div>
+          {{else}}
+          <div class="brand-title">{{t "brand_title"}}</div>
+          <div class="brand-subtitle">{{t "brand_subtitle"}}</div>
+          {{end}}
+        </div>
+      </a>
+      <nav class="topnav">
+        {{with .CurrentUser}}
+        {{if .ID}}
+        <a class="nav-link {{if eq $.ActiveNav "dashboard"}}active{{end}}" href="/">{{t "nav_dashboard"}}</a>
+        {{if isAdminUser .}}
+        <a class="nav-link {{if eq $.ActiveNav "accounts"}}active{{end}}" href="/admin/accounts">{{t "nav_accounts"}}</a>
+        {{end}}
+        {{if not (isAdminUser .)}}
+        <a class="nav-link {{if eq $.ActiveNav "status"}}active{{end}}" href="/status">{{t "nav_status"}}</a>
+        {{end}}
+        <a class="nav-link {{if eq $.ActiveNav "docs"}}active{{end}}" href="{{if isAdminUser .}}/admin/docs{{else}}/docs{{end}}">{{t "nav_docs"}}</a>
+        <a class="nav-link {{if eq $.ActiveNav "clients"}}active{{end}}" href="/clients">{{t "nav_clients"}}</a>
+        {{if not (isAdminUser .)}}
+        <a class="nav-link {{if eq $.ActiveNav "models"}}active{{end}}" href="/models">{{t "nav_models"}}</a>
+        <a class="nav-link {{if eq $.ActiveNav "plans"}}active{{end}}" href="/plans">{{t "nav_plans"}}</a>
+        {{end}}
+        {{if $.ShowImageLabNav}}
+        <a class="nav-link {{if eq $.ActiveNav "images"}}active{{end}}" href="/images">{{t "nav_images"}}</a>
+        {{end}}
+        <a class="nav-link {{if eq $.ActiveNav "logs"}}active{{end}}" href="/logs">{{t "nav_usage_logs"}}</a>
+        <a class="nav-link {{if eq $.ActiveNav "messages"}}active{{end}}" href="/messages" data-nav-messages-link>{{t "nav_messages"}}{{if $.UnreadSiteMessages}}<span class="nav-badge">{{$.UnreadSiteMessages}}</span>{{end}}</a>
+        {{if isAdminUser .}}
+        <a class="nav-link {{if eq $.ActiveNav "support"}}active{{end}}" href="/admin/support" data-nav-support-link>{{t "nav_support"}}{{if $.UnreadSupportMessages}}<span class="nav-badge">{{$.UnreadSupportMessages}}</span>{{end}}</a>
+        {{end}}
+        {{if not (isAdminUser .)}}
+        <a class="nav-link {{if eq $.ActiveNav "payments"}}active{{end}}" href="/payments">{{t "nav_payments"}}</a>
+        {{end}}
+        {{if isAdminUser .}}
+        <a class="nav-link {{if eq $.ActiveNav "models"}}active{{end}}" href="/admin/models">{{t "nav_models"}}</a>
+        <a class="nav-link {{if eq $.ActiveNav "plans"}}active{{end}}" href="/admin/plans">{{t "nav_plans"}}</a>
+        <a class="nav-link {{if eq $.ActiveNav "status"}}active{{end}}" href="/admin/status">{{t "nav_status_admin"}}</a>
+        <a class="nav-link {{if eq $.ActiveNav "gateway"}}active{{end}}" href="/admin/gateway">{{t "nav_gateway"}}</a>
+        <a class="nav-link {{if eq $.ActiveNav "finance"}}active{{end}}" href="/admin/finance">{{t "nav_finance"}}</a>
+        <a class="nav-link {{if eq $.ActiveNav "users"}}active{{end}}" href="/admin/users">{{t "nav_users"}}</a>
+        <a class="nav-link {{if eq $.ActiveNav "settings"}}active{{end}}" href="/admin/settings">{{t "nav_settings"}}</a>
+        <a class="nav-link {{if eq $.ActiveNav "audit"}}active{{end}}" href="/admin/audit">{{t "nav_audit"}}</a>
+        {{end}}
+        <a class="nav-link source-link" href="https://github.com/32ns/ai-gateway" target="_blank" rel="noopener noreferrer" aria-label="GitHub" title="GitHub">
+          {{template "githubMark"}}
+        </a>
+        <details class="user-menu">
+          <summary class="nav-link">{{.Username}}</summary>
+          <div class="user-menu-panel">
+            <button type="button" data-group-settings-open="password-modal">{{t "change_password"}}</button>
+            <button type="button" data-group-settings-open="oauth-bind-modal">{{t "oauth_bind_title"}}</button>
+            <form class="logout-form" method="post" action="/logout">
+              <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+              <button type="submit">{{t "logout"}}</button>
+            </form>
+          </div>
+        </details>
+        {{end}}
+        {{else}}
+        <a class="nav-link {{if eq $.ActiveNav "home"}}active{{end}}" href="/">{{t "nav_home"}}</a>
+        <a class="nav-link {{if eq $.ActiveNav "models"}}active{{end}}" href="/models">{{t "nav_models"}}</a>
+        <a class="nav-link {{if eq $.ActiveNav "plans"}}active{{end}}" href="/plans">{{t "nav_plans"}}</a>
+        <a class="nav-link {{if eq $.ActiveNav "status"}}active{{end}}" href="/status">{{t "nav_status"}}</a>
+        {{if $.ShowImageLabPublic}}
+        <a class="nav-link {{if eq $.ActiveNav "images"}}active{{end}}" href="/images">{{t "nav_images"}}</a>
+        {{end}}
+        <a class="nav-link {{if eq $.ActiveNav "docs"}}active{{end}}" href="/docs">{{t "nav_docs"}}</a>
+        <a class="nav-link source-link" href="https://github.com/32ns/ai-gateway" target="_blank" rel="noopener noreferrer" aria-label="GitHub" title="GitHub">
+          {{template "githubMark"}}
+        </a>
+        <a class="button-link public-login-link {{if eq $.ActiveNav "login"}}active{{end}}" href="/login">{{t "login"}}</a>
+        {{end}}
+      </nav>
+    </header>
+    {{with .CurrentUser}}
+    {{if .ID}}
+    <div class="settings-overlay" id="password-modal" role="dialog" aria-modal="true" aria-labelledby="password-modal-title" hidden>
+      <div class="settings-dialog">
+        <div class="settings-header">
+          <div>
+            <h3 id="password-modal-title">{{t "change_password"}}</h3>
+            <p>{{t "change_password_summary"}}</p>
+          </div>
+          <button type="button" class="icon-button settings-close" data-group-settings-close aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M18 6 6 18"></path>
+              <path d="m6 6 12 12"></path>
+            </svg>
+          </button>
+        </div>
+        <form class="settings-form" method="post" action="/profile/password" data-password-form>
+          <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+          <input type="hidden" name="return_to" value="{{modalReturnPath "password-modal"}}">
+          <label>
+            <span>{{t "current_password"}}</span>
+            {{template "passwordField" dict "Name" "current_password" "Autocomplete" "current-password" "Required" true}}
+          </label>
+          <label>
+            <span>{{t "new_password"}}</span>
+            {{template "passwordField" dict "Name" "new_password" "Autocomplete" "new-password" "Required" true}}
+          </label>
+          <label>
+            <span>{{t "new_password_confirm"}}</span>
+            {{template "passwordField" dict "Name" "new_password_confirm" "Autocomplete" "new-password" "Required" true}}
+          </label>
+          <p class="form-error" data-password-error hidden></p>
+          <div class="settings-actions">
+            <button type="button" class="ghost" data-group-settings-close>{{t "cancel"}}</button>
+            <button type="submit">{{t "save_password"}}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div class="settings-overlay" id="oauth-bind-modal" role="dialog" aria-modal="true" aria-labelledby="oauth-bind-modal-title" hidden>
+      <div class="settings-dialog">
+        <div class="settings-header">
+          <div>
+            <h3 id="oauth-bind-modal-title">{{t "oauth_bind_title"}}</h3>
+            <p>{{t "oauth_bind_summary"}}</p>
+          </div>
+          <button type="button" class="icon-button settings-close" data-group-settings-close aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M18 6 6 18"></path>
+              <path d="m6 6 12 12"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="settings-form oauth-provider-form">
+          {{range oauthProvidersForUser .}}
+          <div class="settings-subhead oauth-provider-row">
+            <div>
+              <strong>{{.Label}}</strong>
+              {{if .Linked}}
+              <span>{{t "oauth_bind_linked_status"}}{{if .Email}} · {{.Email}}{{else if .Username}} · {{.Username}}{{end}}</span>
+              {{else if .Configured}}
+              <span>{{t "oauth_bind_unlinked_status"}}</span>
+              {{else}}
+              <span>{{t "oauth_bind_not_configured"}}</span>
+              {{end}}
+            </div>
+            <div class="oauth-provider-actions">
+              {{if .Linked}}
+              <form method="post" action="/profile/oauth/{{.Provider}}/unlink">
+                <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                <input type="hidden" name="return_to" value="{{modalReturnPath "oauth-bind-modal"}}">
+                <button class="danger" type="submit">{{t "oauth_bind_unlink"}}</button>
+              </form>
+              {{else if .Configured}}
+              <a class="button-link" href="/profile/oauth/{{.Provider}}?return_to={{urlquery (modalReturnPath "oauth-bind-modal")}}">{{t "oauth_bind_link"}}</a>
+              {{end}}
+            </div>
+          </div>
+          {{end}}
+        </div>
+      </div>
+    </div>
+    {{end}}
+    {{end}}
+    <main class="workspace">
+      {{if .NoticeError}}
+      <div class="system-notice tone-bad" data-clear-url-params="notice_error">{{.NoticeError}}</div>
+      {{end}}
+      {{if .GlobalNotice}}
+      <div class="system-notice tone-good" data-clear-url-params="saved,oauth_linked,oauth_unlinked,oauth_merged">{{.GlobalNotice}}</div>
+      {{end}}
+      {{if .GlobalOAuthError}}
+      <div class="system-notice tone-bad" data-clear-url-params="oauth_error">{{.GlobalOAuthError}}</div>
+      {{end}}
+      {{template "content" .}}
+    </main>
+  </div>
+  {{with .CurrentUser}}
+  {{if and .ID (not (isAdminUser .)) (ne $.ActiveNav "support")}}
+  {{template "supportFloatingWidget" $}}
+  {{end}}
+  {{end}}
+  {{if or .PublicPopupSiteMessages .UnreadPopupSiteMessages}}
+  <div class="settings-overlay site-message-popup-overlay" data-site-message-popup-overlay role="dialog" aria-modal="true" aria-labelledby="site-message-popup-title" hidden>
+    <div class="settings-dialog site-message-popup-dialog">
+      <div class="settings-header">
+        <div>
+          <h3 id="site-message-popup-title" data-site-message-popup-title></h3>
+        </div>
+        <button type="button" class="icon-button settings-close" data-site-message-popup-dismiss aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M18 6 6 18"></path>
+            <path d="m6 6 12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <div class="message-body site-message-popup-body" data-site-message-popup-body></div>
+      <form class="settings-actions site-message-popup-actions" method="post" data-site-message-popup-form>
+        <time class="site-message-popup-time" data-site-message-popup-time></time>
+        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+        <button type="button" class="ghost" data-site-message-popup-dismiss>{{t "message_popup_later"}}</button>
+        <button type="submit">{{t "message_mark_read"}}</button>
+      </form>
+    </div>
+    <div hidden data-site-message-popup-items>
+      {{range .PublicPopupSiteMessages}}
+      <article data-site-message-popup-item data-read-mode="browser" data-browser-read-key="{{siteMessageBrowserReadKey .}}">
+        <h3>{{.Title}}</h3>
+        <time data-site-message-popup-item-time datetime="{{.CreatedAt.UTC.Format "2006-01-02T15:04:05Z07:00"}}">{{formatTime .CreatedAt}}</time>
+        <div data-site-message-popup-item-body>{{renderSiteMessageMarkdown .Body}}</div>
+      </article>
+      {{end}}
+      {{range .UnreadPopupSiteMessages}}
+      <article data-site-message-popup-item data-read-mode="server" data-message-id="{{.Message.ID}}" data-read-url="/messages/{{.Message.ID}}/read">
+        <h3>{{.Message.Title}}</h3>
+        <time data-site-message-popup-item-time datetime="{{.Message.CreatedAt.UTC.Format "2006-01-02T15:04:05Z07:00"}}">{{formatTime .Message.CreatedAt}}</time>
+        <div data-site-message-popup-item-body>{{renderSiteMessageMarkdown .Message.Body}}</div>
+      </article>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
+</body>
+</html>
+{{end}}
+
+{{define "passwordField"}}
+<span class="password-field">
+  <input type="password" name="{{.Name}}" autocomplete="{{.Autocomplete}}" {{if .Required}}required{{end}} data-password-toggle-input>
+  <button
+    type="button"
+    class="icon-button password-toggle-button"
+    data-password-toggle
+    tabindex="-1"
+    data-show-label="{{t "show_password"}}"
+    data-hide-label="{{t "hide_password"}}"
+    aria-label="{{t "show_password"}}"
+    title="{{t "show_password"}}"
+  >
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <g data-password-icon-show>
+        <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>
+        <circle cx="12" cy="12" r="3"></circle>
+      </g>
+      <g data-password-icon-hide hidden>
+        <path d="m3 3 18 18"></path>
+        <path d="M10.6 6.2A9.9 9.9 0 0 1 12 6c6 0 9.5 6 9.5 6a17.8 17.8 0 0 1-2.7 3.2"></path>
+        <path d="M6.4 6.8C3.9 8.5 2.5 12 2.5 12s3.5 6 9.5 6a9.7 9.7 0 0 0 4.1-.9"></path>
+      </g>
+    </svg>
+  </button>
+</span>
+{{end}}
+
+{{define "githubMark"}}
+<svg viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M12 .5a12 12 0 0 0-3.8 23.39c.6.11.82-.26.82-.58v-2.03c-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.33-1.76-1.33-1.76-1.09-.74.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.83 2.8 1.3 3.49.99.11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23A11.5 11.5 0 0 1 12 6.6c1.02 0 2.04.14 3 .4 2.28-1.55 3.29-1.23 3.29-1.23.66 1.66.24 2.88.12 3.18.77.84 1.23 1.91 1.23 3.22 0 4.61-2.8 5.63-5.48 5.93.43.37.82 1.1.82 2.22v2.99c0 .32.22.69.83.58A12 12 0 0 0 12 .5Z"></path>
+</svg>
+{{end}}

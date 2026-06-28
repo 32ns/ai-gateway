@@ -1,0 +1,67 @@
+{{define "content"}}
+{{template "status_page_fragment" .}}
+{{end}}
+
+{{define "status_page_fragment"}}
+{{$page := .Page}}
+<div class="status-page" data-partial="status-page" data-status-auto-refresh data-status-refresh-interval="15000">
+  <section class="hero compact">
+    <div>
+      <h1>{{t "status_heading"}}</h1>
+      <p>{{t "status_summary"}}</p>
+    </div>
+    <div class="hero-actions status-summary-actions">
+      <span class="pill tone-good">{{t "monitor_status_ok"}} {{$page.Summary.OK}}</span>
+      <span class="pill tone-warn">{{t "monitor_status_degraded"}} {{$page.Summary.Degraded}}</span>
+      <span class="pill tone-bad">{{t "monitor_status_failed"}} {{$page.Summary.Failed}}</span>
+    </div>
+  </section>
+
+  {{if $page.Targets}}
+  <section class="status-monitor-grid">
+    {{range $page.Targets}}
+    {{$target := .Target}}
+    {{$status := monitorViewStatus .}}
+    <article class="panel status-card model-status-card">
+      <div class="model-status-card-head">
+        <div class="status-monitor-title">
+          <h2>{{$target.Name}}</h2>
+          <span class="status-monitor-subtitle">{{$target.AccountGroup}} / {{$target.Model}}</span>
+        </div>
+        <span class="pill model-status-card-state {{monitorStatusClass $status}}">{{monitorStatusText $status}}</span>
+      </div>
+      <dl class="model-status-metrics status-card-metrics">
+        <div>
+          <dt>{{t "monitor_last_check"}}</dt>
+          <dd>{{if .HasLatest}}{{formatTime .Latest.CheckedAt}}{{else}}-{{end}}</dd>
+        </div>
+        <div>
+          <dt>{{t "monitor_latency"}}</dt>
+          <dd>{{if .HasLatest}}{{.Latest.LatencyMS}}ms{{else}}-{{end}}</dd>
+        </div>
+        <div>
+          <dt>{{t "monitor_availability"}}</dt>
+          <dd class="monitor-availability-value {{monitorAvailabilityClass .}}">{{.Availability}}%</dd>
+        </div>
+        <div>
+          <dt>{{t "monitor_next_check"}}</dt>
+          <dd data-monitor-countdown data-next-check-at="{{monitorNextCheckUnix .}}" class="monitor-next-check" data-monitor-running="{{if .Running}}true{{else}}false{{end}}" data-running-text="{{t "monitor_checking"}}" data-due-text="{{t "monitor_due_now"}}" data-pending-text="{{t "monitor_pending_check"}}">{{if .Running}}<span class="monitor-countdown-spinner" aria-hidden="true"></span><span class="sr-only">{{t "monitor_checking"}}</span>{{else}}{{monitorNextCheckText .}}{{end}}</dd>
+        </div>
+      </dl>
+      <div class="monitor-timeline model-status-timeline" aria-label="{{t "monitor_history"}}">
+        {{range monitorHistoryBars .History}}
+        <span class="monitor-timeline-bar {{monitorStatusClass .Status}}" title="{{monitorStatusText .Status}} - {{formatTime .CheckedAt}}"></span>
+        {{end}}
+        {{if not .History}}<span class="panel-note">{{t "monitor_no_history"}}</span>{{end}}
+      </div>
+    </article>
+    {{end}}
+  </section>
+  {{else}}
+  <section class="panel empty-state">
+    <h2>{{t "status_empty_title"}}</h2>
+    <p>{{t "status_empty_summary"}}</p>
+  </section>
+  {{end}}
+</div>
+{{end}}

@@ -1,0 +1,44 @@
+{{define "content"}}
+<section class="hero compact">
+  <div>
+    <h1>{{t "oauth_claude_heading"}}</h1>
+    <p>{{t "oauth_claude_summary"}}</p>
+  </div>
+  <div class="hero-actions">
+    <a class="button-link ghost-link" href="{{if .OAuthReturnURL}}{{.OAuthReturnURL}}{{else}}/admin/connect/claude{{end}}">{{if .OAuthAccountID}}{{t "edit_account"}}{{else}}{{t "nav_connect_claude"}}{{end}}</a>
+  </div>
+</section>
+
+<section class="panel narrow oauth-panel">
+  <div class="panel-head">
+    <div class="cell-stack">
+      <h2>{{t "oauth_authorization_details"}}</h2>
+      <span class="panel-note">{{tf "oauth_expires_at" (.Start.ExpiresAt.Local.Format "2006-01-02 15:04:05")}}</span>
+    </div>
+    {{if .Error}}
+    <span class="pill tone-bad">{{t "oauth_error"}}</span>
+    {{else}}
+    <span class="pill tone-warn">{{t "oauth_waiting"}}</span>
+    {{end}}
+  </div>
+
+  <div class="grid-form">
+    {{if .Error}}
+    <label class="full-span" data-clear-url-params="error">
+      <span>{{t "error"}}</span>
+      <span class="panel-note">{{.Error}}</span>
+    </label>
+    {{end}}
+
+    <label class="full-span">
+      <span>{{t "oauth_callback_notice"}}</span>
+      <span class="panel-note">{{t "oauth_claude_callback_summary"}}</span>
+    </label>
+
+    <div class="full-span action-row">
+      <a class="button-link primary-link" href="{{.Start.AuthorizationURL}}" target="_blank" rel="noreferrer">{{t "oauth_open_authorization"}}</a>
+      <a class="button-link ghost-link" href="{{if .OAuthReturnURL}}{{.OAuthReturnURL}}{{else}}/admin/connect/claude{{end}}">{{t "cancel"}}</a>
+    </div>
+  </div>
+</section>
+{{end}}

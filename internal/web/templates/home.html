@@ -1,0 +1,70 @@
+{{define "content"}}
+<section class="home-screen">
+  <div class="home-hero">
+    <h1>{{.Home.Heading}}</h1>
+    <p>{{.Home.Summary}}</p>
+    <div class="home-actions">
+      <a class="button-link primary-link" href="/login">{{t "home_primary_cta"}}</a>
+      {{if .AllowPublicRegistration}}
+      <a class="button-link ghost-link" href="/login">{{t "home_secondary_cta"}}</a>
+      {{end}}
+    </div>
+    <div class="home-tool-rail{{if not .ShowImageLabPublic}} home-tool-rail-compact{{end}}" aria-label="{{t "home_tools_label"}}">
+      <span class="home-tool-caption">{{t "home_tools_caption"}}</span>
+      <div class="home-tool-list">
+        <div class="home-tool-chip">
+          <img src="/static/claude.svg?v=2026053101" alt="" aria-hidden="true">
+          <span>
+            <strong>{{t "home_tool_claude"}}</strong>
+            <em>{{t "home_tool_claude_desc"}}</em>
+          </span>
+          <b>{{t "home_tool_fast"}}</b>
+        </div>
+        <div class="home-tool-chip">
+          <img src="/static/codex.svg?v=2026053101" alt="" aria-hidden="true">
+          <span>
+            <strong>{{t "home_tool_codex"}}</strong>
+            <em>{{t "home_tool_codex_desc"}}</em>
+          </span>
+          <b>{{t "home_tool_fast"}}</b>
+        </div>
+        {{if .ShowImageLabPublic}}
+        <a class="home-tool-chip home-tool-chip-link" href="/images" aria-label="{{t "home_tool_image"}}">
+          <span class="home-tool-icon home-tool-icon-image" aria-hidden="true">
+            <svg viewBox="0 0 28 28" focusable="false">
+              <path d="M7.5 5.5h13a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2Z"></path>
+              <path d="m8.5 18.5 4.2-4.2 3.1 3.1 2-2 3.7 3.7"></path>
+              <circle cx="18.4" cy="10" r="1.7"></circle>
+            </svg>
+          </span>
+          <span>
+            <strong>{{t "home_tool_image"}}</strong>
+            <em>{{t "home_tool_image_desc"}}</em>
+          </span>
+          <b>{{t "home_tool_signin_required"}}</b>
+        </a>
+        {{end}}
+      </div>
+    </div>
+  </div>
+
+  <div class="home-proof-strip">
+    <div class="home-metric">
+      <span>{{.Home.AvailabilityKey}}</span>
+      <strong class="home-tone-green">{{.Home.Availability}}</strong>
+    </div>
+    <div class="home-metric">
+      <span>{{.Home.CostKey}}</span>
+      <strong class="home-tone-gold">{{.Home.CostMultiplier}}</strong>
+    </div>
+    <div class="home-metric">
+      <span>{{.Home.LatencyKey}}</span>
+      <strong class="home-tone-blue">{{.Home.Latency}}</strong>
+    </div>
+    <div class="home-metric">
+      <span>{{.Home.CapabilityKey}}</span>
+      <strong>{{.Home.Capability}}</strong>
+    </div>
+  </div>
+</section>
+{{end}}

@@ -1,0 +1,42 @@
+{{define "content"}}
+{{if .Document.ID}}
+<article class="docs-detail">
+  <nav class="docs-breadcrumb"><a href="/docs">{{t "docs"}}</a><span>/</span><span>{{.Document.Title}}</span></nav>
+  <header class="docs-article-head">
+    <div class="docs-article-title">
+      <h1>{{.Document.Title}}</h1>
+      <div class="docs-article-meta">
+        <span class="docs-article-date">{{if .Document.PublishedAt}}{{formatTime .Document.PublishedAt}}{{else}}{{formatTime .Document.UpdatedAt}}{{end}}</span>
+    {{if .CanPublishDocument}}
+        <form method="post" action="/admin/docs/{{.Document.ID}}/publish">
+          <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+          <button type="submit">{{t "document_publish"}}</button>
+        </form>
+    {{end}}
+      </div>
+    </div>
+  </header>
+  <div class="document-body">
+    {{.DocumentHTML}}
+  </div>
+</article>
+{{else}}
+<section class="hero compact docs-index-hero">
+  <div>
+    <h1>{{t "docs"}}</h1>
+  </div>
+</section>
+<section class="docs-index">
+  {{range .Documents}}
+  <a class="docs-row" href="/docs/{{.Slug}}">
+    <span class="docs-row-main">
+      <strong>{{.Title}}</strong>
+    </span>
+    {{if .Pinned}}<span class="docs-row-pin">{{t "document_pinned"}}</span>{{end}}
+  </a>
+  {{else}}
+  <div class="empty">{{t "no_documents"}}</div>
+  {{end}}
+</section>
+{{end}}
+{{end}}

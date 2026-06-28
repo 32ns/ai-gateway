@@ -1,0 +1,12 @@
+{{define "content"}}
+<section class="hero compact">
+  <div>
+    <h1>{{tf "connect_heading" .Start.ProviderLabel}}</h1>
+    <p>{{t "connect_summary"}}</p>
+  </div>
+</section>
+
+<section class="panel wide">
+  {{template "accountConnectPanel" .}}
+</section>
+{{end}}

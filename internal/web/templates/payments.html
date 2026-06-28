@@ -1,0 +1,161 @@
+{{define "content"}}
+<section class="hero compact">
+  <div>
+    <h1>{{t "payments"}}</h1>
+    <p>{{t "payments_hint"}}</p>
+  </div>
+</section>
+
+{{if .PaymentReturn}}
+<div class="system-notice tone-good" data-clear-url-params="notice,order_id">{{t "payment_returned"}}</div>
+{{end}}
+
+<section class="panel" data-partial="payments-list">
+  <div class="panel-head">
+    <h2>{{t "payment_filters"}}</h2>
+    <span class="panel-note">{{tf "payment_total_count" .Payments.Total}}</span>
+  </div>
+  <form class="stack-form" method="get" action="/payments">
+    <div class="filter-grid has-actions">
+      {{if isAdminUser .CurrentUser}}
+      <label>
+        <span>{{t "filter_user"}}</span>
+        <input name="user_id" value="{{with userIdentity .Payments.Filter.UserID}}{{if .Known}}{{.Username}}{{else}}{{.ID}}{{end}}{{end}}">
+      </label>
+      {{end}}
+      <label>
+        <span>{{t "payment_method"}}</span>
+        <select name="provider">
+          <option value="">{{t "none"}}</option>
+          <option value="alipay" {{if eq (printf "%s" .Payments.Filter.Provider) "alipay"}}selected{{end}}>{{t "alipay"}}</option>
+          <option value="wechatpay" {{if eq (printf "%s" .Payments.Filter.Provider) "wechatpay"}}selected{{end}}>{{t "wechat_pay"}}</option>
+          <option value="personalpay" {{if eq (printf "%s" .Payments.Filter.Provider) "personalpay"}}selected{{end}}>{{t "personalpay_wechat"}}</option>
+        </select>
+      </label>
+      <label>
+        <span>{{t "status"}}</span>
+        <select name="status">
+          <option value="">{{t "none"}}</option>
+          <option value="pending" {{if eq (printf "%s" .Payments.Filter.Status) "pending"}}selected{{end}}>{{t "payment_status_pending"}}</option>
+          <option value="paid" {{if eq (printf "%s" .Payments.Filter.Status) "paid"}}selected{{end}}>{{t "payment_status_paid"}}</option>
+          <option value="closed" {{if eq (printf "%s" .Payments.Filter.Status) "closed"}}selected{{end}}>{{t "payment_status_closed"}}</option>
+          <option value="failed" {{if eq (printf "%s" .Payments.Filter.Status) "failed"}}selected{{end}}>{{t "payment_status_failed"}}</option>
+        </select>
+      </label>
+      <div class="form-actions filter-actions">
+        <button type="submit">{{t "filter_apply"}}</button>
+        <a class="button-link ghost-link" href="/payments">{{t "clear_filters"}}</a>
+      </div>
+    </div>
+  </form>
+</section>
+
+<section class="panel">
+  <div class="table-wrap payment-orders-table-wrap">
+    <table class="data-table payment-orders-table">
+      <thead>
+        <tr>
+          <th>{{t "created_at"}}</th>
+          {{if isAdminUser .CurrentUser}}<th>{{t "filter_user"}}</th>{{end}}
+          <th>{{t "payment_order"}}</th>
+          <th>{{t "payment_method"}}</th>
+          <th>{{t "payment_received_amount"}}</th>
+          <th>{{t "status"}}</th>
+          <th>{{t "action"}}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Payments.Orders}}
+        <tr data-payment-order-row="{{.ID}}">
+          {{$pending := eq (printf "%s" .Status) "pending"}}
+          <td>{{.CreatedAt.Local.Format "2006-01-02 15:04:05"}}</td>
+          {{if isAdminUser $.CurrentUser}}
+          <td>
+            {{with userIdentity .UserID}}
+            {{if .Known}}<strong>{{.Username}}</strong>{{else}}<code>{{.ID}}</code>{{end}}
+            {{end}}
+          </td>
+          {{end}}
+          <td><code>{{.OutTradeNo}}</code></td>
+          <td>{{paymentOrderMethodText .}}</td>
+          <td>
+            <strong>{{formatUSD .AmountNanoUSD}}</strong>
+            <div class="muted">{{t "payment_amount"}} {{formatCNYCents .ProviderAmountCents}}</div>
+            <div class="muted">{{t "payment_exchange_rate"}} {{paymentExchangeRateText .}}</div>
+          </td>
+          <td><span class="pill {{paymentStatusClass .Status}}">{{paymentStatusText .Status}}</span></td>
+          <td>
+            <div class="action-row compact">
+              {{if and $pending .PayURL}}<a class="button-link ghost-link" href="{{.PayURL}}" target="_blank" rel="noopener">{{t "open_payment_url"}}</a>{{end}}
+              {{if and $pending .CodeURL}}<button type="button" class="ghost" data-group-settings-open="payment-qr-{{.ID}}">{{t "payment"}}</button>{{end}}
+              {{if $pending}}
+              <form method="post" action="/payments/refresh" data-ajax-form data-ajax-target='[data-partial="payments-list"]'>
+                <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                <input type="hidden" name="id" value="{{.ID}}">
+                <button type="submit" class="ghost">{{t "refresh_payment_order"}}</button>
+              </form>
+              {{end}}
+            </div>
+            {{if and $pending .CodeURL}}
+            <div class="settings-overlay" id="payment-qr-{{.ID}}" role="dialog" aria-modal="true" aria-labelledby="payment-qr-title-{{.ID}}" data-payment-order-modal data-payment-order-id="{{.ID}}" data-payment-cancel-order="{{.ID}}" data-payment-cancel-csrf="{{$.CSRFToken}}" hidden>
+              <div class="settings-dialog payment-dialog">
+                <div class="settings-header">
+                  <div>
+                    <h3 id="payment-qr-title-{{.ID}}">{{t "payment_recharge"}}</h3>
+                  </div>
+                  <button type="button" class="icon-button settings-close" data-group-settings-close aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M18 6 6 18"></path>
+                      <path d="m6 6 12 12"></path>
+                    </svg>
+                  </button>
+                </div>
+                <div class="payment-result">
+                  <div class="payment-result-summary">
+                    <div>
+                      <span>{{t "payment_method"}}</span>
+                      <strong>{{paymentOrderMethodText .}}</strong>
+                    </div>
+                    <div>
+                      <span>{{t "payment_amount"}}</span>
+                      <strong>{{formatCNYCents .ProviderAmountCents}}</strong>
+                    </div>
+                    <div>
+                      <span>{{t "payment_received_amount"}}</span>
+                      <strong>{{formatUSD .AmountNanoUSD}}</strong>
+                    </div>
+                  </div>
+                  {{if .PayURL}}<a class="button-link primary-link" href="{{.PayURL}}" target="_blank" rel="noopener">{{t "open_payment_url"}}</a>{{end}}
+                  <div class="payment-code">
+                    <strong data-payment-status-text data-waiting-text="{{t "payment_waiting"}}" data-paying-text="{{t "payment_paying"}}" data-canceled-text="{{t "payment_canceled"}}" data-success-text="{{t "payment_success"}}" data-expired-text="{{t "payment_expired"}}" hidden></strong>
+                    <img src="/payments/qr?id={{.ID}}" data-payment-order-qr alt="{{t "payment"}}">
+                  </div>
+                </div>
+                <div class="settings-actions">
+                  <button type="button" class="ghost" data-group-settings-close>{{t "cancel"}}</button>
+                </div>
+              </div>
+            </div>
+            {{end}}
+          </td>
+        </tr>
+        {{else}}
+        <tr>
+          <td colspan="{{if isAdminUser $.CurrentUser}}7{{else}}6{{end}}" class="empty">{{t "no_payment_orders"}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="pager">
+    <div class="panel-note">{{tf "payment_total_count" .Payments.Total}}</div>
+    <div class="action-row">
+      {{if .Payments.HasPrev}}<a class="button-link ghost-link" href="{{paymentOrderPageURL .Payments.Filter .Payments.PrevPage}}">{{t "previous"}}</a>{{end}}
+      {{if .Payments.HasNext}}<a class="button-link ghost-link" href="{{paymentOrderPageURL .Payments.Filter .Payments.NextPage}}">{{t "next"}}</a>{{end}}
+    </div>
+  </div>
+</section>
+{{end}}
