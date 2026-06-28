@@ -1,10 +1,12 @@
 # AI Gateway
 
-AI Gateway 是一个用 Go 编写的 AI API 网关和运营控制台。它可以把 OpenAI、Claude、ChatGPT/Codex 等账号或 API Key 统一接入到一个兼容协议入口，并提供账号池、模型路由、失败切换、用量计费、用户管理、套餐、支付、审计、备份恢复等运营能力。
+AI Gateway 是一个用 Go 编写的 AI API 网关功能类似sub2api和new-api。它可以把 OpenAI、Claude、ChatGPT/Codex 等账号或 API Key 统一接入到一个兼容协议入口，并提供账号池、模型路由、失败切换、用量计费、用户管理、套餐、支付、审计、备份恢复等运维能力。
 
 ![首页](./images/home.png)
 
 ![用户控制台](./images/userhome.png)
+
+![生图](./images/image.png)
 
 ![安装向导](./images/install.png)
 
