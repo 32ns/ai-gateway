@@ -20,7 +20,9 @@ import (
 	"github.com/32ns/ai-gateway/internal/backup"
 	"github.com/32ns/ai-gateway/internal/controlplane"
 	"github.com/32ns/ai-gateway/internal/core"
+	"github.com/32ns/ai-gateway/internal/failover"
 	"github.com/32ns/ai-gateway/internal/gateway"
+	"github.com/32ns/ai-gateway/internal/providers"
 )
 
 //go:embed templates/*.html static/*.css static/*.ico static/*.js static/*.png static/*.svg static/css/*.css static/js/*.js
@@ -476,6 +478,16 @@ func (s *Server) writeGatewayError(w http.ResponseWriter, err error) {
 		})
 		return
 	}
+	if message, ok := publicUpstreamRejectedMessage(err); ok {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error": map[string]any{
+				"type":    "invalid_request_error",
+				"code":    providers.ErrorCodeUpstreamRejected,
+				"message": message,
+			},
+		})
+		return
+	}
 
 	payload := map[string]any{
 		"type":    gatewayProtocolErrorType,
@@ -483,6 +495,43 @@ func (s *Server) writeGatewayError(w http.ResponseWriter, err error) {
 	}
 
 	writeJSON(w, http.StatusBadGateway, map[string]any{"error": payload})
+}
+
+func publicUpstreamRejectedMessage(err error) (string, bool) {
+	var executionErr *failover.ExecutionError
+	if !errors.As(err, &executionErr) || executionErr == nil {
+		return "", false
+	}
+	for i := len(executionErr.Attempts) - 1; i >= 0; i-- {
+		attempt := executionErr.Attempts[i]
+		if strings.TrimSpace(attempt.ErrorCode) != providers.ErrorCodeUpstreamRejected {
+			continue
+		}
+		message := strings.TrimSpace(attempt.ErrorMessage)
+		if message == "" {
+			continue
+		}
+		message = strings.TrimSpace(strings.TrimPrefix(message, providers.ErrorCodeUpstreamRejected+":"))
+		if message == "" || !publicUpstreamRejectedText(message) {
+			continue
+		}
+		return message, true
+	}
+	return "", false
+}
+
+func publicUpstreamRejectedText(message string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(message))
+	if normalized == "" {
+		return false
+	}
+	if strings.Contains(normalized, "context window") ||
+		strings.Contains(normalized, "context length") ||
+		strings.Contains(normalized, "maximum context") ||
+		strings.Contains(normalized, "too many tokens") {
+		return true
+	}
+	return strings.Contains(normalized, "input exceeds") && strings.Contains(normalized, "model")
 }
 
 func (s *Server) writeAnthropicGatewayError(w http.ResponseWriter, err error) {
@@ -512,6 +561,11 @@ func (s *Server) writeAnthropicGatewayError(w http.ResponseWriter, err error) {
 			status = accessErr.StatusCode
 			errorType = "permission_error"
 			message = accessErr.Error()
+		}
+		if upstreamRejectedMessage, ok := publicUpstreamRejectedMessage(err); ok {
+			status = http.StatusBadRequest
+			errorType = "invalid_request_error"
+			message = upstreamRejectedMessage
 		}
 	}
 
@@ -1183,12 +1237,12 @@ func parsePricingTiersForm(r *http.Request) ([]core.ModelPricingTier, error) {
 			continue
 		}
 		tiers = append(tiers, core.ModelPricingTier{
-			Name:                     formValueAt(names, i),
-			MaxInputTokens:           maxInputTokens,
-			InputPriceNanoUSD:        inputPrice,
-			CachedInputPriceNanoUSD:  cachedInputPrice,
-			OutputPriceNanoUSD:       outputPrice,
-			ImageOutputPriceNanoUSD:  imageOutputPrice,
+			Name:                    formValueAt(names, i),
+			MaxInputTokens:          maxInputTokens,
+			InputPriceNanoUSD:       inputPrice,
+			CachedInputPriceNanoUSD: cachedInputPrice,
+			OutputPriceNanoUSD:      outputPrice,
+			ImageOutputPriceNanoUSD: imageOutputPrice,
 		})
 	}
 	return tiers, nil

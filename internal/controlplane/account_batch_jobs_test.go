@@ -108,7 +108,7 @@ func TestCancelAccountBatchJobAllowsStartingNextJob(t *testing.T) {
 	}
 }
 
-func TestStartAccountBatchJobMarksFailedDetectionAbnormal(t *testing.T) {
+func TestStartAccountBatchJobDoesNotMarkFailedDetectionAbnormal(t *testing.T) {
 	repo := storage.NewMemoryRepository()
 	ids := testBatchJobAccounts(t, repo, 2)
 	adapter := newBlockingBatchJobAdapter()
@@ -133,11 +133,11 @@ func TestStartAccountBatchJobMarksFailedDetectionAbnormal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if account.Status != core.AccountStatusBlocked {
-		t.Fatalf("failed account status = %q, want %q", account.Status, core.AccountStatusBlocked)
+	if account.Status != core.AccountStatusActive {
+		t.Fatalf("failed account status = %q, want %q", account.Status, core.AccountStatusActive)
 	}
-	if got := AccountFilterStatus(account); got != "exception" {
-		t.Fatalf("failed account filter status = %q, want exception", got)
+	if got := AccountFilterStatus(account); got != "normal" {
+		t.Fatalf("failed account filter status = %q, want normal", got)
 	}
 }
 

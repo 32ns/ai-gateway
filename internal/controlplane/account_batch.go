@@ -613,13 +613,6 @@ func (s *Service) testAccountBatchItem(ctx context.Context, accountID string) Ac
 		if strings.TrimSpace(detectedAccount.ID) != "" {
 			account = detectedAccount
 		}
-		if ctx == nil || ctx.Err() == nil {
-			var markErr error
-			account, markErr = s.markAccountBatchTestFailureAbnormal(account)
-			if markErr != nil {
-				return accountBatchFailedItem(account.ID, account.Label, fmt.Errorf("%v; failed to mark account abnormal: %w", err, markErr))
-			}
-		}
 		return accountBatchFailedItem(account.ID, account.Label, err)
 	}
 	account = detectedAccount

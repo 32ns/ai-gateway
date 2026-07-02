@@ -109,11 +109,9 @@ func (s *Service) RefreshAccountQuota(ctx context.Context, id string) (core.Acco
 	metadata[core.AccountQuotaMetadataKey] = string(encoded)
 	account.Credential.Metadata = metadata
 	account = core.ClearAccountQuotaRefreshFailureMetadata(account)
-	if account.Status != core.AccountStatusBlocked {
-		account.Status = core.AccountStatusActive
-		account.CooldownUntil = nil
-		account.ConsecutiveFails = 0
-	}
+	account.Status = core.AccountStatusActive
+	account.CooldownUntil = nil
+	account.ConsecutiveFails = 0
 	if err := s.upsertAccountRuntimeState(account); err != nil {
 		return core.Account{}, core.AccountQuotaSnapshot{}, err
 	}

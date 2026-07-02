@@ -5327,6 +5327,44 @@ func TestRefreshAccountQuotaReactivatesCoolingAccount(t *testing.T) {
 	}
 }
 
+func TestRefreshAccountQuotaReactivatesBlockedAccount(t *testing.T) {
+	repo := storage.NewMemoryRepository()
+	if err := repo.UpsertAccount(core.Account{
+		ID:               "acct_blocked_quota",
+		Provider:         core.ProviderOpenAI,
+		Label:            "Blocked Account",
+		Status:           core.AccountStatusBlocked,
+		ConsecutiveFails: 2,
+		Credential: core.Credential{
+			Mode:        "openai-oauth-device",
+			AccessToken: "fresh-token",
+			Metadata: map[string]string{
+				"token_source":                        "openai_device_code",
+				core.AccountQuotaErrorMetadataKey:     "previous transient failure",
+				core.AccountQuotaErrorAtMetadataKey:   time.Now().UTC().Format(time.RFC3339),
+				core.AccountQuotaErrorCodeMetadataKey: providers.ErrorCodeUpstreamTransportError,
+			},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	service := New(repo, providers.NewRegistry(&testQuotaAdapter{}))
+	account, snapshot, err := service.RefreshAccountQuota(context.Background(), "acct_blocked_quota")
+	if err != nil {
+		t.Fatalf("RefreshAccountQuota returned error: %v", err)
+	}
+	if snapshot.Plan != "pro" {
+		t.Fatalf("snapshot = %#v, want pro plan", snapshot)
+	}
+	if account.Status != core.AccountStatusActive || account.CooldownUntil != nil || account.ConsecutiveFails != 0 {
+		t.Fatalf("returned account = %#v, want active without failure state", account)
+	}
+	if message, _ := ReadAccountQuotaError(account); message != "" {
+		t.Fatalf("quota error = %q, want cleared", message)
+	}
+}
+
 func TestRefreshAccountQuotaPersistsRefreshError(t *testing.T) {
 	repo := storage.NewMemoryRepository()
 	if err := repo.UpsertAccount(core.Account{
@@ -5792,11 +5830,11 @@ func TestApplyAccountBatchTestReportsPerAccountFailures(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if failed.Status != core.AccountStatusBlocked || failed.CooldownUntil != nil {
-		t.Fatalf("failed account status = %s cooldown=%#v, want blocked without cooldown", failed.Status, failed.CooldownUntil)
+	if failed.Status != core.AccountStatusActive || failed.CooldownUntil != nil {
+		t.Fatalf("failed account status = %s cooldown=%#v, want active without cooldown", failed.Status, failed.CooldownUntil)
 	}
-	if got := AccountFilterStatus(failed); got != "exception" {
-		t.Fatalf("failed account filter status = %q, want exception", got)
+	if got := AccountFilterStatus(failed); got != "normal" {
+		t.Fatalf("failed account filter status = %q, want normal", got)
 	}
 	ok, err := repo.GetAccount("acct_ok")
 	if err != nil {

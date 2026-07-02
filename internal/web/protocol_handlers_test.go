@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/32ns/ai-gateway/internal/core"
+	"github.com/32ns/ai-gateway/internal/failover"
 	"github.com/32ns/ai-gateway/internal/providers"
 )
 
@@ -124,6 +125,74 @@ func TestOpenAIResponsesFailureFinishReasonIsGatewayError(t *testing.T) {
 		t.Fatalf("payload = %#v", payload)
 	}
 	for _, leaked := range []string{"resp_failed_secret", "tool output was invalid", "upstream secret detail", `"status":"failed"`} {
+		if strings.Contains(rec.Body.String(), leaked) {
+			t.Fatalf("response leaked %q in %s", leaked, rec.Body.String())
+		}
+	}
+}
+
+func TestWriteGatewayErrorExposesUpstreamRejectedMessage(t *testing.T) {
+	rec := httptest.NewRecorder()
+	err := &failover.ExecutionError{Attempts: []core.AttemptRecord{
+		{
+			Provider:     core.ProviderOpenAI,
+			AccountID:    "acct_secret",
+			AccountLabel: "secret account",
+			Status:       "invoke_error",
+			ErrorCode:    providers.ErrorCodeUpstreamRejected,
+			ErrorMessage: "upstream_rejected: Your input exceeds the context window of this model. Please adjust your input and try again.",
+		},
+	}}
+
+	(&Server{}).writeGatewayError(rec, err)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+	var payload struct {
+		Error struct {
+			Type    string `json:"type"`
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if payload.Error.Type != "invalid_request_error" || payload.Error.Code != providers.ErrorCodeUpstreamRejected {
+		t.Fatalf("payload = %#v", payload)
+	}
+	if !strings.Contains(payload.Error.Message, "context window") {
+		t.Fatalf("message = %q, want upstream rejection detail", payload.Error.Message)
+	}
+	for _, leaked := range []string{"acct_secret", "secret account"} {
+		if strings.Contains(rec.Body.String(), leaked) {
+			t.Fatalf("response leaked %q in %s", leaked, rec.Body.String())
+		}
+	}
+}
+
+func TestWriteGatewayErrorHidesExecutionServerError(t *testing.T) {
+	rec := httptest.NewRecorder()
+	err := &failover.ExecutionError{Attempts: []core.AttemptRecord{
+		{
+			Provider:     core.ProviderOpenAI,
+			AccountLabel: "secret account",
+			Status:       "invoke_error",
+			ErrorCode:    providers.ErrorCodeUpstreamServerError,
+			ErrorMessage: "upstream_server_error: temporary upstream outage",
+		},
+	}}
+
+	(&Server{}).writeGatewayError(rec, err)
+
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadGateway)
+	}
+	if !strings.Contains(rec.Body.String(), gatewayProtocolErrorMessage) {
+		t.Fatalf("body missing gateway wrapper: %s", rec.Body.String())
+	}
+	for _, leaked := range []string{"temporary upstream outage", "secret account"} {
 		if strings.Contains(rec.Body.String(), leaked) {
 			t.Fatalf("response leaked %q in %s", leaked, rec.Body.String())
 		}
