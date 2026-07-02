@@ -787,13 +787,13 @@ func (e *Engine) responsesCandidates(provider core.ProviderKind, client *core.AP
 
 func (e *Engine) gatewayRequestCandidates(provider core.ProviderKind, client *core.APIClient, req *core.GatewayRequest) []core.Account {
 	if req == nil || !req.StrictAccountAffinity || strings.TrimSpace(req.PreferredAccountID) == "" {
-		return defaultCandidates(e, provider, client)
+		return filterExcludedGatewayAccounts(defaultCandidates(e, provider, client), req)
 	}
 	account, ok := e.boundAccountCandidate(provider, client, req.PreferredAccountID)
 	if !ok {
 		return nil
 	}
-	return []core.Account{account}
+	return filterExcludedGatewayAccounts([]core.Account{account}, req)
 }
 
 func (e *Engine) applyRouteBinding(provider core.ProviderKind, client *core.APIClient, candidates []core.Account) []core.Account {
@@ -888,6 +888,29 @@ func routeBindingKeyForClient(provider core.ProviderKind, client *core.APIClient
 }
 
 func filterExcludedResponseAccounts(candidates []core.Account, req *core.ResponsesRequest) []core.Account {
+	if len(candidates) == 0 || req == nil || len(req.ExcludedAccountIDs) == 0 {
+		return candidates
+	}
+	excluded := make(map[string]struct{}, len(req.ExcludedAccountIDs))
+	for _, id := range req.ExcludedAccountIDs {
+		if id = strings.TrimSpace(id); id != "" {
+			excluded[id] = struct{}{}
+		}
+	}
+	if len(excluded) == 0 {
+		return candidates
+	}
+	filtered := make([]core.Account, 0, len(candidates))
+	for _, candidate := range candidates {
+		if _, ok := excluded[strings.TrimSpace(candidate.ID)]; ok {
+			continue
+		}
+		filtered = append(filtered, candidate)
+	}
+	return filtered
+}
+
+func filterExcludedGatewayAccounts(candidates []core.Account, req *core.GatewayRequest) []core.Account {
 	if len(candidates) == 0 || req == nil || len(req.ExcludedAccountIDs) == 0 {
 		return candidates
 	}

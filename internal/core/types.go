@@ -226,6 +226,7 @@ type GatewayRequest struct {
 	Extra                 map[string]json.RawMessage `json:"extra,omitempty"`
 	StrictAccountAffinity bool                       `json:"-"`
 	PreferredAccountID    string                     `json:"-"`
+	ExcludedAccountIDs    []string                   `json:"-"`
 }
 
 type ResponsesTransport string

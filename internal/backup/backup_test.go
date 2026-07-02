@@ -824,6 +824,31 @@ func TestLogicalBillingRestoreRebuildsFinanceRollups(t *testing.T) {
 	}
 }
 
+func TestLogicalBillingRestorePreservesBackedUpFinanceUserHistoricalSpend(t *testing.T) {
+	source := filepath.Join(t.TempDir(), "source.db")
+	target := filepath.Join(t.TempDir(), "target.db")
+	initLogicalTestDB(t, source)
+	initLogicalTestDB(t, target)
+	setLogicalPayload(t, source, "users", "user_rollup_preserved", `{"ID":"user_rollup_preserved","Username":"source"}`)
+	setLogicalPayload(t, target, "users", "user_rollup_preserved", `{"ID":"user_rollup_preserved","Username":"target"}`)
+	setLogicalClient(t, source, "client_rollup_preserved", "user_rollup_preserved")
+	setLogicalClient(t, target, "client_rollup_preserved", "user_rollup_preserved")
+	setBillingRequestWithAmounts(t, source, "billing_rollup_preserved", "client_rollup_preserved", "user_rollup_preserved", "settled", 5000, 1234)
+	setFinanceUserRollup(t, source, "user_rollup_preserved", 9000)
+
+	var buf bytes.Buffer
+	if _, err := Write(&buf, Options{StatePath: source, DataSets: []string{DataSetBilling}}); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	if err := ReadAndRestore(bytes.NewReader(buf.Bytes()), Options{StatePath: target}); err != nil {
+		t.Fatalf("ReadAndRestore returned error: %v", err)
+	}
+
+	if got := getFinanceUserRollupSpend(t, target, "user_rollup_preserved"); got != 9000 {
+		t.Fatalf("finance user spend = %d, want preserved 9000", got)
+	}
+}
+
 func TestLogicalBillingRestoreRebuildsFinanceRollupSpendSources(t *testing.T) {
 	source := filepath.Join(t.TempDir(), "source.db")
 	target := filepath.Join(t.TempDir(), "target.db")

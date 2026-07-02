@@ -94,6 +94,7 @@ var dataSetTables = map[string][]string{
 		"billing_funding_allocations",
 		"payment_orders",
 		"payment_refunds",
+		"finance_user_rollups",
 	},
 	DataSetMessages:  []string{"site_messages", "site_message_reads"},
 	DataSetDocuments: []string{"documents", "document_redirects"},
@@ -109,6 +110,10 @@ type logicalTableBackup struct {
 	Name    string              `json:"name"`
 	Columns []string            `json:"columns"`
 	Rows    [][]json.RawMessage `json:"rows"`
+}
+
+var optionalLogicalRestoreTables = map[string]struct{}{
+	"finance_user_rollups": {},
 }
 
 func Create(outPath string, opts Options) (Manifest, error) {
@@ -383,6 +388,15 @@ func exportLogicalData(opts Options, dataSets []string) (logicalDataBackup, erro
 
 	data := logicalDataBackup{DataSets: dataSets}
 	for _, table := range tablesForDataSets(dataSets) {
+		if logicalRestoreOptionalTable(table) {
+			exists, err := logicalTableExists(tx, db.backend, table)
+			if err != nil {
+				return logicalDataBackup{}, err
+			}
+			if !exists {
+				continue
+			}
+		}
 		backup, err := exportLogicalTable(tx, table)
 		if err != nil {
 			return logicalDataBackup{}, err
@@ -496,6 +510,12 @@ func restoreLogicalData(path string, opts Options, requestedDataSets []string) e
 	for _, table := range tablesForDataSets(dataSets) {
 		allowedTables[table] = struct{}{}
 	}
+	tablePayloads := map[string]logicalTableBackup{}
+	for _, table := range data.Tables {
+		if _, ok := allowedTables[table.Name]; ok {
+			tablePayloads[table.Name] = table
+		}
+	}
 	db, err := openDatabase(opts)
 	if err != nil {
 		return err
@@ -537,20 +557,20 @@ func restoreLogicalData(path string, opts Options, requestedDataSets []string) e
 		return err
 	}
 	for i := len(tables) - 1; i >= 0; i-- {
+		if _, ok := tablePayloads[tables[i]]; !ok && logicalRestoreOptionalTable(tables[i]) {
+			continue
+		}
 		if _, err := tx.Exec(fmt.Sprintf("DELETE FROM %s", tables[i])); err != nil {
 			_ = tx.Rollback()
 			return err
 		}
 	}
-	tablePayloads := map[string]logicalTableBackup{}
-	for _, table := range data.Tables {
-		if _, ok := allowedTables[table.Name]; ok {
-			tablePayloads[table.Name] = table
-		}
-	}
 	for _, table := range tables {
 		payload, ok := tablePayloads[table]
 		if !ok {
+			if logicalRestoreOptionalTable(table) {
+				continue
+			}
 			_ = tx.Rollback()
 			return fmt.Errorf("backup data is missing table %s", table)
 		}
@@ -634,6 +654,29 @@ func restoreLogicalTable(tx *backupTx, table logicalTableBackup, allowedColumns 
 
 func logicalRestoreColumnCanUseDefault(table, column string) bool {
 	return table == "billing_plan_groups" && column == "quota_price_ratio"
+}
+
+func logicalRestoreOptionalTable(table string) bool {
+	_, ok := optionalLogicalRestoreTables[table]
+	return ok
+}
+
+func logicalTableExists(tx *backupTx, backend, table string) (bool, error) {
+	var marker int
+	var err error
+	switch backend {
+	case databaseBackendPostgres:
+		err = tx.QueryRow(`SELECT 1 FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = ?`, table).Scan(&marker)
+	default:
+		err = tx.QueryRow(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`, table).Scan(&marker)
+	}
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func decodeLogicalCell(raw json.RawMessage) (any, error) {
@@ -824,6 +867,10 @@ func reconcileLogicalRestoreFinanceRollupsTx(tx *backupTx, dataSets []string) er
 }
 
 func rebuildFinanceUserRollupsTx(tx *backupTx) error {
+	if err := snapshotFinanceUserRollupsTx(tx); err != nil {
+		return err
+	}
+	defer tx.Exec(`DROP TABLE IF EXISTS restore_existing_finance_user_rollups`)
 	if _, err := tx.Exec(`DELETE FROM finance_user_rollups`); err != nil {
 		return err
 	}
@@ -842,7 +889,55 @@ func rebuildFinanceUserRollupsTx(tx *backupTx) error {
 	if err := addFinanceUserLedgerRollupsTx(tx); err != nil {
 		return err
 	}
-	return addFinanceUserUsageRollupsTx(tx)
+	if err := addFinanceUserUsageRollupsTx(tx); err != nil {
+		return err
+	}
+	return preserveFinanceUserHistoricalSpendTx(tx)
+}
+
+func snapshotFinanceUserRollupsTx(tx *backupTx) error {
+	if _, err := tx.Exec(`DROP TABLE IF EXISTS restore_existing_finance_user_rollups`); err != nil {
+		return err
+	}
+	_, err := tx.Exec(`
+		CREATE TEMP TABLE restore_existing_finance_user_rollups AS
+		SELECT user_id, spend_nano_usd, usage_spend_nano_usd, plan_spend_nano_usd, last_spend_at_ns
+		FROM finance_user_rollups
+		WHERE user_id <> ''
+	`)
+	return err
+}
+
+func preserveFinanceUserHistoricalSpendTx(tx *backupTx) error {
+	_, err := tx.Exec(`
+		UPDATE finance_user_rollups
+		SET spend_nano_usd = CASE
+				WHEN spend_nano_usd < COALESCE((SELECT existing.spend_nano_usd FROM restore_existing_finance_user_rollups existing WHERE existing.user_id = finance_user_rollups.user_id), 0)
+					THEN COALESCE((SELECT existing.spend_nano_usd FROM restore_existing_finance_user_rollups existing WHERE existing.user_id = finance_user_rollups.user_id), 0)
+				ELSE spend_nano_usd
+			END,
+			usage_spend_nano_usd = CASE
+				WHEN usage_spend_nano_usd < COALESCE((SELECT existing.usage_spend_nano_usd FROM restore_existing_finance_user_rollups existing WHERE existing.user_id = finance_user_rollups.user_id), 0)
+					THEN COALESCE((SELECT existing.usage_spend_nano_usd FROM restore_existing_finance_user_rollups existing WHERE existing.user_id = finance_user_rollups.user_id), 0)
+				ELSE usage_spend_nano_usd
+			END,
+			plan_spend_nano_usd = CASE
+				WHEN plan_spend_nano_usd < COALESCE((SELECT existing.plan_spend_nano_usd FROM restore_existing_finance_user_rollups existing WHERE existing.user_id = finance_user_rollups.user_id), 0)
+					THEN COALESCE((SELECT existing.plan_spend_nano_usd FROM restore_existing_finance_user_rollups existing WHERE existing.user_id = finance_user_rollups.user_id), 0)
+				ELSE plan_spend_nano_usd
+			END,
+			last_spend_at_ns = CASE
+				WHEN last_spend_at_ns < COALESCE((SELECT existing.last_spend_at_ns FROM restore_existing_finance_user_rollups existing WHERE existing.user_id = finance_user_rollups.user_id), 0)
+					THEN COALESCE((SELECT existing.last_spend_at_ns FROM restore_existing_finance_user_rollups existing WHERE existing.user_id = finance_user_rollups.user_id), 0)
+				ELSE last_spend_at_ns
+			END
+		WHERE EXISTS (
+			SELECT 1
+			FROM restore_existing_finance_user_rollups existing
+			WHERE existing.user_id = finance_user_rollups.user_id
+		)
+	`)
+	return err
 }
 
 func addFinanceUserPaymentRollupsTx(tx *backupTx) error {

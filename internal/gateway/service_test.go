@@ -4722,8 +4722,8 @@ func TestExecuteStreamRetriesBeforeFirstOutputOnAnotherAccount(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if lowCost.Status != core.AccountStatusCooling || lowCost.CooldownUntil == nil {
-		t.Fatalf("low cost status=%q cooldown=%#v, want cooling with cooldown", lowCost.Status, lowCost.CooldownUntil)
+	if lowCost.Status != core.AccountStatusActive || lowCost.CooldownUntil != nil {
+		t.Fatalf("low cost status=%q cooldown=%#v, want active without cooldown after shared upstream failure", lowCost.Status, lowCost.CooldownUntil)
 	}
 	requests, total := repo.ListBillingRequestsPage(storage.BillingRequestQuery{ClientID: client.ID, Limit: 1})
 	if total != 1 || len(requests) != 1 {
@@ -5224,8 +5224,8 @@ func TestExecuteResponsesStreamRetriesPreOutputFailedEventOnAnotherAccount(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
-	if lowCost.Status != core.AccountStatusCooling || lowCost.CooldownUntil == nil {
-		t.Fatalf("low cost status=%q cooldown=%#v, want cooling with cooldown", lowCost.Status, lowCost.CooldownUntil)
+	if lowCost.Status != core.AccountStatusActive || lowCost.CooldownUntil != nil {
+		t.Fatalf("low cost status=%q cooldown=%#v, want active without cooldown after shared upstream failure", lowCost.Status, lowCost.CooldownUntil)
 	}
 	audits := repo.ListAudit(1)
 	if len(audits) != 1 || audits[0].Status != "ok" {
@@ -5433,8 +5433,8 @@ func TestExecuteResponsesWebSocketRetriesBeforeSendOnAnotherAccount(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	if lowCost.Status != core.AccountStatusCooling || lowCost.CooldownUntil == nil {
-		t.Fatalf("low cost status=%q cooldown=%#v, want cooling with cooldown", lowCost.Status, lowCost.CooldownUntil)
+	if lowCost.Status != core.AccountStatusActive || lowCost.CooldownUntil != nil {
+		t.Fatalf("low cost status=%q cooldown=%#v, want active without cooldown after shared upstream failure", lowCost.Status, lowCost.CooldownUntil)
 	}
 	audits := repo.ListAudit(1)
 	if len(audits) != 1 || audits[0].Status != "ok" {
@@ -6312,11 +6312,11 @@ func TestExecuteStreamMarksAccountFailureWhenUpstreamReadFails(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if account.Status != core.AccountStatusCooling || account.CooldownUntil == nil {
-		t.Fatalf("account status=%q cooldown=%#v, want cooling with cooldown", account.Status, account.CooldownUntil)
+	if account.Status != core.AccountStatusActive || account.CooldownUntil != nil {
+		t.Fatalf("account status=%q cooldown=%#v, want active without cooldown after shared upstream failure", account.Status, account.CooldownUntil)
 	}
-	if account.ConsecutiveFails == 0 {
-		t.Fatalf("consecutive fails = %d, want recorded failure", account.ConsecutiveFails)
+	if account.ConsecutiveFails != 0 || account.TotalFails != 0 {
+		t.Fatalf("failure counters = consecutive:%d total:%d, want no account penalty for shared upstream failure", account.ConsecutiveFails, account.TotalFails)
 	}
 }
 

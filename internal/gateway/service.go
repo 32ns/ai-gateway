@@ -500,6 +500,39 @@ func gatewayRequestWithStrictAccount(req *core.GatewayRequest, accountID string)
 	return &clone
 }
 
+func gatewayRequestExcludingAccount(req *core.GatewayRequest, accountID string) *core.GatewayRequest {
+	accountID = strings.TrimSpace(accountID)
+	if req == nil || accountID == "" {
+		return req
+	}
+	clone := *req
+	clone.PreferredAccountID = ""
+	clone.StrictAccountAffinity = false
+	clone.ExcludedAccountIDs = appendResponseExcludedAccountID(req.ExcludedAccountIDs, accountID)
+	if req.Metadata != nil {
+		clone.Metadata = cloneStringMap(req.Metadata)
+	}
+	if req.Extra != nil {
+		clone.Extra = cloneRawJSONMap(req.Extra)
+	}
+	return &clone
+}
+
+func cloneRawJSONMap(values map[string]json.RawMessage) map[string]json.RawMessage {
+	if len(values) == 0 {
+		return nil
+	}
+	clone := make(map[string]json.RawMessage, len(values))
+	for key, value := range values {
+		if value != nil {
+			clone[key] = append(json.RawMessage(nil), value...)
+		} else {
+			clone[key] = nil
+		}
+	}
+	return clone
+}
+
 func streamFailureAttempt(provider core.ProviderKind, accountID, accountLabel string, err error) core.AttemptRecord {
 	attempt := core.AttemptRecord{
 		Provider:     provider,
@@ -2185,14 +2218,14 @@ func (s *Service) ExecuteStream(ctx context.Context, req *core.GatewayRequest, e
 				shouldRetrySameAccountStreamBeforeOutput(client, consume.UpstreamErr, consume.Committed) {
 				allAttempts = currentAttempts
 				sameAccountStreamRetries++
-				retryReq = gatewayRequestWithStrictAccount(req, streamResult.Decision.Account.ID)
+				retryReq = gatewayRequestWithStrictAccount(openReq, streamResult.Decision.Account.ID)
 				continue
 			}
 			s.failover.RecordStreamFailure(streamResult, consume.UpstreamErr)
 			recordBillingStreamFailure(billing, failureAttempt)
 			if shouldRetryStreamBeforeOutput(consume.UpstreamErr, consume.Committed, streamRetries) {
 				allAttempts = currentAttempts
-				retryReq = nil
+				retryReq = gatewayRequestExcludingAccount(openReq, failureAttempt.AccountID)
 				sameAccountStreamRetries = 0
 				continue
 			}

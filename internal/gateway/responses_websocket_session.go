@@ -184,7 +184,7 @@ func (s *ResponsesWebSocketSession) Execute(ctx context.Context, req *core.Respo
 			if shouldRetryStreamBeforeOutput(consume.UpstreamErr, consume.Committed, streamRetries) {
 				allAttempts = attempts
 				sameAccountStreamRetries = 0
-				activeReq = responsesRequestWithoutStrictAccount(activeReq)
+				activeReq = responsesRequestExcludingAccount(responsesRequestWithoutStrictAccount(activeReq), failureAttempt.AccountID)
 				continue
 			}
 		}
@@ -322,7 +322,8 @@ func (s *ResponsesWebSocketSession) openOrSendWithRetryBudget(ctx context.Contex
 				return nil, append(attempts, retryAttempts...), retryDecision, retryStateSeq, retryErr
 			}
 			if shouldRetryResponsesWebSocketSend(err) && retriesLeft > 0 {
-				retrySession, retryAttempts, retryDecision, retryStateSeq, retryErr := s.openOrSendWithRetryBudget(ctx, plan, client, req, retriesLeft-1)
+				retryReq := responsesWebSocketSendRetryRequest(req, result.Decision.Account.ID)
+				retrySession, retryAttempts, retryDecision, retryStateSeq, retryErr := s.openOrSendWithRetryBudget(ctx, plan, client, retryReq, retriesLeft-1)
 				if retryErr == nil {
 					return retrySession, append(attempts, retryAttempts...), retryDecision, retryStateSeq, nil
 				}
@@ -378,7 +379,8 @@ func (s *ResponsesWebSocketSession) openOrSendWithRetryBudget(ctx context.Contex
 			return nil, append(attempts, retryAttempts...), retryDecision, retryStateSeq, retryErr
 		}
 		if shouldRetryResponsesWebSocketSend(err) && retriesLeft > 0 {
-			retrySession, retryAttempts, retryDecision, retryStateSeq, retryErr := s.openOrSendWithRetryBudget(ctx, plan, client, req, retriesLeft-1)
+			retryReq := responsesWebSocketSendRetryRequest(req, decision.Account.ID)
+			retrySession, retryAttempts, retryDecision, retryStateSeq, retryErr := s.openOrSendWithRetryBudget(ctx, plan, client, retryReq, retriesLeft-1)
 			if retryErr == nil {
 				return retrySession, append(attempts, retryAttempts...), retryDecision, retryStateSeq, nil
 			}
@@ -412,6 +414,14 @@ func normalizeResponsesWebSocketSendError(err error) error {
 		}
 	}
 	return err
+}
+
+func responsesWebSocketSendRetryRequest(req *core.ResponsesRequest, accountID string) *core.ResponsesRequest {
+	if req != nil && req.StrictAccountAffinity &&
+		strings.EqualFold(strings.TrimSpace(req.PreferredAccountID), strings.TrimSpace(accountID)) {
+		return req
+	}
+	return responsesRequestExcludingAccount(req, accountID)
 }
 
 func shouldRetryResponsesWebSocketSend(err error) bool {

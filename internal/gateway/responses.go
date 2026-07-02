@@ -363,7 +363,7 @@ func (s *Service) executeResponsesStream(ctx context.Context, req *core.Response
 				allAttempts = currentAttempts
 				retryReq = nil
 				sameAccountStreamRetries = 0
-				activeReq = responsesRequestWithoutStrictAccount(activeReq)
+				activeReq = responsesRequestExcludingAccount(responsesRequestWithoutStrictAccount(activeReq), failureAttempt.AccountID)
 				continue
 			}
 		}
@@ -583,6 +583,24 @@ func responsesRequestWithoutStrictAccount(req *core.ResponsesRequest) *core.Resp
 	clone := *req
 	clone.PreferredAccountID = ""
 	clone.StrictAccountAffinity = false
+	if req.Metadata != nil {
+		clone.Metadata = cloneStringMap(req.Metadata)
+	}
+	if req.Headers != nil {
+		clone.Headers = cloneStringMap(req.Headers)
+	}
+	return &clone
+}
+
+func responsesRequestExcludingAccount(req *core.ResponsesRequest, accountID string) *core.ResponsesRequest {
+	accountID = strings.TrimSpace(accountID)
+	if req == nil || accountID == "" {
+		return req
+	}
+	clone := *req
+	clone.PreferredAccountID = ""
+	clone.StrictAccountAffinity = false
+	clone.ExcludedAccountIDs = appendResponseExcludedAccountID(req.ExcludedAccountIDs, accountID)
 	if req.Metadata != nil {
 		clone.Metadata = cloneStringMap(req.Metadata)
 	}
