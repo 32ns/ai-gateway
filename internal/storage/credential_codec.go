@@ -222,6 +222,7 @@ func systemSettingsSecretFields(settings *core.SystemSettings) []*string {
 		&settings.Network.SystemProxyURL,
 		&settings.OAuth.GitHubLoginSecret,
 		&settings.OAuth.GoogleLoginSecret,
+		&settings.OAuth.LinuxDOSecret,
 		&settings.Email.SMTPPassword,
 		&settings.Email.CloudMailPassword,
 		&settings.Registration.TurnstileSecretKey,

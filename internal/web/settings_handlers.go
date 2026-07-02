@@ -241,6 +241,9 @@ func preserveBlankSystemSecrets(input *core.SystemSettings, existing core.System
 	if strings.TrimSpace(input.OAuth.GoogleLoginSecret) == "" {
 		input.OAuth.GoogleLoginSecret = existing.OAuth.GoogleLoginSecret
 	}
+	if strings.TrimSpace(input.OAuth.LinuxDOSecret) == "" {
+		input.OAuth.LinuxDOSecret = existing.OAuth.LinuxDOSecret
+	}
 	if strings.TrimSpace(input.Email.SMTPPassword) == "" {
 		input.Email.SMTPPassword = existing.Email.SMTPPassword
 	}
@@ -285,6 +288,7 @@ func (s *Server) renderSettingsPage(w http.ResponseWriter, r *http.Request, sett
 		"ActiveNav":                    "settings",
 		"Locale":                       locale,
 		"Settings":                     normalized,
+		"OAuthCallbackURLs":            oauthCallbackURLsForSettings(normalized, r),
 		"PersonalPay":                  s.control.PersonalPayRuntime(r.Context()),
 		"Saved":                        saved,
 		"Error":                        strings.TrimSpace(message),
@@ -297,6 +301,18 @@ func (s *Server) renderSettingsPage(w http.ResponseWriter, r *http.Request, sett
 		w.WriteHeader(status)
 	}
 	s.render(w, "settings.html", locale, data)
+}
+
+func oauthCallbackURLsForSettings(settings core.SystemSettings, r *http.Request) map[string]string {
+	baseURL := strings.TrimRight(strings.TrimSpace(settings.Runtime.PublicBaseURL), "/")
+	if baseURL == "" {
+		baseURL = strings.TrimRight(requestOrigin(r), "/")
+	}
+	return map[string]string{
+		"github":  baseURL + "/login/oauth/github/callback",
+		"google":  baseURL + "/login/oauth/google/callback",
+		"linuxdo": baseURL + "/login/oauth/linuxdo/callback",
+	}
 }
 
 func showPersonalPayAndroidBackup(settings core.SystemSettings) bool {

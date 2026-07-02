@@ -501,6 +501,11 @@ func passwordOAuthProviders(user core.User, settings core.SystemSettings) []pass
 			Label:      "Google",
 			Configured: settings.OAuth.GoogleLoginEnabled && strings.TrimSpace(settings.OAuth.GoogleLoginClientID) != "" && strings.TrimSpace(settings.OAuth.GoogleLoginSecret) != "",
 		},
+		{
+			Provider:   "linuxdo",
+			Label:      "Linux.do",
+			Configured: settings.OAuth.LinuxDOLoginEnabled && strings.TrimSpace(settings.OAuth.LinuxDOClientID) != "" && strings.TrimSpace(settings.OAuth.LinuxDOSecret) != "",
+		},
 	}
 	for i := range providers {
 		for _, identity := range user.OAuthIdentities {
@@ -536,6 +541,8 @@ func oauthProviderLabel(provider string) string {
 		return "GitHub"
 	case "google":
 		return "Google"
+	case "linuxdo":
+		return "Linux.do"
 	default:
 		return strings.TrimSpace(provider)
 	}
@@ -566,8 +573,9 @@ func (s *Server) renderLoginPage(w http.ResponseWriter, r *http.Request, message
 		"Username":                strings.TrimSpace(username),
 		"NoticeError":             strings.TrimSpace(r.URL.Query().Get("notice_error")),
 		"AllowPublicRegistration": s.publicRegistrationAllowed(),
-		"GitHubLoginEnabled":      settings.OAuth.GitHubLoginEnabled && settings.OAuth.GitHubLoginClientID != "" && settings.OAuth.GitHubLoginSecret != "",
-		"GoogleLoginEnabled":      settings.OAuth.GoogleLoginEnabled && settings.OAuth.GoogleLoginClientID != "" && settings.OAuth.GoogleLoginSecret != "",
+		"GitHubLoginEnabled":      settings.OAuth.GitHubLoginEnabled && strings.TrimSpace(settings.OAuth.GitHubLoginClientID) != "" && strings.TrimSpace(settings.OAuth.GitHubLoginSecret) != "",
+		"GoogleLoginEnabled":      settings.OAuth.GoogleLoginEnabled && strings.TrimSpace(settings.OAuth.GoogleLoginClientID) != "" && strings.TrimSpace(settings.OAuth.GoogleLoginSecret) != "",
+		"LinuxDOLoginEnabled":     settings.OAuth.LinuxDOLoginEnabled && strings.TrimSpace(settings.OAuth.LinuxDOClientID) != "" && strings.TrimSpace(settings.OAuth.LinuxDOSecret) != "",
 	})
 }
 
@@ -656,6 +664,7 @@ func (s *Server) renderRegisterPage(w http.ResponseWriter, r *http.Request, mess
 		"RegistrationUsernameMinLength": settings.Registration.UsernameMinLength,
 		"GitHubLoginEnabled":            settings.OAuth.GitHubLoginEnabled && strings.TrimSpace(settings.OAuth.GitHubLoginClientID) != "" && strings.TrimSpace(settings.OAuth.GitHubLoginSecret) != "",
 		"GoogleLoginEnabled":            settings.OAuth.GoogleLoginEnabled && strings.TrimSpace(settings.OAuth.GoogleLoginClientID) != "" && strings.TrimSpace(settings.OAuth.GoogleLoginSecret) != "",
+		"LinuxDOLoginEnabled":           settings.OAuth.LinuxDOLoginEnabled && strings.TrimSpace(settings.OAuth.LinuxDOClientID) != "" && strings.TrimSpace(settings.OAuth.LinuxDOSecret) != "",
 		"TurnstileEnabled":              settings.Registration.TurnstileEnabled && strings.TrimSpace(settings.Registration.TurnstileSiteKey) != "",
 		"TurnstileSiteKey":              settings.Registration.TurnstileSiteKey,
 		"NoticeError":                   strings.TrimSpace(r.URL.Query().Get("notice_error")),

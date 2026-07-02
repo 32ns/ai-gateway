@@ -382,6 +382,18 @@
                 <input type="checkbox" name="github_login_enabled" {{if .Settings.OAuth.GitHubLoginEnabled}}checked{{end}} form="system-settings-form">
                 <span>{{t "github_login_enabled"}}</span>
               </label>
+              <div class="settings-oauth-callback">
+                <span>{{t "oauth_callback_url"}}</span>
+                <div class="settings-oauth-callback-copy">
+                  <code>{{index .OAuthCallbackURLs "github"}}</code>
+                  <button type="button" class="icon-button copy-secret-button" data-copy-secret data-copy-value="{{index .OAuthCallbackURLs "github"}}" data-copy-label="{{t "copy_callback_url"}}" data-copy-success="{{t "copied"}}" data-copy-failed="{{t "copy_failed"}}" aria-label="{{t "copy_callback_url"}}" title="{{t "copy_callback_url"}}">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="8" y="3" width="8" height="4" rx="1"></rect>
+                      <path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"></path>
+                    </svg>
+                  </button>
+                </div>
+              </div>
               <label>
                 <span>{{t "github_client_id"}}</span>
                 <input name="github_login_client_id" value="{{.Settings.OAuth.GitHubLoginClientID}}" form="system-settings-form">
@@ -396,6 +408,18 @@
                 <input type="checkbox" name="google_login_enabled" {{if .Settings.OAuth.GoogleLoginEnabled}}checked{{end}} form="system-settings-form">
                 <span>{{t "google_login_enabled"}}</span>
               </label>
+              <div class="settings-oauth-callback">
+                <span>{{t "oauth_callback_url"}}</span>
+                <div class="settings-oauth-callback-copy">
+                  <code>{{index .OAuthCallbackURLs "google"}}</code>
+                  <button type="button" class="icon-button copy-secret-button" data-copy-secret data-copy-value="{{index .OAuthCallbackURLs "google"}}" data-copy-label="{{t "copy_callback_url"}}" data-copy-success="{{t "copied"}}" data-copy-failed="{{t "copy_failed"}}" aria-label="{{t "copy_callback_url"}}" title="{{t "copy_callback_url"}}">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="8" y="3" width="8" height="4" rx="1"></rect>
+                      <path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"></path>
+                    </svg>
+                  </button>
+                </div>
+              </div>
               <label>
                 <span>{{t "google_client_id"}}</span>
                 <input name="google_login_client_id" value="{{.Settings.OAuth.GoogleLoginClientID}}" form="system-settings-form">
@@ -403,6 +427,32 @@
               <label>
                 <span>{{t "google_client_secret"}}</span>
                 <input type="password" name="google_login_secret" placeholder="{{if .Settings.OAuth.GoogleLoginSecret}}{{t "secret_keep_placeholder"}}{{end}}" form="system-settings-form">
+              </label>
+            </div>
+            <div class="settings-oauth-provider-group">
+              <label class="checkbox-row">
+                <input type="checkbox" name="linuxdo_login_enabled" {{if .Settings.OAuth.LinuxDOLoginEnabled}}checked{{end}} form="system-settings-form">
+                <span>{{t "linuxdo_login_enabled"}}</span>
+              </label>
+              <div class="settings-oauth-callback">
+                <span>{{t "oauth_callback_url"}}</span>
+                <div class="settings-oauth-callback-copy">
+                  <code>{{index .OAuthCallbackURLs "linuxdo"}}</code>
+                  <button type="button" class="icon-button copy-secret-button" data-copy-secret data-copy-value="{{index .OAuthCallbackURLs "linuxdo"}}" data-copy-label="{{t "copy_callback_url"}}" data-copy-success="{{t "copied"}}" data-copy-failed="{{t "copy_failed"}}" aria-label="{{t "copy_callback_url"}}" title="{{t "copy_callback_url"}}">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="8" y="3" width="8" height="4" rx="1"></rect>
+                      <path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"></path>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <label>
+                <span>{{t "linuxdo_client_id"}}</span>
+                <input name="linuxdo_login_client_id" value="{{.Settings.OAuth.LinuxDOClientID}}" form="system-settings-form">
+              </label>
+              <label>
+                <span>{{t "linuxdo_client_secret"}}</span>
+                <input type="password" name="linuxdo_login_secret" placeholder="{{if .Settings.OAuth.LinuxDOSecret}}{{t "secret_keep_placeholder"}}{{end}}" form="system-settings-form">
               </label>
             </div>
             <label class="checkbox-row full-span">

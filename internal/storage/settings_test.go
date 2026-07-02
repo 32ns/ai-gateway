@@ -45,6 +45,9 @@ func TestMemoryRepositorySystemSettings(t *testing.T) {
 	settings.OAuth.GitHubLoginEnabled = true
 	settings.OAuth.GitHubLoginClientID = "github-client"
 	settings.OAuth.GitHubLoginSecret = "github-secret"
+	settings.OAuth.LinuxDOLoginEnabled = true
+	settings.OAuth.LinuxDOClientID = "linuxdo-client"
+	settings.OAuth.LinuxDOSecret = "linuxdo-secret"
 	settings.OAuth.LoginAutoCreateUser = true
 	settings.Runtime.AllowPublicRegistration = true
 	settings.Runtime.RegistrationEmailAllowlistEnabled = true
@@ -89,6 +92,9 @@ func TestMemoryRepositorySystemSettings(t *testing.T) {
 		t.Fatalf("OpenAIEnabled = true, want false")
 	}
 	if !stored.OAuth.GitHubLoginEnabled || stored.OAuth.GitHubLoginClientID != "github-client" || stored.OAuth.GitHubLoginSecret != "github-secret" || !stored.OAuth.LoginAutoCreateUser {
+		t.Fatalf("OAuth = %#v", stored.OAuth)
+	}
+	if !stored.OAuth.LinuxDOLoginEnabled || stored.OAuth.LinuxDOClientID != "linuxdo-client" || stored.OAuth.LinuxDOSecret != "linuxdo-secret" {
 		t.Fatalf("OAuth = %#v", stored.OAuth)
 	}
 	if !stored.Runtime.AllowPublicRegistration {
@@ -159,6 +165,9 @@ func TestSQLiteRepositoryPersistsSystemSettings(t *testing.T) {
 	settings.OAuth.GoogleLoginEnabled = true
 	settings.OAuth.GoogleLoginClientID = "google-client"
 	settings.OAuth.GoogleLoginSecret = "google-secret"
+	settings.OAuth.LinuxDOLoginEnabled = true
+	settings.OAuth.LinuxDOClientID = "linuxdo-client"
+	settings.OAuth.LinuxDOSecret = "linuxdo-secret"
 	settings.Registration.NewUserRewardEnabled = true
 	settings.Registration.NewUserRewardNanoUSD = 2750
 	settings.Registration.RequireInvitationCode = true
@@ -247,6 +256,9 @@ func TestSQLiteRepositoryPersistsSystemSettings(t *testing.T) {
 		t.Fatalf("Usage log retention = %#v", stored.Retention)
 	}
 	if !stored.OAuth.GoogleLoginEnabled || stored.OAuth.GoogleLoginClientID != "google-client" || stored.OAuth.GoogleLoginSecret != "google-secret" {
+		t.Fatalf("OAuth = %#v", stored.OAuth)
+	}
+	if !stored.OAuth.LinuxDOLoginEnabled || stored.OAuth.LinuxDOClientID != "linuxdo-client" || stored.OAuth.LinuxDOSecret != "linuxdo-secret" {
 		t.Fatalf("OAuth = %#v", stored.OAuth)
 	}
 	if stored.Retention.BillingLedgerRetentionDays != 8 {

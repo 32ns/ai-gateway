@@ -76,20 +76,26 @@ func (s *Server) handleProfileOAuth(w http.ResponseWriter, r *http.Request) {
 func parseProfileOAuthPath(path string) (string, string) {
 	rest := strings.Trim(strings.TrimPrefix(path, "/profile/oauth/"), "/")
 	switch rest {
-	case "github", "google":
+	case "github", "google", "linuxdo":
 		return rest, "start"
 	case "github/callback":
 		return "github", "callback"
 	case "google/callback":
 		return "google", "callback"
+	case "linuxdo/callback":
+		return "linuxdo", "callback"
 	case "github/merge":
 		return "github", "merge"
 	case "google/merge":
 		return "google", "merge"
+	case "linuxdo/merge":
+		return "linuxdo", "merge"
 	case "github/unlink":
 		return "github", "unlink"
 	case "google/unlink":
 		return "google", "unlink"
+	case "linuxdo/unlink":
+		return "linuxdo", "unlink"
 	default:
 		return "", ""
 	}

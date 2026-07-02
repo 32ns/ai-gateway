@@ -98,13 +98,16 @@
         <a class="button-link ghost-link" href="/login">{{t "back_login"}}</a>
       </div>
     </form>
-    {{if or .GitHubLoginEnabled .GoogleLoginEnabled}}
+    {{if or .GitHubLoginEnabled .GoogleLoginEnabled .LinuxDOLoginEnabled}}
     <div class="oauth-login-actions">
       {{if .GitHubLoginEnabled}}
       <a class="button-link ghost-link" href="/login/oauth/github?next={{urlquery .Next}}">{{t "login_with_github"}}</a>
       {{end}}
       {{if .GoogleLoginEnabled}}
       <a class="button-link ghost-link" href="/login/oauth/google?next={{urlquery .Next}}">{{t "login_with_google"}}</a>
+      {{end}}
+      {{if .LinuxDOLoginEnabled}}
+      <a class="button-link ghost-link" href="/login/oauth/linuxdo?next={{urlquery .Next}}">{{t "login_with_linuxdo"}}</a>
       {{end}}
     </div>
     {{end}}

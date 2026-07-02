@@ -1457,6 +1457,9 @@ func TestSettingsPageUpdatesSystemSettings(t *testing.T) {
 	form.Set("google_login_enabled", "on")
 	form.Set("google_login_client_id", "google-client")
 	form.Set("google_login_secret", "google-secret")
+	form.Set("linuxdo_login_enabled", "on")
+	form.Set("linuxdo_login_client_id", "linuxdo-client")
+	form.Set("linuxdo_login_secret", "linuxdo-secret")
 	form.Set("login_oauth_auto_create_user", "on")
 	form.Set("email_verify_on_register", "on")
 	form.Set("email_provider", "smtp")
@@ -1486,7 +1489,7 @@ func TestSettingsPageUpdatesSystemSettings(t *testing.T) {
 	form.Set("user_dashboard_custom_panel_html", `<strong>Console notice</strong>`)
 	form.Set("image_user_console_enabled", "on")
 	form.Set("image_backend", "official")
-				form.Set("payment_min_recharge_usd", "2.50")
+	form.Set("payment_min_recharge_usd", "2.50")
 	form.Set("payment_max_recharge_usd", "200")
 	form.Set("invitation_enabled", "on")
 	form.Set("inviter_recharge_reward_percent", "5")
@@ -1540,6 +1543,16 @@ func TestSettingsPageUpdatesSystemSettings(t *testing.T) {
 			t.Fatalf("settings page header missing configured brand value %q: %s", want, savedRec.Body.String())
 		}
 	}
+	for _, want := range []string{
+		"https://gateway.example.com/login/oauth/github/callback",
+		"https://gateway.example.com/login/oauth/google/callback",
+		"https://gateway.example.com/login/oauth/linuxdo/callback",
+		`data-copy-label="Copy callback URL"`,
+	} {
+		if !strings.Contains(savedRec.Body.String(), want) {
+			t.Fatalf("settings page missing OAuth callback copy value %q: %s", want, savedRec.Body.String())
+		}
+	}
 
 	settings, err := repo.GetSystemSettings()
 	if err != nil {
@@ -1568,6 +1581,9 @@ func TestSettingsPageUpdatesSystemSettings(t *testing.T) {
 	}
 	if !settings.OAuth.GitHubLoginEnabled || settings.OAuth.GitHubLoginClientID != "github-client" || settings.OAuth.GitHubLoginSecret != "github-secret" {
 		t.Fatalf("GitHub login settings = %#v", settings.OAuth)
+	}
+	if !settings.OAuth.LinuxDOLoginEnabled || settings.OAuth.LinuxDOClientID != "linuxdo-client" || settings.OAuth.LinuxDOSecret != "linuxdo-secret" {
+		t.Fatalf("Linux.do login settings = %#v", settings.OAuth)
 	}
 	if !settings.OAuth.GoogleLoginEnabled || settings.OAuth.GoogleLoginClientID != "google-client" || settings.OAuth.GoogleLoginSecret != "google-secret" || !settings.OAuth.LoginAutoCreateUser {
 		t.Fatalf("Google login settings = %#v", settings.OAuth)
@@ -1599,7 +1615,7 @@ func TestSettingsPageUpdatesSystemSettings(t *testing.T) {
 	if settings.Network.SystemProxyURL != "http://127.0.0.1:7890" {
 		t.Fatalf("SystemProxyURL = %q", settings.Network.SystemProxyURL)
 	}
-	if settings.Image.Backend != core.ImageBackendOfficial || !core.ImageUserConsoleEnabled(settings.Image)  {
+	if settings.Image.Backend != core.ImageBackendOfficial || !core.ImageUserConsoleEnabled(settings.Image) {
 		t.Fatalf("Image settings = %#v", settings.Image)
 	}
 	if settings.Payment.MinRechargeNanoUSD != 2500000000 || settings.Payment.MaxRechargeNanoUSD != 200*core.NanoUSDPerUSD {
@@ -1651,6 +1667,7 @@ func TestPreserveBlankLoginOAuthSecrets(t *testing.T) {
 		OAuth: core.SystemOAuthSettings{
 			GitHubLoginSecret: "",
 			GoogleLoginSecret: "next-google",
+			LinuxDOSecret:     "",
 		},
 		Email: core.SystemEmailSettings{
 			SMTPPassword:       "",
@@ -1674,6 +1691,7 @@ func TestPreserveBlankLoginOAuthSecrets(t *testing.T) {
 		OAuth: core.SystemOAuthSettings{
 			GitHubLoginSecret: "current-github",
 			GoogleLoginSecret: "current-google",
+			LinuxDOSecret:     "current-linuxdo",
 		},
 		Email: core.SystemEmailSettings{
 			SMTPPassword:       "current-smtp",
@@ -1701,6 +1719,9 @@ func TestPreserveBlankLoginOAuthSecrets(t *testing.T) {
 	}
 	if input.OAuth.GoogleLoginSecret != "next-google" {
 		t.Fatalf("GoogleLoginSecret = %q", input.OAuth.GoogleLoginSecret)
+	}
+	if input.OAuth.LinuxDOSecret != "current-linuxdo" {
+		t.Fatalf("LinuxDOSecret = %q", input.OAuth.LinuxDOSecret)
 	}
 	if input.Email.SMTPPassword != "current-smtp" {
 		t.Fatalf("SMTPPassword = %q", input.Email.SMTPPassword)
@@ -8377,6 +8398,9 @@ func TestLoginPageShowsEnabledOAuthProviders(t *testing.T) {
 	settings.OAuth.GoogleLoginEnabled = true
 	settings.OAuth.GoogleLoginClientID = "google-client"
 	settings.OAuth.GoogleLoginSecret = "google-secret"
+	settings.OAuth.LinuxDOLoginEnabled = true
+	settings.OAuth.LinuxDOClientID = "linuxdo-client"
+	settings.OAuth.LinuxDOSecret = "linuxdo-secret"
 	if err := repo.UpsertSystemSettings(settings); err != nil {
 		t.Fatalf("UpsertSystemSettings returned error: %v", err)
 	}
@@ -8392,7 +8416,7 @@ func TestLoginPageShowsEnabledOAuthProviders(t *testing.T) {
 		t.Fatalf("status = %d, want %d body=%s", rec.Code, http.StatusOK, rec.Body.String())
 	}
 	body := rec.Body.String()
-	for _, want := range []string{"/login/oauth/github?next=%2Fclients", "/login/oauth/google?next=%2Fclients", "Sign in with GitHub", "Sign in with Google"} {
+	for _, want := range []string{"/login/oauth/github?next=%2Fclients", "/login/oauth/google?next=%2Fclients", "/login/oauth/linuxdo?next=%2Fclients", "Sign in with GitHub", "Sign in with Google", "Sign in with Linux.do"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("login page missing %q: %s", want, body)
 		}
@@ -8464,6 +8488,42 @@ func TestLoginOAuthStartUsesPublicBaseURL(t *testing.T) {
 	}
 	if strings.Contains(location, "wrong.example.com") {
 		t.Fatalf("Location should not use request host when PublicBaseURL is configured: %s", location)
+	}
+}
+
+func TestLoginOAuthStartRedirectsToLinuxDOProvider(t *testing.T) {
+	repo := storage.NewMemoryRepository()
+	settings := core.DefaultSystemSettings()
+	settings.OAuth.LinuxDOLoginEnabled = true
+	settings.OAuth.LinuxDOClientID = "linuxdo-client"
+	settings.OAuth.LinuxDOSecret = "linuxdo-secret"
+	if err := repo.UpsertSystemSettings(settings); err != nil {
+		t.Fatalf("UpsertSystemSettings returned error: %v", err)
+	}
+	registry := providers.NewRegistry(&providers.OpenAIAdapter{}, &providers.ClaudeAdapter{})
+	control := controlplane.New(repo, registry)
+	server := NewServer(control, nil, "data/state.db")
+	handler := server.Handler()
+
+	req := httptest.NewRequest(http.MethodGet, "/login/oauth/linuxdo?next=%2Fclients", nil)
+	req.Host = "auth.example.com"
+	req.RemoteAddr = "127.0.0.1:1234"
+	req.Header.Set("X-Forwarded-Proto", "https")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d body=%s", rec.Code, http.StatusSeeOther, rec.Body.String())
+	}
+	location := rec.Header().Get("Location")
+	for _, want := range []string{
+		"https://connect.linux.do/oauth2/authorize?",
+		"client_id=linuxdo-client",
+		"redirect_uri=https%3A%2F%2Fauth.example.com%2Flogin%2Foauth%2Flinuxdo%2Fcallback",
+		"scope=openid+email+profile",
+	} {
+		if !strings.Contains(location, want) {
+			t.Fatalf("Location missing %q: %s", want, location)
+		}
 	}
 }
 
@@ -8899,6 +8959,9 @@ func TestProfileOAuthPageRendersBindingState(t *testing.T) {
 	settings.OAuth.GitHubLoginEnabled = true
 	settings.OAuth.GitHubLoginClientID = "github-client"
 	settings.OAuth.GitHubLoginSecret = "github-secret"
+	settings.OAuth.LinuxDOLoginEnabled = true
+	settings.OAuth.LinuxDOClientID = "linuxdo-client"
+	settings.OAuth.LinuxDOSecret = "linuxdo-secret"
 	if _, err := control.UpdateSystemSettings(settings); err != nil {
 		t.Fatalf("UpdateSystemSettings returned error: %v", err)
 	}
@@ -8932,7 +8995,7 @@ func TestProfileOAuthPageRendersBindingState(t *testing.T) {
 	if parts := strings.SplitN(body, `<main class="workspace">`, 2); len(parts) == 2 {
 		mainBody = parts[1]
 	}
-	for _, want := range []string{"Third-party Accounts", `/profile/oauth/github`, `/profile/oauth/google/unlink`, "alice@example.com"} {
+	for _, want := range []string{"Third-party Accounts", `/profile/oauth/github`, `/profile/oauth/google/unlink`, `/profile/oauth/linuxdo`, "alice@example.com", "Linux.do"} {
 		if !strings.Contains(mainBody, want) {
 			t.Fatalf("profile oauth page missing %q: %s", want, body)
 		}
@@ -8953,6 +9016,9 @@ func TestProfileOAuthStartUsesLoginCallback(t *testing.T) {
 	settings.OAuth.GoogleLoginEnabled = true
 	settings.OAuth.GoogleLoginClientID = "google-client"
 	settings.OAuth.GoogleLoginSecret = "google-secret"
+	settings.OAuth.LinuxDOLoginEnabled = true
+	settings.OAuth.LinuxDOClientID = "linuxdo-client"
+	settings.OAuth.LinuxDOSecret = "linuxdo-secret"
 	if _, err := control.UpdateSystemSettings(settings); err != nil {
 		t.Fatalf("UpdateSystemSettings returned error: %v", err)
 	}
@@ -8968,7 +9034,7 @@ func TestProfileOAuthStartUsesLoginCallback(t *testing.T) {
 	server := NewServer(control, nil, "data/state.db")
 	handler := authenticatedUserHandler(t, control, user, server.Handler())
 
-	for _, provider := range []string{"github", "google"} {
+	for _, provider := range []string{"github", "google", "linuxdo"} {
 		req := httptest.NewRequest(http.MethodGet, "/profile/oauth/"+provider, nil)
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
@@ -9364,6 +9430,9 @@ func TestRegisterPageShowsEnabledOAuthProviders(t *testing.T) {
 	settings.OAuth.GoogleLoginEnabled = true
 	settings.OAuth.GoogleLoginClientID = "google-client"
 	settings.OAuth.GoogleLoginSecret = "google-secret"
+	settings.OAuth.LinuxDOLoginEnabled = true
+	settings.OAuth.LinuxDOClientID = "linuxdo-client"
+	settings.OAuth.LinuxDOSecret = "linuxdo-secret"
 	if err := repo.UpsertSystemSettings(settings); err != nil {
 		t.Fatalf("UpsertSystemSettings returned error: %v", err)
 	}
@@ -9379,7 +9448,7 @@ func TestRegisterPageShowsEnabledOAuthProviders(t *testing.T) {
 		t.Fatalf("status = %d, want %d body=%s", rec.Code, http.StatusOK, rec.Body.String())
 	}
 	body := rec.Body.String()
-	for _, want := range []string{"/login/oauth/github?next=%2Fclients", "/login/oauth/google?next=%2Fclients", "Sign in with GitHub", "Sign in with Google"} {
+	for _, want := range []string{"/login/oauth/github?next=%2Fclients", "/login/oauth/google?next=%2Fclients", "/login/oauth/linuxdo?next=%2Fclients", "Sign in with GitHub", "Sign in with Google", "Sign in with Linux.do"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("register page missing %q: %s", want, body)
 		}

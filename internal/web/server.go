@@ -1029,6 +1029,9 @@ func systemSettingsFromForm(r *http.Request, existing core.SystemSettings) core.
 		GoogleLoginEnabled:  r.FormValue("google_login_enabled") != "",
 		GoogleLoginClientID: r.FormValue("google_login_client_id"),
 		GoogleLoginSecret:   r.FormValue("google_login_secret"),
+		LinuxDOLoginEnabled: r.FormValue("linuxdo_login_enabled") != "",
+		LinuxDOClientID:     r.FormValue("linuxdo_login_client_id"),
+		LinuxDOSecret:       r.FormValue("linuxdo_login_secret"),
 		LoginAutoCreateUser: r.FormValue("login_oauth_auto_create_user") != "",
 	}
 	input.Email = core.SystemEmailSettings{

@@ -63,12 +63,14 @@ func (s *Server) handleLoginOAuth(w http.ResponseWriter, r *http.Request) {
 func parseLoginOAuthPath(path string) (string, bool) {
 	rest := strings.Trim(strings.TrimPrefix(path, "/login/oauth/"), "/")
 	switch rest {
-	case "github", "google":
+	case "github", "google", "linuxdo":
 		return rest, false
 	case "github/callback":
 		return "github", true
 	case "google/callback":
 		return "google", true
+	case "linuxdo/callback":
+		return "linuxdo", true
 	default:
 		return "", false
 	}
@@ -196,6 +198,19 @@ func (s *Server) loginOAuthProvider(provider string) (loginOAuthProviderConfig, 
 			UserURL:      "https://openidconnect.googleapis.com/v1/userinfo",
 			Scope:        "openid email profile",
 		}, nil
+	case "linuxdo":
+		if !settings.OAuth.LinuxDOLoginEnabled || settings.OAuth.LinuxDOClientID == "" || settings.OAuth.LinuxDOSecret == "" {
+			return loginOAuthProviderConfig{}, fmt.Errorf("linux.do login is not configured")
+		}
+		return loginOAuthProviderConfig{
+			Provider:     "linuxdo",
+			ClientID:     settings.OAuth.LinuxDOClientID,
+			ClientSecret: settings.OAuth.LinuxDOSecret,
+			AuthURL:      "https://connect.linux.do/oauth2/authorize",
+			TokenURL:     "https://connect.linux.do/oauth2/token",
+			UserURL:      "https://connect.linux.do/api/user",
+			Scope:        "openid email profile",
+		}, nil
 	default:
 		return loginOAuthProviderConfig{}, fmt.Errorf("oauth provider is not supported")
 	}
@@ -273,6 +288,8 @@ func fetchLoginOAuthProfile(ctx context.Context, config loginOAuthProviderConfig
 		return fetchGitHubLoginProfile(ctx, config, proxyURL, token)
 	case "google":
 		return fetchGoogleLoginProfile(ctx, config, proxyURL, token)
+	case "linuxdo":
+		return fetchLinuxDOLoginProfile(ctx, config, proxyURL, token)
 	default:
 		return loginOAuthProfile{}, fmt.Errorf("oauth provider is not supported")
 	}
@@ -340,6 +357,67 @@ func fetchGoogleLoginProfile(ctx context.Context, config loginOAuthProviderConfi
 		EmailVerified: user.EmailVerified,
 		Username:      user.Name,
 	}, nil
+}
+
+func fetchLinuxDOLoginProfile(ctx context.Context, config loginOAuthProviderConfig, proxyURL, token string) (loginOAuthProfile, error) {
+	var user map[string]any
+	if err := getLoginOAuthJSON(ctx, config.UserURL, proxyURL, token, &user); err != nil {
+		return loginOAuthProfile{}, err
+	}
+	subject := firstOAuthProfileString(user, "sub", "id", "user_id")
+	if subject == "" {
+		return loginOAuthProfile{}, fmt.Errorf("linux.do profile did not include a subject")
+	}
+	return loginOAuthProfile{
+		Provider:      "linuxdo",
+		Subject:       subject,
+		Email:         firstOAuthProfileString(user, "email", "mail"),
+		EmailVerified: oauthProfileBool(user, "email_verified", "emailVerified", "verified"),
+		Username:      firstOAuthProfileString(user, "username", "login", "name", "display_name"),
+	}, nil
+}
+
+func firstOAuthProfileString(values map[string]any, keys ...string) string {
+	for _, key := range keys {
+		value, ok := values[key]
+		if !ok {
+			continue
+		}
+		switch typed := value.(type) {
+		case string:
+			if text := strings.TrimSpace(typed); text != "" {
+				return text
+			}
+		case float64:
+			if typed != 0 {
+				return fmt.Sprintf("%.0f", typed)
+			}
+		case json.Number:
+			if text := strings.TrimSpace(typed.String()); text != "" {
+				return text
+			}
+		}
+	}
+	return ""
+}
+
+func oauthProfileBool(values map[string]any, keys ...string) bool {
+	for _, key := range keys {
+		value, ok := values[key]
+		if !ok {
+			continue
+		}
+		switch typed := value.(type) {
+		case bool:
+			return typed
+		case string:
+			switch strings.ToLower(strings.TrimSpace(typed)) {
+			case "true", "1", "yes", "verified":
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func getLoginOAuthJSON(ctx context.Context, target, proxyURL, token string, dst any) error {

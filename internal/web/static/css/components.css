@@ -1959,6 +1959,36 @@ button {
   align-content: start;
 }
 
+.settings-oauth-callback {
+  display: grid;
+  gap: 6px;
+}
+
+.settings-oauth-callback > span {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.settings-oauth-callback-copy {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.settings-oauth-callback-copy code {
+  min-width: 0;
+  overflow: hidden;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .payment-settings-divider {
   height: 1px;
   margin: 50px 0;

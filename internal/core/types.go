@@ -679,6 +679,9 @@ type SystemOAuthSettings struct {
 	GoogleLoginEnabled  bool
 	GoogleLoginClientID string
 	GoogleLoginSecret   string
+	LinuxDOLoginEnabled bool
+	LinuxDOClientID     string
+	LinuxDOSecret       string
 	LoginAutoCreateUser bool
 }
 
@@ -967,6 +970,8 @@ func NormalizeSystemSettings(settings SystemSettings) SystemSettings {
 	settings.OAuth.GitHubLoginSecret = strings.TrimSpace(settings.OAuth.GitHubLoginSecret)
 	settings.OAuth.GoogleLoginClientID = strings.TrimSpace(settings.OAuth.GoogleLoginClientID)
 	settings.OAuth.GoogleLoginSecret = strings.TrimSpace(settings.OAuth.GoogleLoginSecret)
+	settings.OAuth.LinuxDOClientID = strings.TrimSpace(settings.OAuth.LinuxDOClientID)
+	settings.OAuth.LinuxDOSecret = strings.TrimSpace(settings.OAuth.LinuxDOSecret)
 	settings.Email.Provider = strings.ToLower(strings.TrimSpace(settings.Email.Provider))
 	if settings.Email.Provider == "" {
 		settings.Email.Provider = EmailProviderSMTP
