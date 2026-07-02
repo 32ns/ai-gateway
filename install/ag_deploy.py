@@ -74,6 +74,150 @@ GUI_SECRET_FIELDS = (
     (GUI_MASTER_KEY_FIELD, GUI_PROTECTED_MASTER_KEY_FIELD),
 )
 
+WINDOWS_TIMEZONE_TO_IANA = {
+    "Afghanistan Standard Time": "Asia/Kabul",
+    "Alaskan Standard Time": "America/Anchorage",
+    "Aleutian Standard Time": "America/Adak",
+    "Altai Standard Time": "Asia/Barnaul",
+    "Arab Standard Time": "Asia/Riyadh",
+    "Arabian Standard Time": "Asia/Dubai",
+    "Arabic Standard Time": "Asia/Baghdad",
+    "Argentina Standard Time": "America/Argentina/Buenos_Aires",
+    "Astrakhan Standard Time": "Europe/Astrakhan",
+    "Atlantic Standard Time": "America/Halifax",
+    "AUS Central Standard Time": "Australia/Darwin",
+    "Aus Central W. Standard Time": "Australia/Eucla",
+    "AUS Eastern Standard Time": "Australia/Sydney",
+    "Azerbaijan Standard Time": "Asia/Baku",
+    "Azores Standard Time": "Atlantic/Azores",
+    "Bahia Standard Time": "America/Bahia",
+    "Bangladesh Standard Time": "Asia/Dhaka",
+    "Belarus Standard Time": "Europe/Minsk",
+    "Bougainville Standard Time": "Pacific/Bougainville",
+    "Canada Central Standard Time": "America/Regina",
+    "Cape Verde Standard Time": "Atlantic/Cape_Verde",
+    "Caucasus Standard Time": "Asia/Yerevan",
+    "Cen. Australia Standard Time": "Australia/Adelaide",
+    "Central America Standard Time": "America/Guatemala",
+    "Central Asia Standard Time": "Asia/Almaty",
+    "Central Brazilian Standard Time": "America/Cuiaba",
+    "Central Europe Standard Time": "Europe/Budapest",
+    "Central European Standard Time": "Europe/Warsaw",
+    "Central Pacific Standard Time": "Pacific/Guadalcanal",
+    "Central Standard Time": "America/Chicago",
+    "Central Standard Time (Mexico)": "America/Mexico_City",
+    "Chatham Islands Standard Time": "Pacific/Chatham",
+    "China Standard Time": "Asia/Shanghai",
+    "Cuba Standard Time": "America/Havana",
+    "Dateline Standard Time": "Etc/GMT+12",
+    "E. Africa Standard Time": "Africa/Nairobi",
+    "E. Australia Standard Time": "Australia/Brisbane",
+    "E. Europe Standard Time": "Europe/Chisinau",
+    "E. South America Standard Time": "America/Sao_Paulo",
+    "Easter Island Standard Time": "Pacific/Easter",
+    "Eastern Standard Time": "America/New_York",
+    "Eastern Standard Time (Mexico)": "America/Cancun",
+    "Egypt Standard Time": "Africa/Cairo",
+    "Ekaterinburg Standard Time": "Asia/Yekaterinburg",
+    "Fiji Standard Time": "Pacific/Fiji",
+    "FLE Standard Time": "Europe/Kyiv",
+    "Georgian Standard Time": "Asia/Tbilisi",
+    "GMT Standard Time": "Europe/London",
+    "Greenland Standard Time": "America/Godthab",
+    "Greenwich Standard Time": "Atlantic/Reykjavik",
+    "GTB Standard Time": "Europe/Athens",
+    "Haiti Standard Time": "America/Port-au-Prince",
+    "Hawaiian Standard Time": "Pacific/Honolulu",
+    "India Standard Time": "Asia/Kolkata",
+    "Iran Standard Time": "Asia/Tehran",
+    "Israel Standard Time": "Asia/Jerusalem",
+    "Jordan Standard Time": "Asia/Amman",
+    "Kaliningrad Standard Time": "Europe/Kaliningrad",
+    "Kamchatka Standard Time": "Asia/Kamchatka",
+    "Korea Standard Time": "Asia/Seoul",
+    "Libya Standard Time": "Africa/Tripoli",
+    "Line Islands Standard Time": "Pacific/Kiritimati",
+    "Lord Howe Standard Time": "Australia/Lord_Howe",
+    "Magadan Standard Time": "Asia/Magadan",
+    "Magallanes Standard Time": "America/Punta_Arenas",
+    "Marquesas Standard Time": "Pacific/Marquesas",
+    "Mauritius Standard Time": "Indian/Mauritius",
+    "Mid-Atlantic Standard Time": "Atlantic/South_Georgia",
+    "Middle East Standard Time": "Asia/Beirut",
+    "Montevideo Standard Time": "America/Montevideo",
+    "Morocco Standard Time": "Africa/Casablanca",
+    "Mountain Standard Time": "America/Denver",
+    "Mountain Standard Time (Mexico)": "America/Chihuahua",
+    "Myanmar Standard Time": "Asia/Yangon",
+    "N. Central Asia Standard Time": "Asia/Novosibirsk",
+    "Namibia Standard Time": "Africa/Windhoek",
+    "Nepal Standard Time": "Asia/Kathmandu",
+    "New Zealand Standard Time": "Pacific/Auckland",
+    "Newfoundland Standard Time": "America/St_Johns",
+    "Norfolk Standard Time": "Pacific/Norfolk",
+    "North Asia East Standard Time": "Asia/Irkutsk",
+    "North Asia Standard Time": "Asia/Krasnoyarsk",
+    "North Korea Standard Time": "Asia/Pyongyang",
+    "Omsk Standard Time": "Asia/Omsk",
+    "Pacific SA Standard Time": "America/Santiago",
+    "Pacific Standard Time": "America/Los_Angeles",
+    "Pacific Standard Time (Mexico)": "America/Tijuana",
+    "Pakistan Standard Time": "Asia/Karachi",
+    "Paraguay Standard Time": "America/Asuncion",
+    "Qyzylorda Standard Time": "Asia/Qyzylorda",
+    "Romance Standard Time": "Europe/Paris",
+    "Russia Time Zone 10": "Asia/Srednekolymsk",
+    "Russia Time Zone 11": "Asia/Kamchatka",
+    "Russia Time Zone 3": "Europe/Samara",
+    "Russian Standard Time": "Europe/Moscow",
+    "SA Eastern Standard Time": "America/Cayenne",
+    "SA Pacific Standard Time": "America/Bogota",
+    "SA Western Standard Time": "America/La_Paz",
+    "Saint Pierre Standard Time": "America/Miquelon",
+    "Sakhalin Standard Time": "Asia/Sakhalin",
+    "Samoa Standard Time": "Pacific/Apia",
+    "Sao Tome Standard Time": "Africa/Sao_Tome",
+    "Saratov Standard Time": "Europe/Saratov",
+    "SE Asia Standard Time": "Asia/Bangkok",
+    "Singapore Standard Time": "Asia/Singapore",
+    "South Africa Standard Time": "Africa/Johannesburg",
+    "South Sudan Standard Time": "Africa/Juba",
+    "Sri Lanka Standard Time": "Asia/Colombo",
+    "Sudan Standard Time": "Africa/Khartoum",
+    "Syria Standard Time": "Asia/Damascus",
+    "Taipei Standard Time": "Asia/Taipei",
+    "Tasmania Standard Time": "Australia/Hobart",
+    "Tocantins Standard Time": "America/Araguaina",
+    "Tokyo Standard Time": "Asia/Tokyo",
+    "Tomsk Standard Time": "Asia/Tomsk",
+    "Tonga Standard Time": "Pacific/Tongatapu",
+    "Transbaikal Standard Time": "Asia/Chita",
+    "Turkey Standard Time": "Europe/Istanbul",
+    "Turks And Caicos Standard Time": "America/Grand_Turk",
+    "Ulaanbaatar Standard Time": "Asia/Ulaanbaatar",
+    "US Eastern Standard Time": "America/Indianapolis",
+    "US Mountain Standard Time": "America/Phoenix",
+    "UTC": "Etc/UTC",
+    "UTC+12": "Etc/GMT-12",
+    "UTC+13": "Etc/GMT-13",
+    "UTC-02": "Etc/GMT+2",
+    "UTC-08": "Etc/GMT+8",
+    "UTC-09": "Etc/GMT+9",
+    "UTC-11": "Etc/GMT+11",
+    "Venezuela Standard Time": "America/Caracas",
+    "Vladivostok Standard Time": "Asia/Vladivostok",
+    "Volgograd Standard Time": "Europe/Volgograd",
+    "W. Australia Standard Time": "Australia/Perth",
+    "W. Central Africa Standard Time": "Africa/Lagos",
+    "W. Europe Standard Time": "Europe/Berlin",
+    "W. Mongolia Standard Time": "Asia/Hovd",
+    "West Asia Standard Time": "Asia/Tashkent",
+    "West Bank Standard Time": "Asia/Hebron",
+    "West Pacific Standard Time": "Pacific/Port_Moresby",
+    "Yakutsk Standard Time": "Asia/Yakutsk",
+    "Yukon Standard Time": "America/Whitehorse",
+}
+
 
 LogFn = Callable[[str], None]
 
@@ -290,6 +434,7 @@ class InstallOptions:
     app_port: str = DEFAULT_APP_PORT
     install_caddy: bool = True
     configure_caddy: bool = True
+    sync_timezone: bool = True
 
 
 @dataclass
@@ -374,6 +519,45 @@ def run_process(
     if proc.returncode != 0:
         raise DeployError(f"command failed with exit code {proc.returncode}")
     return output
+
+
+def current_windows_timezone_id(log: Optional[LogFn] = None) -> str:
+    try:
+        output = run_process(["tzutil", "/g"], log=None)
+    except Exception as exc:  # noqa: BLE001 - fall back to TZ/localtime on nonstandard Windows installs.
+        log_line(log, f"WARNING: could not read Windows timezone with tzutil: {exc}")
+        return ""
+    return output.strip()
+
+
+def current_local_timezone(log: Optional[LogFn] = None) -> str:
+    env_tz = os.environ.get("TZ", "").strip()
+    if env_tz and "/" in env_tz and not env_tz.startswith(":"):
+        return env_tz
+    if sys.platform == "win32":
+        windows_id = current_windows_timezone_id(log)
+        if windows_id:
+            mapped = WINDOWS_TIMEZONE_TO_IANA.get(windows_id)
+            if mapped:
+                return mapped
+            log_line(log, f"WARNING: Windows timezone is not mapped to IANA: {windows_id}")
+        return ""
+    try:
+        localtime = Path("/etc/localtime")
+        if localtime.is_symlink():
+            target = os.readlink(localtime)
+            marker = "/zoneinfo/"
+            if marker in target:
+                return target.split(marker, 1)[1].strip("/")
+    except OSError:
+        pass
+    try:
+        text = Path("/etc/timezone").read_text(encoding="utf-8").strip()
+        if text and "/" in text:
+            return text
+    except OSError:
+        pass
+    return ""
 
 
 def format_bytes(value: int) -> str:
@@ -972,6 +1156,52 @@ def install_answers(options: InstallOptions) -> str:
     return "\n".join(values) + "\n"
 
 
+def validate_iana_timezone(timezone_name: str) -> str:
+    value = timezone_name.strip()
+    if not value:
+        return ""
+    if value.startswith("/") or value.startswith(".") or "//" in value:
+        raise DeployError(f"invalid timezone: {timezone_name}")
+    if any(ch in value for ch in "\\\r\n\t '\"`$;&|<>"):
+        raise DeployError(f"invalid timezone: {timezone_name}")
+    return value
+
+
+def remote_timezone_command(timezone_name: str) -> str:
+    timezone_name = validate_iana_timezone(timezone_name)
+    if not timezone_name:
+        raise DeployError("timezone is required")
+    zoneinfo = posixpath.join("/usr/share/zoneinfo", timezone_name)
+    quoted_timezone = shell_quote(timezone_name)
+    quoted_zoneinfo = shell_quote(zoneinfo)
+    return "\n".join(
+        [
+            f"tz={quoted_timezone}",
+            f"zoneinfo={quoted_zoneinfo}",
+            "if [ ! -f \"$zoneinfo\" ]; then",
+            "  echo \"timezone data not found: $tz\" >&2",
+            "  exit 1",
+            "fi",
+            "if command -v timedatectl >/dev/null 2>&1; then",
+            "  timedatectl set-timezone \"$tz\"",
+            "else",
+            "  ln -sfn \"$zoneinfo\" /etc/localtime",
+            "  printf '%s\\n' \"$tz\" > /etc/timezone 2>/dev/null || true",
+            "fi",
+            "echo \"Server timezone: $tz\"",
+        ]
+    )
+
+
+def sync_remote_timezone(remote: RemoteSession, log: Optional[LogFn] = None) -> None:
+    timezone_name = validate_iana_timezone(current_local_timezone(log))
+    if not timezone_name:
+        log_line(log, "WARNING: local timezone could not be detected; server timezone was not changed")
+        return
+    log_line(log, f"Syncing server timezone to local timezone: {timezone_name}")
+    remote.run(remote_timezone_command(timezone_name))
+
+
 def build_for_remote(binary: Path | None, skip_tests: bool, no_build: bool, log: Optional[LogFn]) -> Path:
     if no_build:
         if binary is None:
@@ -998,6 +1228,8 @@ def install_with_session(
     remote_archive = remote_binary + ".gz"
     try:
         upload_compressed_binary(remote, local_binary, remote_binary)
+        if install_options.sync_timezone:
+            sync_remote_timezone(remote, log)
         remote.run(f"{shell_quote(remote_binary)} install", input_text=install_answers(install_options))
     finally:
         cleanup_remote_paths(remote, remote_binary, remote_archive)
@@ -1984,6 +2216,8 @@ def add_install_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--no-install-caddy", dest="install_caddy", action="store_false")
     parser.add_argument("--configure-caddy", dest="configure_caddy", action="store_true", default=True)
     parser.add_argument("--no-configure-caddy", dest="configure_caddy", action="store_false")
+    parser.add_argument("--sync-timezone", dest="sync_timezone", action="store_true", default=True)
+    parser.add_argument("--no-sync-timezone", dest="sync_timezone", action="store_false")
 
 
 def add_service_args(parser: argparse.ArgumentParser) -> None:
@@ -2055,6 +2289,7 @@ def install_options_from_args(args: argparse.Namespace) -> InstallOptions:
         app_port=args.app_port,
         install_caddy=args.install_caddy,
         configure_caddy=args.configure_caddy,
+        sync_timezone=args.sync_timezone,
     )
 
 
@@ -2398,6 +2633,8 @@ def run_gui() -> int:
             self.configure_caddy.setChecked(self.config_bool("configure_caddy", True))
             self.reload_app_after_caddy = QtWidgets.QCheckBox("Reload app after Caddy change")
             self.reload_app_after_caddy.setChecked(self.config_bool("reload_app_after_caddy", True))
+            self.sync_timezone = QtWidgets.QCheckBox("Sync server timezone with this computer")
+            self.sync_timezone.setChecked(self.config_bool("sync_timezone", True))
             master_key_widget = QtWidgets.QWidget()
             master_key_row = QtWidgets.QHBoxLayout(master_key_widget)
             master_key_row.setContentsMargins(0, 0, 0, 0)
@@ -2483,7 +2720,7 @@ def run_gui() -> int:
             service_checks_layout = QtWidgets.QVBoxLayout(service_checks)
             service_checks_layout.setContentsMargins(0, 4, 0, 0)
             service_checks_layout.setSpacing(6)
-            for checkbox in (self.skip_tests,):
+            for checkbox in (self.skip_tests, self.sync_timezone):
                 service_checks_layout.addWidget(checkbox)
             service.addWidget(service_checks, 6, 1)
             left_column.addWidget(service_card)
@@ -2956,6 +3193,7 @@ def run_gui() -> int:
                 "app_port": self.app_port.text().strip() or DEFAULT_APP_PORT,
                 "timeout": self.timeout.text().strip() or DEFAULT_TIMEOUT,
                 "skip_tests": self.skip_tests.isChecked(),
+                "sync_timezone": self.sync_timezone.isChecked(),
                 "install_caddy": self.install_caddy.isChecked(),
                 "configure_caddy": self.configure_caddy.isChecked(),
                 "reload_app_after_caddy": self.reload_app_after_caddy.isChecked(),
@@ -3108,6 +3346,7 @@ def run_gui() -> int:
                 app_port=self.app_port.text().strip() or DEFAULT_APP_PORT,
                 install_caddy=self.install_caddy.isChecked(),
                 configure_caddy=self.configure_caddy.isChecked(),
+                sync_timezone=self.sync_timezone.isChecked(),
             )
 
         def service_options(self) -> ServiceOptions:
