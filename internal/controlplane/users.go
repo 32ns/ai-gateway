@@ -991,6 +991,8 @@ func normalizeOAuthProvider(provider string) string {
 		return "github"
 	case "google":
 		return "google"
+	case "linuxdo":
+		return "linuxdo"
 	default:
 		return ""
 	}

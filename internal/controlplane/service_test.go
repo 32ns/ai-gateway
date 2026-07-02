@@ -1141,6 +1141,53 @@ func TestLinkOAuthIdentityToExistingUser(t *testing.T) {
 	}
 }
 
+func TestLinkOAuthIdentitySupportsLinuxDO(t *testing.T) {
+	repo := storage.NewMemoryRepository()
+	service := New(repo, providers.NewRegistry(&providers.OpenAIAdapter{}))
+	user, err := service.CreateUser(UserInput{
+		Username: "alice",
+		Password: "secret",
+		Role:     core.UserRoleUser,
+		Enabled:  true,
+	})
+	if err != nil {
+		t.Fatalf("CreateUser returned error: %v", err)
+	}
+
+	linked, err := service.LinkOAuthIdentity(user.ID, OAuthUserInput{
+		Provider: "linuxdo",
+		Subject:  "linuxdo-subject",
+		Email:    "alice@example.com",
+		Username: "alice-linuxdo",
+	})
+	if err != nil {
+		t.Fatalf("LinkOAuthIdentity returned error: %v", err)
+	}
+	if len(linked.OAuthIdentities) != 1 {
+		t.Fatalf("OAuthIdentities = %#v", linked.OAuthIdentities)
+	}
+	identity := linked.OAuthIdentities[0]
+	if identity.Provider != "linuxdo" || identity.Subject != "linuxdo-subject" || identity.Email != "alice@example.com" || identity.Username != "alice-linuxdo" {
+		t.Fatalf("identity = %#v", identity)
+	}
+
+	loggedIn, created, err := service.AuthenticateOAuthUser(OAuthUserInput{Provider: "linuxdo", Subject: "linuxdo-subject"})
+	if err != nil {
+		t.Fatalf("AuthenticateOAuthUser returned error: %v", err)
+	}
+	if created || loggedIn.ID != user.ID {
+		t.Fatalf("oauth login returned user=%q created=%v, want existing %q", loggedIn.ID, created, user.ID)
+	}
+
+	unlinked, err := service.UnlinkOAuthIdentity(user.ID, "linuxdo")
+	if err != nil {
+		t.Fatalf("UnlinkOAuthIdentity returned error: %v", err)
+	}
+	if len(unlinked.OAuthIdentities) != 0 {
+		t.Fatalf("OAuthIdentities after unlink = %#v", unlinked.OAuthIdentities)
+	}
+}
+
 func TestLinkOAuthIdentityRejectsIdentityLinkedToAnotherUser(t *testing.T) {
 	repo := storage.NewMemoryRepository()
 	service := New(repo, providers.NewRegistry(&providers.OpenAIAdapter{}))
