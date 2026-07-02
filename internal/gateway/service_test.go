@@ -1941,6 +1941,84 @@ func (a *firstOutputResponsesStreamAdapter) OpenResponsesStream(_ context.Contex
 	}, nil
 }
 
+type noUsageResponsesStreamAdapter struct {
+	echoAdapter
+}
+
+func (a *noUsageResponsesStreamAdapter) OpenResponsesStream(_ context.Context, decision core.RouteDecision, _ *core.ResponsesRequest) (*providers.StreamSession, error) {
+	return &providers.StreamSession{
+		Response: &core.GatewayResponse{
+			ID:           "resp_no_usage",
+			Model:        decision.Model,
+			Provider:     decision.Provider,
+			AccountID:    decision.Account.ID,
+			AccountLabel: decision.Account.Label,
+			FinishReason: "stop",
+			CreatedAt:    time.Now().UTC(),
+		},
+		Stream: &testStream{events: []*core.StreamEvent{
+			{FinishReason: "stop", Done: true, RawEvent: "response.completed"},
+		}},
+	}, nil
+}
+
+func TestExecuteResponsesStreamSkipsBillingForSSEGenerateFalse(t *testing.T) {
+	repo := storage.NewMemoryRepository()
+	if err := repo.UpsertUser(core.User{ID: "user_responses_generate_false", Username: "responses-generate-false", Enabled: true, BalanceNanoUSD: core.NanoUSDPerUSD}); err != nil {
+		t.Fatal(err)
+	}
+	client := core.APIClient{ID: "client_responses_generate_false", Name: "Responses Generate False", APIKey: "gw_responses_generate_false", OwnerUserID: "user_responses_generate_false", Enabled: true}
+	if err := repo.UpsertClient(client); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.UpsertAccount(core.Account{
+		ID:       "acct_responses_generate_false",
+		Provider: core.ProviderOpenAI,
+		Label:    "Responses Generate False Account",
+		Status:   core.AccountStatusActive,
+		Priority: 100,
+		Weight:   100,
+		Credential: core.Credential{
+			Mode:        "manual-token",
+			AccessToken: "token",
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.UpsertModel(core.ModelConfig{
+		ID:                      "responses-generate-false-model",
+		Provider:                core.ProviderOpenAI,
+		UpstreamID:              "responses-generate-false-model",
+		Enabled:                 true,
+		VisibleGroups:           []string{core.DefaultAccountGroupName},
+		Source:                  core.ModelSourceManual,
+		InputPriceNanoUSDPer1M:  core.NanoUSDPerUSD,
+		OutputPriceNanoUSDPer1M: 2 * core.NanoUSDPerUSD,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	service := New(
+		repo,
+		routing.NewRouter(),
+		failover.NewEngine(accounts.NewPool(repo), providers.NewRegistry(&noUsageResponsesStreamAdapter{})),
+	)
+	generate := false
+	if err := service.ExecuteResponsesStream(context.Background(), &core.ResponsesRequest{
+		Model:     "responses-generate-false-model",
+		RawBody:   json.RawMessage(`{"model":"responses-generate-false-model","stream":true,"generate":false,"input":"warmup"}`),
+		Client:    &client,
+		Stream:    true,
+		Generate:  &generate,
+		Transport: core.ResponsesTransportSSE,
+	}, nil); err != nil {
+		t.Fatalf("ExecuteResponsesStream returned error: %v", err)
+	}
+	if requests, total := repo.ListBillingRequestsPage(storage.BillingRequestQuery{ClientID: client.ID, Limit: 1}); total != 0 || len(requests) != 0 {
+		t.Fatalf("billing requests = total %d items %#v, want none", total, requests)
+	}
+}
+
 type rawFirstOutputResponsesStreamAdapter struct {
 	echoAdapter
 }

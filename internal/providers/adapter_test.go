@@ -572,7 +572,7 @@ func TestOpenAIResponsesPayloadFromResponsesRequestPreservesRawFields(t *testing
 	}
 }
 
-func TestOpenAIResponsesPayloadFiltersInternalRouteMetadata(t *testing.T) {
+func TestOpenAIResponsesPayloadDropsMetadata(t *testing.T) {
 	payload, err := openAIResponsesRawPayloadFromResponses("gpt-5.5", &core.ResponsesRequest{
 		Model:          "gpt-5.5",
 		PromptCacheKey: "public-cache",
@@ -607,17 +607,8 @@ func TestOpenAIResponsesPayloadFiltersInternalRouteMetadata(t *testing.T) {
 	if payload["prompt_cache_key"] != "public-cache" {
 		t.Fatalf("prompt_cache_key = %#v", payload["prompt_cache_key"])
 	}
-	metadata, ok := payload["metadata"].(map[string]string)
-	if !ok {
-		t.Fatalf("metadata = %#v", payload["metadata"])
-	}
-	if len(metadata) != 1 || metadata["user"] != "visible" {
-		t.Fatalf("metadata = %#v", metadata)
-	}
-	for _, key := range []string{"anthropic_version", "anthropic_beta", "x-client-request-id", "x-claude-code-agent-id"} {
-		if _, exists := metadata[key]; exists {
-			t.Fatalf("metadata.%s should be filtered: %#v", key, metadata)
-		}
+	if _, exists := payload["metadata"]; exists {
+		t.Fatalf("metadata should not be forwarded for responses payloads: %#v", payload)
 	}
 }
 
@@ -836,10 +827,8 @@ func TestOpenAIAdapterForwardsSessionHeadersToSub2APIResponses(t *testing.T) {
 		if body["prompt_cache_key"] != "sess_456" {
 			t.Fatalf("prompt_cache_key = %#v body=%#v", body["prompt_cache_key"], body)
 		}
-		metadata, _ := body["metadata"].(map[string]any)
-		userID, _ := metadata["user_id"].(string)
-		if !strings.HasPrefix(userID, "user_") || !strings.Contains(userID, "_account__session_") {
-			t.Fatalf("metadata.user_id = %#v body=%#v", userID, body)
+		if _, exists := body["metadata"]; exists {
+			t.Fatalf("metadata should not be forwarded for responses payloads: %#v", body)
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"id":          "resp_sub2api",
@@ -988,7 +977,7 @@ func TestOpenAIAdapterForwardsSessionToSub2APIChatStream(t *testing.T) {
 	}
 }
 
-func TestOpenAIResponsesCompactPayloadAddsSub2APIMetadataUserID(t *testing.T) {
+func TestOpenAIResponsesCompactPayloadSkipsSub2APIMetadata(t *testing.T) {
 	payload, err := openAIResponsesCompactPayloadFromResponsesForAccount("gpt-4.1", &core.ResponsesRequest{
 		Model:    "gpt-4.1",
 		RawBody:  json.RawMessage(`{"model":"gpt-4.1","input":"hello"}`),
@@ -997,9 +986,8 @@ func TestOpenAIResponsesCompactPayloadAddsSub2APIMetadataUserID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("openAIResponsesCompactPayloadFromResponsesForAccount returned error: %v", err)
 	}
-	metadata, _ := payload["metadata"].(map[string]string)
-	if userID := metadata["user_id"]; !strings.HasPrefix(userID, "user_") {
-		t.Fatalf("metadata.user_id = %#v payload=%#v", userID, payload)
+	if _, exists := payload["metadata"]; exists {
+		t.Fatalf("metadata should not be forwarded for responses compact payloads: %#v", payload)
 	}
 }
 
@@ -3633,6 +3621,23 @@ func TestParseOpenAIResponsesStreamPayloadMarksTextItemDoneAsFirstOutput(t *test
 	}
 	if !emittedDelta {
 		t.Fatal("emittedDelta = false, want true")
+	}
+}
+
+func TestParseOpenAIResponsesStreamPayloadRejectsErrorEvents(t *testing.T) {
+	raw := []byte(`{"type":"error","message":"responses websocket error event received"}`)
+	event, err := parseOpenAIResponsesStreamPayload(core.Account{}, &core.GatewayResponse{}, nil, nil, "", raw)
+	if err == nil {
+		t.Fatalf("parseOpenAIResponsesStreamPayload returned event %#v, want error", event)
+	}
+	if code := ErrorCode(err); code == "" {
+		t.Fatalf("error code empty for %v", err)
+	}
+
+	raw = []byte(`{"message":"upstream failed"}`)
+	event, err = parseOpenAIResponsesStreamPayload(core.Account{}, &core.GatewayResponse{}, nil, nil, "error", raw)
+	if err == nil {
+		t.Fatalf("event:error returned event %#v, want error", event)
 	}
 }
 

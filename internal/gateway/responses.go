@@ -660,9 +660,6 @@ func responsesGenerateDisabled(req *core.ResponsesRequest) bool {
 	if req == nil {
 		return false
 	}
-	if req.Transport != core.ResponsesTransportWebSocket {
-		return false
-	}
 	if req.Generate != nil {
 		return !*req.Generate
 	}

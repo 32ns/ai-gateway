@@ -205,6 +205,7 @@ type openAIResponsesStreamPayload struct {
 	Delta    string                       `json:"delta"`
 	Item     *openAIResponsesItem         `json:"item"`
 	Response *openAIResponsesResponseBody `json:"response"`
+	Error    *openAIErrorObject           `json:"error"`
 }
 
 type openAIResponsesResponseBody struct {
@@ -2195,6 +2196,9 @@ func parseOpenAIResponsesStreamPayload(account core.Account, response *core.Gate
 	if rawEvent == "" {
 		rawEvent = eventName
 	}
+	if openAIResponsesStreamErrorEvent(payload.Type, eventName) {
+		return nil, mapOpenAIResponsesStreamError(account, rawData, payload.Error)
+	}
 
 	switch payload.Type {
 	case "response.created":
@@ -2247,6 +2251,34 @@ func parseOpenAIResponsesStreamPayload(account core.Account, response *core.Gate
 	default:
 		return &core.StreamEvent{RawEvent: rawEvent, RawData: rawData}, nil
 	}
+}
+
+func openAIResponsesStreamErrorEvent(payloadType, eventName string) bool {
+	payloadType = strings.TrimSpace(payloadType)
+	eventName = strings.TrimSpace(eventName)
+	for _, value := range []string{payloadType, eventName} {
+		switch value {
+		case "error", "response.error":
+			return true
+		}
+	}
+	return false
+}
+
+func mapOpenAIResponsesStreamError(account core.Account, rawData []byte, payloadErr *openAIErrorObject) error {
+	if payloadErr != nil && strings.TrimSpace(payloadErr.Message) != "" {
+		body, err := json.Marshal(map[string]any{
+			"error": map[string]any{
+				"message": strings.TrimSpace(payloadErr.Message),
+				"code":    strings.TrimSpace(payloadErr.Code),
+				"type":    strings.TrimSpace(payloadErr.Type),
+			},
+		})
+		if err == nil {
+			return mapHTTPErrorForAccount(account, http.StatusBadRequest, body)
+		}
+	}
+	return mapHTTPErrorForAccount(account, http.StatusBadRequest, rawData)
 }
 
 func openAIResponsesItemRecordsFirstOutput(item openAIResponsesItem) bool {
@@ -2373,9 +2405,6 @@ func openAIResponsesRawPayloadFromResponsesForAccount(model string, req *core.Re
 	}
 	if promptCacheKey := openAIStablePromptCacheKeyForAccount(account, req.PromptCacheKey, req.Metadata); promptCacheKey != "" {
 		payload["prompt_cache_key"] = promptCacheKey
-	}
-	if metadata := openAIUserMetadataForAccount(account, req.Metadata); len(metadata) > 0 {
-		payload["metadata"] = metadata
 	}
 	if previousResponseID := strings.TrimSpace(req.PreviousResponseID); previousResponseID != "" {
 		payload["previous_response_id"] = previousResponseID
@@ -2532,11 +2561,6 @@ func openAIResponsesCompactPayloadFromResponsesForAccount(model string, req *cor
 	}
 	if promptCacheKey, _ := source["prompt_cache_key"].(string); strings.TrimSpace(promptCacheKey) != "" {
 		payload["prompt_cache_key"] = promptCacheKey
-	}
-	if req != nil {
-		if metadata := openAIUserMetadataForAccount(account, req.Metadata); len(metadata) > 0 {
-			payload["metadata"] = metadata
-		}
 	}
 	copyNonNilJSONField(payload, source, "text", "text")
 	return payload, nil
