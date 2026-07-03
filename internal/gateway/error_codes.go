@@ -1,6 +1,7 @@
 package gateway
 
 const (
+	ErrorCodeAccountGroupForbidden = "account_group_forbidden"
 	ErrorCodeBillingAmountOverflow = "billing_amount_overflow"
 	ErrorCodeBillingConflict       = "billing_conflict"
 	ErrorCodeBillingOwnerMismatch  = "billing_owner_mismatch"

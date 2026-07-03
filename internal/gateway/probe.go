@@ -149,7 +149,7 @@ func (s *Service) ProbeMonitorTarget(ctx context.Context, input MonitorProbeInpu
 		return result, errors.New(result.ErrorMessage)
 	}
 	result.Status = core.MonitorStatusOK
-	if monitorAttemptsHadFailure(invocation.Attempts) {
+	if s.monitorSuccessfulAccountIsBackup(resp.AccountID) {
 		result.Status = core.MonitorStatusDegraded
 	}
 	return result, nil
@@ -175,13 +175,13 @@ func monitorClientID(targetID string) string {
 	return "monitor:" + targetID
 }
 
-func monitorAttemptsHadFailure(attempts []core.AttemptRecord) bool {
-	for _, attempt := range attempts {
-		if attempt.Status != "" && attempt.Status != "ok" && attempt.Status != "running" {
-			return true
-		}
+func (s *Service) monitorSuccessfulAccountIsBackup(accountID string) bool {
+	accountID = strings.TrimSpace(accountID)
+	if s == nil || s.repo == nil || accountID == "" {
+		return false
 	}
-	return false
+	account, err := s.repo.GetAccount(accountID)
+	return err == nil && account.Backup
 }
 
 func lastFailedAttempt(attempts []core.AttemptRecord) *core.AttemptRecord {

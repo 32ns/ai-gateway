@@ -4692,6 +4692,28 @@ func TestDefaultClientModelListUsesOnlyDefaultGroup(t *testing.T) {
 	}
 }
 
+func TestHiddenAccountGroupModelListRequiresVisibleUser(t *testing.T) {
+	repo := storage.NewMemoryRepository()
+	hide := false
+	if err := repo.UpsertAccountGroup(core.AccountGroup{ID: "group_hidden", Name: "Hidden", ShowInClientEditor: &hide, VisibleUserIDs: []string{"user_visible_models"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.UpsertModel(core.ModelConfig{ID: "hidden-model", Provider: core.ProviderOpenAI, Enabled: true, VisibleGroups: []string{"Hidden"}}); err != nil {
+		t.Fatal(err)
+	}
+	service := New(repo, providers.NewRegistry(&providers.OpenAIAdapter{}))
+
+	deniedModels := service.ListModelsForClient(context.Background(), &core.APIClient{ID: "client_denied_models", OwnerUserID: "user_denied_models", AccountGroup: "Hidden"})
+	if len(deniedModels) != 0 {
+		t.Fatalf("denied models = %#v, want none", deniedModels)
+	}
+
+	visibleModels := service.ListModelsForClient(context.Background(), &core.APIClient{ID: "client_visible_models", OwnerUserID: "user_visible_models", AccountGroup: "Hidden"})
+	if len(visibleModels) != 1 || visibleModels[0].Name != "hidden-model" {
+		t.Fatalf("visible models = %#v, want hidden-model", visibleModels)
+	}
+}
+
 func TestSyncProviderModelsDefaultsVisibleGroupsByProviderGroupType(t *testing.T) {
 	repo := storage.NewMemoryRepository()
 	for _, group := range []core.AccountGroup{
@@ -4869,6 +4891,52 @@ func TestAccountGroupVisibilityAllowsSpecificUsers(t *testing.T) {
 	}
 	if _, err := service.CreateClientInAccountGroupForUser(otherUser, "Other Client", 0, true, "Private", core.ProviderOpenAI, nil); err == nil {
 		t.Fatal("other user should not create client in private group")
+	}
+}
+
+func TestHiddenAccountGroupExistingClientRequiresVisibleUser(t *testing.T) {
+	repo := storage.NewMemoryRepository()
+	visibleUser := core.User{ID: "user_visible_existing_group", Username: "visible-existing", Role: core.UserRoleUser, Enabled: true}
+	otherUser := core.User{ID: "user_other_existing_group", Username: "other-existing", Role: core.UserRoleUser, Enabled: true}
+	for _, user := range []core.User{visibleUser, otherUser} {
+		if err := repo.UpsertUser(user); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := repo.UpsertAccountGroup(core.AccountGroup{ID: "group_private", Name: "Private", ShowInClientEditor: boolPtr(false), VisibleUserIDs: []string{visibleUser.ID}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.UpsertAccount(core.Account{ID: "acct_private", Provider: core.ProviderOpenAI, Label: "Private", Group: "Private", Status: core.AccountStatusActive}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.UpsertClient(core.APIClient{ID: "client_other_private", Name: "Other Private", APIKey: "gw_other_private", OwnerUserID: otherUser.ID, Enabled: true, AccountGroup: "Private"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.UpsertClient(core.APIClient{ID: "client_visible_private", Name: "Visible Private", APIKey: "gw_visible_private", OwnerUserID: visibleUser.ID, Enabled: true, AccountGroup: "Private"}); err != nil {
+		t.Fatal(err)
+	}
+	service := New(repo, providers.NewRegistry(&providers.OpenAIAdapter{}))
+
+	otherEditor, err := service.GetClientEditorForUser("client_other_private", otherUser)
+	if err != nil {
+		t.Fatalf("GetClientEditorForUser returned error: %v", err)
+	}
+	if clientEditorHasGroup(otherEditor, "Private") {
+		t.Fatalf("private group leaked to non-visible current owner: %#v", otherEditor.AvailableAccountGroups)
+	}
+	if err := service.UpdateClientBillingSourceForUser(otherUser, "client_other_private", "Other Private", 0, true, "Private", core.ClientBillingSourceCash, core.ProviderOpenAI, nil); err == nil {
+		t.Fatal("non-visible owner should not keep hidden account group")
+	}
+
+	visibleEditor, err := service.GetClientEditorForUser("client_visible_private", visibleUser)
+	if err != nil {
+		t.Fatalf("GetClientEditorForUser returned error: %v", err)
+	}
+	if !clientEditorHasGroup(visibleEditor, "Private") {
+		t.Fatalf("private group missing for visible current owner: %#v", visibleEditor.AvailableAccountGroups)
+	}
+	if err := service.UpdateClientBillingSourceForUser(visibleUser, "client_visible_private", "Visible Private", 0, true, "Private", core.ClientBillingSourceCash, core.ProviderOpenAI, nil); err != nil {
+		t.Fatalf("visible owner should keep hidden account group: %v", err)
 	}
 }
 

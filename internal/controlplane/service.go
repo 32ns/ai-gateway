@@ -654,7 +654,30 @@ func (s *Service) ListModels(ctx context.Context) []core.ModelSpec {
 
 func (s *Service) ListModelsForClient(ctx context.Context, client *core.APIClient) []core.ModelSpec {
 	_ = ctx
+	if !s.clientCanUseAccountGroup(client) {
+		return nil
+	}
 	return s.buildModelSpecsForGroup(clientAccountGroupName(client))
+}
+
+func (s *Service) clientCanUseAccountGroup(client *core.APIClient) bool {
+	if s == nil || s.repo == nil || client == nil {
+		return true
+	}
+	groupName := clientAccountGroupName(client)
+	if strings.EqualFold(groupName, core.DefaultAccountGroupName) {
+		return true
+	}
+	ownerID := strings.TrimSpace(client.OwnerUserID)
+	if ownerID == "" {
+		return true
+	}
+	for _, group := range accountGroupsWithDefault(s.repo.ListAccountGroups()) {
+		if strings.EqualFold(normalizeStoredAccountGroup(group.Name), groupName) {
+			return core.AccountGroupVisibleInClientEditorForUser(group, ownerID)
+		}
+	}
+	return true
 }
 
 func (s *Service) buildModelSpecs() []core.ModelSpec {
@@ -2462,15 +2485,14 @@ func (s *Service) clientEditorAccountGroups(current string) []core.AccountGroup 
 }
 
 func (s *Service) clientEditorAccountGroupsForUser(current string, user core.User) []core.AccountGroup {
-	current = normalizeAccountGroup(current)
 	out := make([]core.AccountGroup, 0)
 	for _, group := range accountGroupsWithDefault(s.repo.ListAccountGroups()) {
-		if !core.AccountGroupVisibleInClientEditorForUser(group, user.ID) && !strings.EqualFold(normalizeAccountGroup(group.Name), current) {
+		if !core.AccountGroupVisibleInClientEditorForUser(group, user.ID) {
 			continue
 		}
 		out = append(out, group)
 	}
-	return availableAccountGroupsWithCurrent(out, current)
+	return sortAccountGroupsByName(out)
 }
 
 func (s *Service) visibleNamedAccountGroups(current string) []core.AccountGroup {
@@ -3879,15 +3901,20 @@ func validateProxyURL(value string) error {
 func availableAccountGroupsWithCurrent(groups []core.AccountGroup, current string) []core.AccountGroup {
 	current = normalizeAccountGroup(current)
 	if current == "" {
-		return groups
+		return sortAccountGroupsByName(groups)
 	}
 	for _, group := range groups {
 		if strings.EqualFold(group.Name, current) {
-			return groups
+			return sortAccountGroupsByName(groups)
 		}
 	}
 	out := append([]core.AccountGroup(nil), groups...)
 	out = append(out, core.AccountGroup{Name: current})
+	return sortAccountGroupsByName(out)
+}
+
+func sortAccountGroupsByName(groups []core.AccountGroup) []core.AccountGroup {
+	out := append([]core.AccountGroup(nil), groups...)
 	slices.SortFunc(out, func(a, b core.AccountGroup) int {
 		if strings.ToLower(a.Name) < strings.ToLower(b.Name) {
 			return -1

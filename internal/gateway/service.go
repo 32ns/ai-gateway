@@ -2547,6 +2547,9 @@ func (s *Service) clientForRoute(metadata map[string]string, client *core.APICli
 	if client == nil {
 		return nil, core.DefaultRoutePolicy(), nil
 	}
+	if err := s.ensureClientAccountGroupUsable(client); err != nil {
+		return nil, core.DefaultRoutePolicy(), err
+	}
 	routePolicy := s.routePolicyForClient(client)
 	if routePolicy.DefaultProvider == "" {
 		routePolicy = core.DefaultRoutePolicy()
@@ -2559,6 +2562,34 @@ func (s *Service) clientForRoute(metadata map[string]string, client *core.APICli
 	routedClient.RouteAffinityKey = affinityKey
 	routedClient.CacheAffinityRoute = explicitCacheAffinityRoute(metadata)
 	return &routedClient, routePolicy, nil
+}
+
+func (s *Service) ensureClientAccountGroupUsable(client *core.APIClient) error {
+	if s == nil || s.repo == nil || client == nil {
+		return nil
+	}
+	groupName := clientAccountGroup(client)
+	if strings.EqualFold(groupName, core.DefaultAccountGroupName) {
+		return nil
+	}
+	ownerID := strings.TrimSpace(client.OwnerUserID)
+	if ownerID == "" {
+		return nil
+	}
+	for _, group := range s.repo.ListAccountGroups() {
+		if !strings.EqualFold(gatewayAccountGroupName(group.Name), groupName) {
+			continue
+		}
+		if core.AccountGroupVisibleInClientEditorForUser(group, ownerID) {
+			return nil
+		}
+		return &AccessError{
+			StatusCode: http.StatusForbidden,
+			Code:       ErrorCodeAccountGroupForbidden,
+			Message:    fmt.Sprintf("account group %q is not available to this API key owner", groupName),
+		}
+	}
+	return nil
 }
 
 func (s *Service) routePolicyForClient(client *core.APIClient) core.RoutePolicy {

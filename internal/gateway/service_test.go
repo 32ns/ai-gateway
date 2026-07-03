@@ -165,6 +165,83 @@ func TestExecuteRejectsModelOutsideClientVisibleGroups(t *testing.T) {
 	}
 }
 
+func TestExecuteRejectsHiddenAccountGroupForNonVisibleOwner(t *testing.T) {
+	repo := storage.NewMemoryRepository()
+	hide := false
+	if err := repo.UpsertUser(core.User{ID: "user_allowed", Username: "allowed", Enabled: true, BalanceNanoUSD: core.NanoUSDPerUSD}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.UpsertUser(core.User{ID: "user_denied", Username: "denied", Enabled: true, BalanceNanoUSD: core.NanoUSDPerUSD}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.UpsertAccountGroup(core.AccountGroup{ID: "group_hidden", Name: "Hidden", ShowInClientEditor: &hide, VisibleUserIDs: []string{"user_allowed"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.UpsertAccount(core.Account{ID: "acct_hidden", Provider: core.ProviderOpenAI, Group: "Hidden", Status: core.AccountStatusActive, Credential: core.Credential{AccessToken: "hidden-token"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.UpsertModel(core.ModelConfig{ID: "hidden-model", Provider: core.ProviderOpenAI, Enabled: true, VisibleGroups: []string{"Hidden"}}); err != nil {
+		t.Fatal(err)
+	}
+	client := core.APIClient{ID: "client_denied_hidden", Name: "Denied Hidden", APIKey: "gw_denied_hidden", OwnerUserID: "user_denied", Enabled: true, AccountGroup: "Hidden"}
+	if err := repo.UpsertClient(client); err != nil {
+		t.Fatal(err)
+	}
+	service := New(
+		repo,
+		routing.NewRouter(),
+		failover.NewEngine(accounts.NewPool(repo), providers.NewRegistry(&echoAdapter{})),
+	)
+
+	_, err := service.Execute(context.Background(), &core.GatewayRequest{
+		Model:    "hidden-model",
+		Messages: []core.Message{{Role: "user", Content: "hello"}},
+		Client:   &client,
+	})
+	var accessErr *AccessError
+	if !errors.As(err, &accessErr) || accessErr.StatusCode != http.StatusForbidden || accessErr.Code != ErrorCodeAccountGroupForbidden {
+		t.Fatalf("err = %#v, want account group forbidden access error", err)
+	}
+}
+
+func TestExecuteAllowsHiddenAccountGroupForVisibleOwner(t *testing.T) {
+	repo := storage.NewMemoryRepository()
+	hide := false
+	if err := repo.UpsertUser(core.User{ID: "user_allowed", Username: "allowed", Enabled: true, BalanceNanoUSD: core.NanoUSDPerUSD}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.UpsertAccountGroup(core.AccountGroup{ID: "group_hidden", Name: "Hidden", ShowInClientEditor: &hide, VisibleUserIDs: []string{"user_allowed"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.UpsertAccount(core.Account{ID: "acct_hidden", Provider: core.ProviderOpenAI, Group: "Hidden", Status: core.AccountStatusActive, Credential: core.Credential{AccessToken: "hidden-token"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.UpsertModel(core.ModelConfig{ID: "hidden-model", Provider: core.ProviderOpenAI, Enabled: true, VisibleGroups: []string{"Hidden"}}); err != nil {
+		t.Fatal(err)
+	}
+	client := core.APIClient{ID: "client_allowed_hidden", Name: "Allowed Hidden", APIKey: "gw_allowed_hidden", OwnerUserID: "user_allowed", Enabled: true, AccountGroup: "Hidden"}
+	if err := repo.UpsertClient(client); err != nil {
+		t.Fatal(err)
+	}
+	service := New(
+		repo,
+		routing.NewRouter(),
+		failover.NewEngine(accounts.NewPool(repo), providers.NewRegistry(&echoAdapter{})),
+	)
+
+	resp, err := service.Execute(context.Background(), &core.GatewayRequest{
+		Model:    "hidden-model",
+		Messages: []core.Message{{Role: "user", Content: "hello"}},
+		Client:   &client,
+	})
+	if err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	if resp == nil || resp.AccountID != "acct_hidden" {
+		t.Fatalf("response account = %#v, want acct_hidden", resp)
+	}
+}
+
 func TestExecuteDefaultClientDoesNotUseOtherGroups(t *testing.T) {
 	repo := storage.NewMemoryRepository()
 	hide := false
@@ -314,14 +391,14 @@ func TestProbeMonitorTargetUsesRoutedGroupAndStopsAfterSuccess(t *testing.T) {
 			Credential: core.Credential{Mode: "manual-token", AccessToken: "primary-token"},
 		},
 		{
-			ID:         "acct_plus_backup",
+			ID:         "acct_plus_secondary",
 			Provider:   core.ProviderOpenAI,
-			Label:      "Plus Backup",
+			Label:      "Plus Secondary",
 			Group:      "Plus",
 			Status:     core.AccountStatusActive,
 			Priority:   200,
 			Weight:     100,
-			Credential: core.Credential{Mode: "manual-token", AccessToken: "backup-token"},
+			Credential: core.Credential{Mode: "manual-token", AccessToken: "secondary-token"},
 		},
 		{
 			ID:         "acct_plus_unused",
@@ -355,23 +432,23 @@ func TestProbeMonitorTargetUsesRoutedGroupAndStopsAfterSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ProbeMonitorTarget returned error: %v", err)
 	}
-	if result.Status != core.MonitorStatusDegraded {
-		t.Fatalf("status = %q, want %q", result.Status, core.MonitorStatusDegraded)
+	if result.Status != core.MonitorStatusOK {
+		t.Fatalf("status = %q, want %q", result.Status, core.MonitorStatusOK)
 	}
-	if result.AccountID != "acct_plus_backup" || result.AccountLabel != "Plus Backup" {
-		t.Fatalf("successful account = %q/%q, want acct_plus_backup/Plus Backup", result.AccountID, result.AccountLabel)
+	if result.AccountID != "acct_plus_secondary" || result.AccountLabel != "Plus Secondary" {
+		t.Fatalf("successful account = %q/%q, want acct_plus_secondary/Plus Secondary", result.AccountID, result.AccountLabel)
 	}
-	if got, want := adapter.seen, []string{"acct_plus_primary", "acct_plus_backup"}; !reflect.DeepEqual(got, want) {
+	if got, want := adapter.seen, []string{"acct_plus_primary", "acct_plus_secondary"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("adapter accounts = %#v, want %#v", got, want)
 	}
 	if len(result.Attempts) != 2 {
-		t.Fatalf("attempts = %#v, want failed primary and successful backup", result.Attempts)
+		t.Fatalf("attempts = %#v, want failed primary and successful secondary account", result.Attempts)
 	}
 	if result.Attempts[0].AccountID != "acct_plus_primary" || result.Attempts[0].Status != "invoke_error" {
 		t.Fatalf("first attempt = %#v, want failed Plus primary", result.Attempts[0])
 	}
-	if result.Attempts[1].AccountID != "acct_plus_backup" || result.Attempts[1].Status != "ok" {
-		t.Fatalf("second attempt = %#v, want successful Plus backup", result.Attempts[1])
+	if result.Attempts[1].AccountID != "acct_plus_secondary" || result.Attempts[1].Status != "ok" {
+		t.Fatalf("second attempt = %#v, want successful Plus secondary account", result.Attempts[1])
 	}
 	if audits := repo.ListAudit(10); len(audits) != 0 {
 		t.Fatalf("probe should not write gateway audit events, got %#v", audits)
@@ -438,6 +515,7 @@ func seedMonitorTimeoutProbeService(t *testing.T, adapter providers.Adapter) *Se
 			Label:      "Plus Backup",
 			Group:      "Plus",
 			Status:     core.AccountStatusActive,
+			Backup:     true,
 			Priority:   200,
 			Weight:     100,
 			Credential: core.Credential{Mode: "manual-token", AccessToken: "backup-token"},
@@ -688,6 +766,7 @@ func TestProbeMonitorTargetFallsBackAfterEmptyModelReply(t *testing.T) {
 			Label:      "Default Backup",
 			Group:      core.DefaultAccountGroupName,
 			Status:     core.AccountStatusActive,
+			Backup:     true,
 			Priority:   200,
 			Weight:     100,
 			Credential: core.Credential{Mode: "manual-token", AccessToken: "backup-token"},
