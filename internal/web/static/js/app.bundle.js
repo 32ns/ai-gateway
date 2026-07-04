@@ -1,5 +1,5 @@
 import { createConfirmUI, createPromptUI } from "./dialogs.js?v=2026060401";
-import { createToastUI, showServerRenderedToasts } from "./toast.js?v=2026062501";
+import { createToastUI, showServerRenderedToasts } from "./toast.js?v=2026070401";
 import { initPricingEditors } from "./pricing.js?v=2026051501";
 import { initModelGroupPopovers } from "./model_groups.js?v=2026052003";
 import { initCopySecrets } from "./clipboard.js?v=2026051501";
@@ -2250,7 +2250,16 @@ document.addEventListener("DOMContentLoaded", () => {
     if (jobID) {
       accountBatchTerminalToasts.add(key);
     }
-    toastUI.show({ message: String(payload?.message || ""), tone: payload?.tone === "bad" ? "error" : "ok" });
+    const tone = payload?.tone === "bad" ? "error" : "ok";
+    const options = { message: String(payload?.message || ""), tone };
+    if (String(payload?.action || "") === "test") {
+      if (tone === "error") {
+        options.sticky = true;
+      } else {
+        options.duration = 3000;
+      }
+    }
+    toastUI.show(options);
   };
 
   const refreshAccountBatchPartials = async (accountIDs = [], refreshURLOverride = "") => {

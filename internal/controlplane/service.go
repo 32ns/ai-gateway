@@ -1458,10 +1458,7 @@ func streamDetectionEventUsable(provider core.ProviderKind, event *core.StreamEv
 
 func (s *Service) accountDetectionModel(account core.Account) string {
 	if account.Provider == core.ProviderOpenAI {
-		if openAIAccountDetectionLoginMethod(account) == "token" {
-			return "gpt-5.4-mini"
-		}
-		return "gpt-5.4"
+		return "gpt-5.5"
 	}
 	for _, model := range s.repo.ListModels() {
 		if model.Provider != account.Provider || !model.Enabled {
@@ -1481,9 +1478,9 @@ func (s *Service) accountDetectionModel(account core.Account) string {
 	case core.ProviderClaude:
 		return "claude-sonnet-4-6"
 	case core.ProviderOpenAI:
-		return "gpt-5.4"
+		return "gpt-5.5"
 	default:
-		return "gpt-5.4"
+		return "gpt-5.5"
 	}
 }
 

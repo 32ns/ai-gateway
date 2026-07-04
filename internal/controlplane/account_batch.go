@@ -90,16 +90,17 @@ func (j AccountBatchJobSnapshot) Result() AccountBatchResult {
 }
 
 type accountBatchJob struct {
-	id          string
-	action      AccountBatchAction
-	targetGroup string
-	status      AccountBatchJobStatus
-	ids         []string
-	items       []AccountBatchItemResult
-	startedAt   time.Time
-	finishedAt  *time.Time
-	cancel      context.CancelFunc
-	ctx         context.Context
+	id           string
+	action       AccountBatchAction
+	targetGroup  string
+	status       AccountBatchJobStatus
+	ids          []string
+	displayNames []string
+	items        []AccountBatchItemResult
+	startedAt    time.Time
+	finishedAt   *time.Time
+	cancel       context.CancelFunc
+	ctx          context.Context
 }
 
 func (s *Service) ApplyAccountBatch(ctx context.Context, input AccountBatchInput) (AccountBatchResult, error) {
@@ -152,14 +153,15 @@ func (s *Service) StartAccountBatch(ctx context.Context, input AccountBatchInput
 	}
 	jobCtx, cancel := context.WithCancel(context.Background())
 	job := &accountBatchJob{
-		id:          jobID,
-		action:      action,
-		targetGroup: targetGroup,
-		status:      AccountBatchJobQueued,
-		ids:         ids,
-		items:       make([]AccountBatchItemResult, len(ids)),
-		cancel:      cancel,
-		ctx:         jobCtx,
+		id:           jobID,
+		action:       action,
+		targetGroup:  targetGroup,
+		status:       AccountBatchJobQueued,
+		ids:          ids,
+		displayNames: s.accountBatchDisplayNames(ids),
+		items:        make([]AccountBatchItemResult, len(ids)),
+		cancel:       cancel,
+		ctx:          jobCtx,
 	}
 
 	s.accountBatchMu.Lock()
@@ -244,6 +246,25 @@ func (s *Service) validateAccountBatchInput(input AccountBatchInput) (AccountBat
 		}
 	}
 	return action, ids, targetGroup, nil
+}
+
+func (s *Service) accountBatchDisplayNames(ids []string) []string {
+	out := make([]string, len(ids))
+	for index, id := range ids {
+		id = strings.TrimSpace(id)
+		out[index] = id
+		if id == "" || s == nil || s.repo == nil {
+			continue
+		}
+		account, err := s.repo.GetAccount(id)
+		if err != nil {
+			continue
+		}
+		if label := strings.TrimSpace(account.Label); label != "" {
+			out[index] = label
+		}
+	}
+	return out
 }
 
 func (s *Service) runAccountBatchJob(job *accountBatchJob) {
@@ -349,7 +370,7 @@ func (j *accountBatchJob) snapshot() AccountBatchJobSnapshot {
 	for index, item := range j.items {
 		if strings.TrimSpace(item.Status) == "" {
 			if current == "" && index < len(j.ids) {
-				current = strings.TrimSpace(j.ids[index])
+				current = j.currentDisplayName(index)
 			}
 			continue
 		}
@@ -383,6 +404,21 @@ func (j *accountBatchJob) snapshot() AccountBatchJobSnapshot {
 		FinishedAt:  cloneTimePtr(j.finishedAt),
 		Items:       items,
 	}
+}
+
+func (j *accountBatchJob) currentDisplayName(index int) string {
+	if j == nil || index < 0 {
+		return ""
+	}
+	if index < len(j.displayNames) {
+		if name := strings.TrimSpace(j.displayNames[index]); name != "" {
+			return name
+		}
+	}
+	if index < len(j.ids) {
+		return strings.TrimSpace(j.ids[index])
+	}
+	return ""
 }
 
 func (s *Service) cleanupAccountBatchJobs(now time.Time) {

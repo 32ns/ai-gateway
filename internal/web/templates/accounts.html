@@ -16,10 +16,20 @@
 </section>
 
 {{if .AccountTestMessage}}
-<div class="system-notice {{if eq .AccountTestTone "good"}}tone-good{{else}}tone-bad{{end}}" data-clear-url-params="test_tone,test_message">{{.AccountTestMessage}}</div>
+<div
+  class="system-notice {{if eq .AccountTestTone "good"}}tone-good{{else}}tone-bad{{end}}"
+  data-clear-url-params="test_tone,test_message"
+  data-toast-duration="{{if eq .AccountTestTone "good"}}3000{{else}}0{{end}}"
+  {{if ne .AccountTestTone "good"}}data-toast-sticky="true"{{end}}
+>{{.AccountTestMessage}}</div>
 {{end}}
 {{if .AccountBatchMessage}}
-<div class="system-notice {{if eq .AccountBatchTone "good"}}tone-good{{else}}tone-bad{{end}}" data-clear-url-params="batch_tone,batch_message">{{.AccountBatchMessage}}</div>
+<div
+  class="system-notice {{if eq .AccountBatchTone "good"}}tone-good{{else}}tone-bad{{end}}"
+  data-clear-url-params="batch_tone,batch_message"
+  data-toast-duration="{{if eq .AccountBatchTone "good"}}3000{{else}}0{{end}}"
+  {{if ne .AccountBatchTone "good"}}data-toast-sticky="true"{{end}}
+>{{.AccountBatchMessage}}</div>
 {{end}}
 {{if .AccountCreated}}
 <div class="system-notice tone-good" data-clear-url-params="created,imported">{{t "account_created"}}</div>

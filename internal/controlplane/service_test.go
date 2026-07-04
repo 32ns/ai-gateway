@@ -1510,7 +1510,7 @@ func TestDetectAccountStatusReactivatesBlockedAccount(t *testing.T) {
 	}
 }
 
-func TestDetectAccountStatusUsesCodexModelForTokenLogin(t *testing.T) {
+func TestDetectAccountStatusUsesUnifiedOpenAIModelForTokenLogin(t *testing.T) {
 	repo := storage.NewMemoryRepository()
 	if err := repo.UpsertAccount(core.Account{
 		ID:       "acct_test",
@@ -1535,8 +1535,8 @@ func TestDetectAccountStatusUsesCodexModelForTokenLogin(t *testing.T) {
 	if adapter.upstreamMode != "" {
 		t.Fatalf("upstream mode = %q, want empty", adapter.upstreamMode)
 	}
-	if adapter.model != "gpt-5.4-mini" {
-		t.Fatalf("model = %q, want gpt-5.4-mini", adapter.model)
+	if adapter.model != "gpt-5.5" {
+		t.Fatalf("model = %q, want gpt-5.5", adapter.model)
 	}
 	if adapter.message != "Reply with exactly this word: pong" {
 		t.Fatalf("message = %q, want token detection prompt", adapter.message)
@@ -1569,8 +1569,8 @@ func TestDetectAccountStatusUsesChatCompletionsForOpenAIAPIKeyLogin(t *testing.T
 	if adapter.upstreamMode != "" {
 		t.Fatalf("upstream mode = %q, want chat completions", adapter.upstreamMode)
 	}
-	if adapter.model != "gpt-5.4" {
-		t.Fatalf("model = %q, want gpt-5.4", adapter.model)
+	if adapter.model != "gpt-5.5" {
+		t.Fatalf("model = %q, want gpt-5.5", adapter.model)
 	}
 	if adapter.message != "hi" {
 		t.Fatalf("message = %q, want API-key detection prompt", adapter.message)
@@ -1607,8 +1607,8 @@ func TestDetectAccountStatusUsesRealMessageForOpenAIAPIKeyLogin(t *testing.T) {
 	if adapter.upstreamMode != "" {
 		t.Fatalf("upstream mode = %q, want chat completions", adapter.upstreamMode)
 	}
-	if adapter.model != "gpt-5.4" {
-		t.Fatalf("model = %q, want gpt-5.4", adapter.model)
+	if adapter.model != "gpt-5.5" {
+		t.Fatalf("model = %q, want gpt-5.5", adapter.model)
 	}
 	if adapter.message != "hi" {
 		t.Fatalf("message = %q, want real detection prompt for API-key login", adapter.message)
@@ -1651,8 +1651,8 @@ func TestDetectAccountStatusUsesRealMessageEvenWithQuotaMetadata(t *testing.T) {
 	if adapter.upstreamMode != "" {
 		t.Fatalf("upstream mode = %q, want chat completions", adapter.upstreamMode)
 	}
-	if adapter.model != "gpt-5.4" {
-		t.Fatalf("model = %q, want gpt-5.4", adapter.model)
+	if adapter.model != "gpt-5.5" {
+		t.Fatalf("model = %q, want gpt-5.5", adapter.model)
 	}
 	if adapter.message != "hi" {
 		t.Fatalf("message = %q, want real detection prompt for API-key login", adapter.message)
@@ -1699,12 +1699,12 @@ func TestDetectAccountStatusAPIKeyIgnoresConfiguredTextModel(t *testing.T) {
 	if _, err := service.DetectAccountStatus(context.Background(), "acct_test"); err != nil {
 		t.Fatalf("DetectAccountStatus returned error: %v", err)
 	}
-	if adapter.model != "gpt-5.4" {
-		t.Fatalf("model = %q, want API-key detection default", adapter.model)
+	if adapter.model != "gpt-5.5" {
+		t.Fatalf("model = %q, want gpt-5.5", adapter.model)
 	}
 }
 
-func TestDetectAccountStatusTokenLoginIgnoresConfiguredTextModel(t *testing.T) {
+func TestDetectAccountStatusTokenLoginUsesUnifiedOpenAIModel(t *testing.T) {
 	repo := storage.NewMemoryRepository()
 	if err := repo.UpsertModel(core.ModelConfig{
 		ID:       "gpt-5.3-codex",
@@ -1734,8 +1734,8 @@ func TestDetectAccountStatusTokenLoginIgnoresConfiguredTextModel(t *testing.T) {
 	if _, err := service.DetectAccountStatus(context.Background(), "acct_test"); err != nil {
 		t.Fatalf("DetectAccountStatus returned error: %v", err)
 	}
-	if adapter.model != "gpt-5.4-mini" {
-		t.Fatalf("model = %q, want gpt-5.4-mini", adapter.model)
+	if adapter.model != "gpt-5.5" {
+		t.Fatalf("model = %q, want gpt-5.5", adapter.model)
 	}
 }
 

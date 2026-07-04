@@ -63,7 +63,7 @@ func TestStaticAssetEntryPointsReferenceEmbeddedChildren(t *testing.T) {
 	if !strings.Contains(string(js), `./js/app.bundle.js`) {
 		t.Fatalf("app.js does not import the bundled application script")
 	}
-	if !strings.Contains(string(js), `./js/app.bundle.js?v=2026062501`) {
+	if !strings.Contains(string(js), `./js/app.bundle.js?v=2026070401`) {
 		t.Fatalf("app.js must cache-bust the site message popup date script")
 	}
 	if !strings.Contains(string(js), `./js/events.js?v=2026061512`) {
@@ -78,6 +78,9 @@ func TestStaticAssetEntryPointsReferenceEmbeddedChildren(t *testing.T) {
 	}
 	if !strings.Contains(string(bundle), `./selects.js?v=2026061702`) {
 		t.Fatalf("app.bundle.js must cache-bust enhanced select descriptions")
+	}
+	if !strings.Contains(string(bundle), `./toast.js?v=2026070401`) {
+		t.Fatalf("app.bundle.js must cache-bust account detection toast behavior")
 	}
 	selects, err := assets.ReadFile("static/js/selects.js")
 	if err != nil {
@@ -97,7 +100,7 @@ func TestStaticAssetEntryPointsReferenceEmbeddedChildren(t *testing.T) {
 	if !strings.Contains(layoutBody, `/static/app.css?v=2026062501`) {
 		t.Fatalf("layout.html must cache-bust the app stylesheet entrypoint")
 	}
-	if !strings.Contains(layoutBody, `/static/app.js?v=2026062501`) {
+	if !strings.Contains(layoutBody, `/static/app.js?v=2026070401`) {
 		t.Fatalf("layout.html must cache-bust the app module entrypoint")
 	}
 }
@@ -995,6 +998,54 @@ func TestAppBundleKeepsCompletedAccountBatchResultVisible(t *testing.T) {
 	}
 	if strings.Contains(body, `message: panel.dataset.refreshingMessage || ""`) {
 		t.Fatalf("app.bundle.js must not replace completed account batch result with refreshing text")
+	}
+}
+
+func TestAccountDetectionToastsUseRequestedLifetimes(t *testing.T) {
+	toastJS, err := assets.ReadFile("static/js/toast.js")
+	if err != nil {
+		t.Fatalf("read toast.js: %v", err)
+	}
+	toastBody := string(toastJS)
+	for _, want := range []string{
+		`const duration = Number(options?.duration ?? options?.durationMs ?? 5000);`,
+		`const sticky = Boolean(options?.sticky) || duration <= 0;`,
+		`notice.dataset.toastSticky === "true"`,
+		`options.duration = duration;`,
+	} {
+		if !strings.Contains(toastBody, want) {
+			t.Fatalf("toast.js missing lifetime behavior %q", want)
+		}
+	}
+
+	accountsTemplate, err := assets.ReadFile("templates/accounts.html")
+	if err != nil {
+		t.Fatalf("read accounts.html: %v", err)
+	}
+	accountsBody := string(accountsTemplate)
+	for _, want := range []string{
+		`data-toast-duration="{{if eq .AccountTestTone "good"}}3000{{else}}0{{end}}"`,
+		`data-toast-duration="{{if eq .AccountBatchTone "good"}}3000{{else}}0{{end}}"`,
+		`data-toast-sticky="true"`,
+	} {
+		if !strings.Contains(accountsBody, want) {
+			t.Fatalf("accounts.html missing account detection toast option %q", want)
+		}
+	}
+
+	bundle, err := assets.ReadFile("static/js/app.bundle.js")
+	if err != nil {
+		t.Fatalf("read app.bundle.js: %v", err)
+	}
+	bundleBody := string(bundle)
+	for _, want := range []string{
+		`if (String(payload?.action || "") === "test") {`,
+		`options.sticky = true;`,
+		`options.duration = 3000;`,
+	} {
+		if !strings.Contains(bundleBody, want) {
+			t.Fatalf("app.bundle.js missing account batch detection toast option %q", want)
+		}
 	}
 }
 

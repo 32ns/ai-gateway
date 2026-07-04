@@ -25,17 +25,22 @@ function createToastUI() {
       }
 
       while (region.children.length >= 4) {
-        const first = region.firstElementChild;
-        if (!first) {
+        const removable = Array.from(region.children).find((child) => child?.dataset?.sticky !== "true");
+        if (!removable) {
           break;
         }
-        first.remove();
+        removable.remove();
       }
 
       const tone = options?.tone || "info";
+      const duration = Number(options?.duration ?? options?.durationMs ?? 5000);
+      const sticky = Boolean(options?.sticky) || duration <= 0;
       const toast = document.createElement("div");
       toast.className = `toast-message toast-${tone}`;
       toast.setAttribute("role", tone === "error" ? "alert" : "status");
+      if (sticky) {
+        toast.dataset.sticky = "true";
+      }
 
       const text = document.createElement("div");
       text.className = "toast-text";
@@ -57,7 +62,9 @@ function createToastUI() {
       region.appendChild(toast);
 
       window.requestAnimationFrame(() => toast.classList.add("is-visible"));
-      window.setTimeout(() => dismiss(toast), 5000);
+      if (!sticky && Number.isFinite(duration) && duration > 0) {
+        window.setTimeout(() => dismiss(toast), duration);
+      }
     },
   };
 }
@@ -109,7 +116,15 @@ function showServerRenderedToasts(toastUI, root = document) {
       : notice.classList.contains("tone-good")
         ? "ok"
         : "info";
-    toastUI.show({ message, tone });
+    const options = { message, tone };
+    const duration = Number.parseInt(notice.dataset.toastDuration || "", 10);
+    if (Number.isFinite(duration)) {
+      options.duration = duration;
+    }
+    if (notice.dataset.toastSticky === "true") {
+      options.sticky = true;
+    }
+    toastUI.show(options);
   });
   if (scope === document) {
     clearURLParams(clearParams);
@@ -136,4 +151,3 @@ function clearURLParams(params) {
   const next = `${url.pathname}${url.search}${url.hash}`;
   window.history.replaceState(window.history.state, "", next);
 }
-

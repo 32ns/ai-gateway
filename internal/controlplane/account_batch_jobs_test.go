@@ -41,6 +41,38 @@ func TestStartAccountBatchJobRunsLiveActionsConcurrently(t *testing.T) {
 	}
 }
 
+func TestStartAccountBatchJobCurrentUsesAccountLabel(t *testing.T) {
+	repo := storage.NewMemoryRepository()
+	ids := testBatchJobAccounts(t, repo, 1)
+	adapter := newBlockingBatchJobAdapter()
+	service := New(repo, providers.NewRegistry(adapter))
+
+	job, err := service.StartAccountBatch(context.Background(), AccountBatchInput{
+		Action:     AccountBatchActionTest,
+		AccountIDs: ids,
+	})
+	if err != nil {
+		t.Fatalf("StartAccountBatch returned error: %v", err)
+	}
+	wantCurrent := "Batch Job " + ids[0]
+	if job.Current != wantCurrent {
+		t.Fatalf("initial current = %q, want label %q", job.Current, wantCurrent)
+	}
+
+	waitForBatchJobStarts(t, adapter, 1)
+	active, ok := service.ActiveAccountBatchJob()
+	if !ok {
+		t.Fatal("active account batch job not found")
+	}
+	if active.Current != wantCurrent {
+		t.Fatalf("running current = %q, want label %q", active.Current, wantCurrent)
+	}
+	if _, ok := service.CancelAccountBatchJob(job.ID); !ok {
+		t.Fatalf("CancelAccountBatchJob(%q) returned not found", job.ID)
+	}
+	waitForAccountBatchJob(t, service, job.ID)
+}
+
 func TestStartAccountBatchJobRejectsConcurrentLiveJob(t *testing.T) {
 	repo := storage.NewMemoryRepository()
 	ids := testBatchJobAccounts(t, repo, 2)
