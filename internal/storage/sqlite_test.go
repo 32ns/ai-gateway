@@ -1600,6 +1600,121 @@ func TestSQLiteRepositoryOpenAIResponseBindingPromptCacheKeyRoundTrip(t *testing
 	}
 }
 
+func TestSQLiteRepositoryFindUserByEmailFallsBackToPayloadAndRejectsDuplicates(t *testing.T) {
+	tempDir := t.TempDir()
+	statePath := filepath.Join(tempDir, "state.db")
+
+	repo, err := NewSQLiteRepository(statePath, "")
+	if err != nil {
+		t.Fatalf("NewSQLiteRepository returned error: %v", err)
+	}
+	t.Cleanup(func() { _ = repo.Close() })
+
+	if err := repo.UpsertUser(core.User{ID: "user_email_a", Username: "email-a", Email: "Alice@Example.com", Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.db.Exec(`UPDATE users SET email_key = '' WHERE id = ?`, "user_email_a"); err != nil {
+		t.Fatalf("clear email_key: %v", err)
+	}
+	user, err := repo.FindUserByEmail("alice@example.com")
+	if err != nil {
+		t.Fatalf("FindUserByEmail returned error: %v", err)
+	}
+	if user.ID != "user_email_a" {
+		t.Fatalf("FindUserByEmail ID = %q, want user_email_a", user.ID)
+	}
+
+	if err := repo.UpsertUser(core.User{ID: "user_email_b", Username: "email-b", Email: "ALICE@example.com", Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.FindUserByEmail("alice@example.com"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("FindUserByEmail duplicate err = %v, want ErrNotFound", err)
+	}
+}
+
+func TestSQLiteRepositoryPasswordResetTokenRoundTripAndSessionCleanup(t *testing.T) {
+	tempDir := t.TempDir()
+	statePath := filepath.Join(tempDir, "state.db")
+
+	repo, err := NewSQLiteRepository(statePath, "")
+	if err != nil {
+		t.Fatalf("NewSQLiteRepository returned error: %v", err)
+	}
+	t.Cleanup(func() { _ = repo.Close() })
+
+	now := time.Now().UTC()
+	if err := repo.UpsertUser(core.User{ID: "user_reset", Username: "reset", Email: "reset@example.com", Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.UpsertUser(core.User{ID: "user_other", Username: "other", Email: "other@example.com", Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.UpsertUserSession(core.UserSession{TokenHash: "session_reset", UserID: "user_reset", ExpiresAt: now.Add(time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.UpsertUserSession(core.UserSession{TokenHash: "session_other", UserID: "user_other", ExpiresAt: now.Add(time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+
+	token := core.PasswordResetToken{
+		ID:        "reset_token",
+		UserID:    "user_reset",
+		Email:     "Reset@Example.com",
+		TokenHash: "reset_hash",
+		ExpiresAt: now.Add(time.Hour),
+		CreatedAt: now,
+	}
+	if err := repo.CreatePasswordResetToken(token); err != nil {
+		t.Fatalf("CreatePasswordResetToken returned error: %v", err)
+	}
+	loaded, err := repo.GetPasswordResetTokenByHash("reset_hash")
+	if err != nil {
+		t.Fatalf("GetPasswordResetTokenByHash returned error: %v", err)
+	}
+	if loaded.ID != token.ID || loaded.Email != "reset@example.com" {
+		t.Fatalf("loaded reset token = %#v", loaded)
+	}
+	latest, err := repo.LatestPasswordResetToken("RESET@example.com")
+	if err != nil {
+		t.Fatalf("LatestPasswordResetToken returned error: %v", err)
+	}
+	if latest.ID != token.ID {
+		t.Fatalf("LatestPasswordResetToken ID = %q, want %q", latest.ID, token.ID)
+	}
+	if count := repo.CountPasswordResetTokensSince("reset@example.com", now.Add(-time.Minute)); count != 1 {
+		t.Fatalf("CountPasswordResetTokensSince = %d, want 1", count)
+	}
+
+	usedAt := now.Add(time.Minute)
+	loaded.UsedAt = &usedAt
+	if err := repo.UpdatePasswordResetToken(loaded); err != nil {
+		t.Fatalf("UpdatePasswordResetToken returned error: %v", err)
+	}
+	updated, err := repo.GetPasswordResetTokenByHash("reset_hash")
+	if err != nil {
+		t.Fatalf("GetPasswordResetTokenByHash after update returned error: %v", err)
+	}
+	if updated.UsedAt == nil || !updated.UsedAt.Equal(usedAt) {
+		t.Fatalf("Updated UsedAt = %v, want %v", updated.UsedAt, usedAt)
+	}
+
+	if err := repo.DeleteUserSessionsByUser("user_reset"); err != nil {
+		t.Fatalf("DeleteUserSessionsByUser returned error: %v", err)
+	}
+	if _, err := repo.GetUserSession("session_reset"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("GetUserSession session_reset err = %v, want ErrNotFound", err)
+	}
+	if _, err := repo.GetUserSession("session_other"); err != nil {
+		t.Fatalf("GetUserSession session_other returned error: %v", err)
+	}
+	if err := repo.DeletePasswordResetToken(token.ID); err != nil {
+		t.Fatalf("DeletePasswordResetToken returned error: %v", err)
+	}
+	if _, err := repo.GetPasswordResetTokenByHash("reset_hash"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("GetPasswordResetTokenByHash after delete err = %v, want ErrNotFound", err)
+	}
+}
+
 func TestSQLiteRepositoryDeleteClientRemovesResponseBindings(t *testing.T) {
 	tempDir := t.TempDir()
 	statePath := filepath.Join(tempDir, "state.db")

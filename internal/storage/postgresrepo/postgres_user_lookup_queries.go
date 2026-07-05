@@ -41,6 +41,87 @@ func (r *PostgresRepository) FindUserByOAuthIdentity(provider, subject string) (
 	return cloneUser(user), nil
 }
 
+func (r *PostgresRepository) FindUserByEmail(email string) (core.User, error) {
+	email = emailKey(email)
+	if email == "" {
+		return core.User{}, ErrNotFound
+	}
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	user, found, err := r.findUniqueUserByEmailQueryLocked(email)
+	if err != nil {
+		return core.User{}, err
+	}
+	if found {
+		return user, nil
+	}
+	return r.findUniqueUserByEmailScanLocked(email)
+}
+
+func (r *PostgresRepository) findUniqueUserByEmailQueryLocked(email string) (core.User, bool, error) {
+	rows, err := r.db.Query(`
+		SELECT u.payload, COALESCE(b.balance_nano_usd, 0)
+		FROM users u
+		LEFT JOIN user_balances b ON b.user_id = u.id
+		WHERE u.email_key = ? OR u.email_key = ''
+	`, email)
+	if err != nil {
+		return core.User{}, false, err
+	}
+	defer rows.Close()
+	return uniqueUserFromRows(rows, email)
+}
+
+func (r *PostgresRepository) findUniqueUserByEmailScanLocked(email string) (core.User, error) {
+	rows, err := r.db.Query(`
+		SELECT u.payload, COALESCE(b.balance_nano_usd, 0)
+		FROM users u
+		LEFT JOIN user_balances b ON b.user_id = u.id
+	`)
+	if err != nil {
+		return core.User{}, err
+	}
+	defer rows.Close()
+	user, found, err := uniqueUserFromRows(rows, email)
+	if err != nil {
+		return core.User{}, err
+	}
+	if !found {
+		return core.User{}, ErrNotFound
+	}
+	return user, nil
+}
+
+func uniqueUserFromRows(rows *sql.Rows, email string) (core.User, bool, error) {
+	var matched core.User
+	count := 0
+	for rows.Next() {
+		var payload string
+		var balance int64
+		if err := rows.Scan(&payload, &balance); err != nil {
+			return core.User{}, false, err
+		}
+		var user core.User
+		if err := json.Unmarshal([]byte(payload), &user); err != nil {
+			return core.User{}, false, err
+		}
+		if emailKey(user.Email) != email {
+			continue
+		}
+		user.BalanceNanoUSD = balance
+		matched = cloneUser(user)
+		count++
+	}
+	if err := rows.Err(); err != nil {
+		return core.User{}, false, err
+	}
+	if count != 1 {
+		return core.User{}, false, nil
+	}
+	return matched, true, nil
+}
+
 func (r *PostgresRepository) FindUserByInvitationSignature(signature string) (core.User, error) {
 	signature = strings.TrimSpace(signature)
 	if signature == "" {

@@ -65,6 +65,12 @@ func cloneEmailVerificationCode(code core.EmailVerificationCode) core.EmailVerif
 	return copyCode
 }
 
+func clonePasswordResetToken(token core.PasswordResetToken) core.PasswordResetToken {
+	copyToken := token
+	copyToken.UsedAt = cloneTimePtr(token.UsedAt)
+	return copyToken
+}
+
 func emailKey(email string) string {
 	return strings.ToLower(strings.TrimSpace(email))
 }

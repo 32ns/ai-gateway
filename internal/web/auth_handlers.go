@@ -421,6 +421,101 @@ func (s *Server) handlePasswordPage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (s *Server) handlePasswordForgot(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/password/forgot" {
+		http.NotFound(w, r)
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		if user, err := s.currentUserFromSession(r); err == nil && user.ID != "" {
+			redirectLocalSeeOther(w, r, "/profile/password")
+			return
+		}
+		s.renderPasswordForgotPage(w, r, false, "", http.StatusOK)
+	case http.MethodPost:
+		if isMultipartFormRequest(r) {
+			defer cleanupMultipartForm(r)
+		}
+		csrfToken, err := s.ensureConsoleCSRFToken(w, r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		submitted, err := readConsoleCSRFToken(w, r)
+		if err != nil || submitted != csrfToken {
+			s.renderPasswordForgotPage(w, r, false, translate(resolveLocale(w, r), "csrf_invalid"), http.StatusForbidden)
+			return
+		}
+		settings := s.controlCurrentSettings()
+		if !s.allowRegistrationIPRequest(r, "password-reset", settings.Registration.EmailCodeIPHourlyLimit) {
+			s.renderPasswordForgotPage(w, r, false, translate(resolveLocale(w, r), "password_reset_rate_limited"), http.StatusTooManyRequests)
+			return
+		}
+		if err := s.control.RequestPasswordReset(r.Context(), controlplane.PasswordResetRequest{
+			Email:   r.FormValue("email"),
+			BaseURL: s.publicBaseURLForRequest(r),
+		}); err != nil {
+			s.renderPasswordForgotPage(w, r, false, err.Error(), http.StatusBadRequest)
+			return
+		}
+		s.renderPasswordForgotPage(w, r, true, "", http.StatusOK)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *Server) handlePasswordReset(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/password/reset" {
+		http.NotFound(w, r)
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		token := strings.TrimSpace(r.URL.Query().Get("token"))
+		if err := s.control.ValidatePasswordResetToken(token); err != nil {
+			s.renderPasswordResetPage(w, r, token, false, translate(resolveLocale(w, r), "password_reset_invalid"), http.StatusBadRequest)
+			return
+		}
+		s.renderPasswordResetPage(w, r, token, true, "", http.StatusOK)
+	case http.MethodPost:
+		if isMultipartFormRequest(r) {
+			defer cleanupMultipartForm(r)
+		}
+		csrfToken, err := s.ensureConsoleCSRFToken(w, r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		submitted, err := readConsoleCSRFToken(w, r)
+		if err != nil || submitted != csrfToken {
+			s.renderPasswordResetPage(w, r, r.FormValue("token"), true, translate(resolveLocale(w, r), "csrf_invalid"), http.StatusForbidden)
+			return
+		}
+		token := strings.TrimSpace(r.FormValue("token"))
+		nextPassword := r.FormValue("new_password")
+		if nextPassword != r.FormValue("new_password_confirm") {
+			s.renderPasswordResetPage(w, r, token, true, translate(resolveLocale(w, r), "password_mismatch"), http.StatusBadRequest)
+			return
+		}
+		if err := s.control.CompletePasswordReset(token, nextPassword); err != nil {
+			message := err.Error()
+			showForm := true
+			if errors.Is(err, controlplane.ErrPasswordResetTokenInvalid) {
+				message = translate(resolveLocale(w, r), "password_reset_invalid")
+				showForm = false
+			}
+			s.renderPasswordResetPage(w, r, token, showForm, message, http.StatusBadRequest)
+			return
+		}
+		values := url.Values{}
+		values.Set("notice", translate(resolveLocale(w, r), "password_reset_success_login"))
+		redirectLocalSeeOther(w, r, "/login?"+values.Encode())
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
 func (s *Server) redirectRegisterError(w http.ResponseWriter, r *http.Request, message string) {
 	values := url.Values{}
 	if next := sanitizeNextPath(r.FormValue("next"), core.User{Role: core.UserRoleUser, Enabled: true}); next != "/" {
@@ -478,6 +573,59 @@ func (s *Server) renderPasswordPage(w http.ResponseWriter, r *http.Request, save
 		w.WriteHeader(status)
 	}
 	s.render(w, "password.html", locale, data)
+}
+
+func (s *Server) renderPasswordForgotPage(w http.ResponseWriter, r *http.Request, sent bool, message string, status int) {
+	csrfToken, err := s.ensureConsoleCSRFToken(w, r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	locale := resolveLocale(w, r)
+	data := map[string]any{
+		"TitleKey":  "page_title_password_forgot",
+		"ActiveNav": "",
+		"Locale":    locale,
+		"CSRFToken": csrfToken,
+		"Sent":      sent,
+		"Message":   strings.TrimSpace(message),
+		"Email":     strings.TrimSpace(r.FormValue("email")),
+	}
+	if status != http.StatusOK {
+		w.WriteHeader(status)
+	}
+	s.render(w, "password_forgot.html", locale, data)
+}
+
+func (s *Server) renderPasswordResetPage(w http.ResponseWriter, r *http.Request, token string, showForm bool, message string, status int) {
+	csrfToken, err := s.ensureConsoleCSRFToken(w, r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	locale := resolveLocale(w, r)
+	data := map[string]any{
+		"TitleKey":  "page_title_password_reset",
+		"ActiveNav": "",
+		"Locale":    locale,
+		"CSRFToken": csrfToken,
+		"Token":     strings.TrimSpace(token),
+		"ShowForm":  showForm,
+		"Message":   strings.TrimSpace(message),
+	}
+	if status != http.StatusOK {
+		w.WriteHeader(status)
+	}
+	s.render(w, "password_reset.html", locale, data)
+}
+
+func (s *Server) publicBaseURLForRequest(r *http.Request) string {
+	if s != nil && s.control != nil {
+		if baseURL := strings.TrimRight(strings.TrimSpace(s.control.PublicBaseURL()), "/"); baseURL != "" {
+			return baseURL
+		}
+	}
+	return requestBaseURL(r)
 }
 
 type passwordOAuthProviderView struct {
@@ -570,6 +718,7 @@ func (s *Server) renderLoginPage(w http.ResponseWriter, r *http.Request, message
 		"CSRFToken":               csrfToken,
 		"Next":                    next,
 		"Message":                 message,
+		"Notice":                  strings.TrimSpace(r.URL.Query().Get("notice")),
 		"Username":                strings.TrimSpace(username),
 		"NoticeError":             strings.TrimSpace(r.URL.Query().Get("notice_error")),
 		"AllowPublicRegistration": s.publicRegistrationAllowed(),

@@ -54,6 +54,8 @@ func (s *Server) registerPublicRoutes(mux *http.ServeMux) {
 	})
 	mux.Handle("/login", http.HandlerFunc(s.handleLogin))
 	mux.Handle("/login/oauth/", http.HandlerFunc(s.handleLoginOAuth))
+	mux.Handle("/password/forgot", http.HandlerFunc(s.handlePasswordForgot))
+	mux.Handle("/password/reset", http.HandlerFunc(s.handlePasswordReset))
 	mux.Handle("/register", http.HandlerFunc(s.handleRegister))
 	mux.Handle("/register/email-code/send", http.HandlerFunc(s.handleRegisterEmailCodeSend))
 	mux.HandleFunc("/models", s.handleUserModelsPage)

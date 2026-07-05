@@ -241,13 +241,18 @@ func validateCloudMailSettings(settings core.SystemEmailSettings) error {
 }
 
 func sendVerificationEmail(ctx context.Context, settings core.SystemEmailSettings, toEmail, code string) error {
-	if settings.Provider == core.EmailProviderCloudMail {
-		return sendVerificationEmailCloudMail(ctx, settings, toEmail, code)
-	}
-	return sendVerificationEmailSMTP(ctx, settings, toEmail, code)
+	content := buildVerificationEmailContent(settings, toEmail, code)
+	return sendEmail(ctx, settings, toEmail, content)
 }
 
-func sendVerificationEmailSMTP(ctx context.Context, settings core.SystemEmailSettings, toEmail, code string) error {
+func sendEmail(ctx context.Context, settings core.SystemEmailSettings, toEmail string, content verificationEmailContent) error {
+	if settings.Provider == core.EmailProviderCloudMail {
+		return sendEmailCloudMail(ctx, settings, toEmail, content)
+	}
+	return sendEmailSMTP(ctx, settings, toEmail, content)
+}
+
+func sendEmailSMTP(ctx context.Context, settings core.SystemEmailSettings, toEmail string, content verificationEmailContent) error {
 	ctx, cancel := emailSMTPContext(ctx)
 	defer cancel()
 
@@ -258,7 +263,6 @@ func sendVerificationEmailSMTP(ctx context.Context, settings core.SystemEmailSet
 	if fromName != "" {
 		from = (&mail.Address{Name: fromName, Address: from}).String()
 	}
-	content := buildVerificationEmailContent(settings, toEmail, code)
 	message := strings.Join([]string{
 		"From: " + from,
 		"To: " + toEmail,
@@ -275,7 +279,7 @@ func sendVerificationEmailSMTP(ctx context.Context, settings core.SystemEmailSet
 	return sendMailStartTLS(ctx, addr, host, auth, fromEmailEnvelope(settings), []string{toEmail}, []byte(message))
 }
 
-func sendVerificationEmailCloudMail(ctx context.Context, settings core.SystemEmailSettings, toEmail, code string) error {
+func sendEmailCloudMail(ctx context.Context, settings core.SystemEmailSettings, toEmail string, content verificationEmailContent) error {
 	ctx, cancel := emailSMTPContext(ctx)
 	defer cancel()
 
@@ -288,7 +292,6 @@ func sendVerificationEmailCloudMail(ctx context.Context, settings core.SystemEma
 	if resolvedAccountID, err := resolveCloudMailAccountID(ctx, baseURL, token, settings); err == nil && resolvedAccountID > 0 {
 		accountID = resolvedAccountID
 	}
-	content := buildVerificationEmailContent(settings, toEmail, code)
 	name := strings.TrimSpace(settings.FromName)
 	if name == "" {
 		name = "AI Gateway"

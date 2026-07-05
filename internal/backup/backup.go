@@ -79,7 +79,7 @@ var orderedDataSets = []string{
 
 var dataSetTables = map[string][]string{
 	DataSetSettings: []string{"system_settings"},
-	DataSetUsers:    []string{"users", "user_balances", "user_oauth_identities", "user_invitation_codes", "mcp_tokens"},
+	DataSetUsers:    []string{"users", "user_balances", "user_oauth_identities", "user_invitation_codes", "mcp_tokens", "password_reset_tokens"},
 	DataSetAccounts: []string{"accounts", "account_credentials", "account_runtime", "account_groups"},
 	DataSetModels:   []string{"models"},
 	DataSetClients:  []string{"clients", "client_spend", "openai_response_bindings"},
@@ -113,7 +113,8 @@ type logicalTableBackup struct {
 }
 
 var optionalLogicalRestoreTables = map[string]struct{}{
-	"finance_user_rollups": {},
+	"finance_user_rollups":  {},
+	"password_reset_tokens": {},
 }
 
 func Create(outPath string, opts Options) (Manifest, error) {
@@ -557,7 +558,7 @@ func restoreLogicalData(path string, opts Options, requestedDataSets []string) e
 		return err
 	}
 	for i := len(tables) - 1; i >= 0; i-- {
-		if _, ok := tablePayloads[tables[i]]; !ok && logicalRestoreOptionalTable(tables[i]) {
+		if _, ok := tablePayloads[tables[i]]; !ok && logicalRestoreOptionalTable(tables[i]) && !logicalRestoreClearMissingOptionalTable(tables[i]) {
 			continue
 		}
 		if _, err := tx.Exec(fmt.Sprintf("DELETE FROM %s", tables[i])); err != nil {
@@ -653,12 +654,17 @@ func restoreLogicalTable(tx *backupTx, table logicalTableBackup, allowedColumns 
 }
 
 func logicalRestoreColumnCanUseDefault(table, column string) bool {
-	return table == "billing_plan_groups" && column == "quota_price_ratio"
+	return (table == "billing_plan_groups" && column == "quota_price_ratio") ||
+		(table == "users" && column == "email_key")
 }
 
 func logicalRestoreOptionalTable(table string) bool {
 	_, ok := optionalLogicalRestoreTables[table]
 	return ok
+}
+
+func logicalRestoreClearMissingOptionalTable(table string) bool {
+	return table == "password_reset_tokens"
 }
 
 func logicalTableExists(tx *backupTx, backend, table string) (bool, error) {
@@ -1435,6 +1441,7 @@ var postgresForeignKeyChecks = []struct {
 }{
 	{childTable: "user_balances", childColumn: "user_id", parentTable: "users"},
 	{childTable: "user_sessions", childColumn: "user_id", parentTable: "users"},
+	{childTable: "password_reset_tokens", childColumn: "user_id", parentTable: "users"},
 	{childTable: "user_oauth_identities", childColumn: "user_id", parentTable: "users"},
 	{childTable: "user_invitation_codes", childColumn: "user_id", parentTable: "users"},
 	{childTable: "mcp_tokens", childColumn: "owner_user_id", parentTable: "users"},

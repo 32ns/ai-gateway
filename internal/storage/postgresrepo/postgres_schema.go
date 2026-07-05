@@ -51,6 +51,7 @@ func (r *PostgresRepository) initSchemaLocked() error {
 			id TEXT PRIMARY KEY,
 			username_key TEXT NOT NULL UNIQUE,
 			username TEXT NOT NULL DEFAULT '',
+			email_key TEXT NOT NULL DEFAULT '',
 			role TEXT NOT NULL DEFAULT '',
 			enabled BOOLEAN NOT NULL DEFAULT TRUE,
 			inviter_user_id TEXT NOT NULL DEFAULT '',
@@ -91,6 +92,21 @@ func (r *PostgresRepository) initSchemaLocked() error {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions(expires_at_ns)`,
+		`CREATE TABLE IF NOT EXISTS password_reset_tokens (
+			id TEXT PRIMARY KEY,
+			token_hash TEXT NOT NULL UNIQUE,
+			user_id TEXT NOT NULL,
+			email_key TEXT NOT NULL,
+			expires_at_ns BIGINT NOT NULL,
+			used_at_ns BIGINT NOT NULL DEFAULT 0,
+			created_at_ns BIGINT NOT NULL,
+			updated_at_ns BIGINT NOT NULL,
+			payload TEXT NOT NULL,
+			FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_hash ON password_reset_tokens(token_hash)`,
+		`CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_email_created ON password_reset_tokens(email_key, created_at_ns DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_expires ON password_reset_tokens(expires_at_ns)`,
 		`CREATE TABLE IF NOT EXISTS mcp_tokens (
 			id TEXT PRIMARY KEY,
 			token_hash TEXT NOT NULL UNIQUE,
@@ -464,6 +480,7 @@ func (r *PostgresRepository) initSchemaLocked() error {
 		}
 	}
 	for _, statement := range []string{
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_key TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE billing_plan_groups ADD COLUMN IF NOT EXISTS quota_price_ratio TEXT NOT NULL DEFAULT '1:1'`,
 		`ALTER TABLE billing_requests ADD COLUMN IF NOT EXISTS account_label TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE billing_requests ADD COLUMN IF NOT EXISTS failed_account_labels TEXT NOT NULL DEFAULT ''`,
@@ -490,6 +507,7 @@ func (r *PostgresRepository) initSchemaLocked() error {
 	for _, statement := range []string{
 		`CREATE INDEX IF NOT EXISTS idx_clients_api_key_hash ON clients(api_key_hash)`,
 		`CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)`,
+		`CREATE INDEX IF NOT EXISTS idx_users_email_key ON users(email_key)`,
 		`CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)`,
 		`CREATE INDEX IF NOT EXISTS idx_users_enabled ON users(enabled)`,
 		`CREATE INDEX IF NOT EXISTS idx_users_inviter ON users(inviter_user_id)`,

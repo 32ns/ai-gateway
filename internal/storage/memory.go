@@ -36,6 +36,7 @@ type Repository interface {
 	ListUsersPage(query UserListQuery) ([]UserListItem, int, int)
 	GetUser(id string) (core.User, error)
 	FindUserByUsername(username string) (core.User, error)
+	FindUserByEmail(email string) (core.User, error)
 	FindUserByOAuthIdentity(provider, subject string) (core.User, error)
 	FindUserByInvitationSignature(signature string) (core.User, error)
 	ListUsersByInviter(inviterID string) []core.User
@@ -50,6 +51,7 @@ type Repository interface {
 	UpsertUserSession(session core.UserSession) error
 	GetUserSession(tokenHash string) (core.UserSession, error)
 	DeleteUserSession(tokenHash string) error
+	DeleteUserSessionsByUser(userID string) error
 	DeleteExpiredUserSessions(now time.Time) error
 	UpsertMCPToken(token core.MCPToken) error
 	GetMCPToken(id string) (core.MCPToken, error)
@@ -61,6 +63,12 @@ type Repository interface {
 	CountEmailVerificationCodesSince(purpose, email string, since time.Time) int
 	UpdateEmailVerificationCode(code core.EmailVerificationCode) error
 	DeleteEmailVerificationCode(id string) error
+	CreatePasswordResetToken(token core.PasswordResetToken) error
+	GetPasswordResetTokenByHash(tokenHash string) (core.PasswordResetToken, error)
+	LatestPasswordResetToken(email string) (core.PasswordResetToken, error)
+	CountPasswordResetTokensSince(email string, since time.Time) int
+	UpdatePasswordResetToken(token core.PasswordResetToken) error
+	DeletePasswordResetToken(id string) error
 	ListAccounts() []core.Account
 	GetAccount(id string) (core.Account, error)
 	UpsertAccount(account core.Account) error
@@ -206,77 +214,81 @@ func LoadStartupSystemSettings(repo Repository) (core.SystemSettings, error) {
 }
 
 type MemoryRepository struct {
-	mu              sync.RWMutex
-	accounts        map[string]core.Account
-	users           map[string]core.User
-	sessions        map[string]core.UserSession
-	mcpTokens       map[string]core.MCPToken
-	mcpTokenHash    map[string]string
-	emailCodes      map[string]core.EmailVerificationCode
-	groups          map[string]core.AccountGroup
-	models          map[string]core.ModelConfig
-	clients         map[string]core.APIClient
-	responses       map[string]core.OpenAIResponseBinding
-	clientSpend     map[string]core.ClientSpend
-	billing         map[string]core.BillingReservation
-	planGroups      map[string]core.BillingPlanGroup
-	plans           map[string]core.BillingPlan
-	entitlements    map[string]core.UserPlanEntitlement
-	allocations     map[string]core.BillingFundingAllocation
-	planLedger      []core.PlanQuotaLedgerEntry
-	ledger          []core.BillingLedgerEntry
-	payments        map[string]core.PaymentOrder
-	refunds         map[string]core.PaymentRefund
-	messages        map[string]core.SiteMessage
-	messageRead     map[string]core.SiteMessageRead
-	supportTickets  map[string]core.SupportTicket
-	supportMessages map[string][]core.SupportMessage
-	documents       map[string]core.Document
-	docRedirects    map[string]core.DocumentRedirect
-	monitorTargets  map[string]core.MonitorTarget
-	monitorResults  []core.MonitorResult
-	audit           []core.AuditEvent
-	limit           int
-	usageMaxAge     time.Duration
-	ledgerMaxAge    time.Duration
-	settings        core.SystemSettings
-	hasSettings     bool
+	mu                sync.RWMutex
+	accounts          map[string]core.Account
+	users             map[string]core.User
+	sessions          map[string]core.UserSession
+	mcpTokens         map[string]core.MCPToken
+	mcpTokenHash      map[string]string
+	emailCodes        map[string]core.EmailVerificationCode
+	passwordResets    map[string]core.PasswordResetToken
+	passwordResetHash map[string]string
+	groups            map[string]core.AccountGroup
+	models            map[string]core.ModelConfig
+	clients           map[string]core.APIClient
+	responses         map[string]core.OpenAIResponseBinding
+	clientSpend       map[string]core.ClientSpend
+	billing           map[string]core.BillingReservation
+	planGroups        map[string]core.BillingPlanGroup
+	plans             map[string]core.BillingPlan
+	entitlements      map[string]core.UserPlanEntitlement
+	allocations       map[string]core.BillingFundingAllocation
+	planLedger        []core.PlanQuotaLedgerEntry
+	ledger            []core.BillingLedgerEntry
+	payments          map[string]core.PaymentOrder
+	refunds           map[string]core.PaymentRefund
+	messages          map[string]core.SiteMessage
+	messageRead       map[string]core.SiteMessageRead
+	supportTickets    map[string]core.SupportTicket
+	supportMessages   map[string][]core.SupportMessage
+	documents         map[string]core.Document
+	docRedirects      map[string]core.DocumentRedirect
+	monitorTargets    map[string]core.MonitorTarget
+	monitorResults    []core.MonitorResult
+	audit             []core.AuditEvent
+	limit             int
+	usageMaxAge       time.Duration
+	ledgerMaxAge      time.Duration
+	settings          core.SystemSettings
+	hasSettings       bool
 }
 
 func NewMemoryRepository() *MemoryRepository {
 	return &MemoryRepository{
-		accounts:        make(map[string]core.Account),
-		users:           make(map[string]core.User),
-		sessions:        make(map[string]core.UserSession),
-		mcpTokens:       make(map[string]core.MCPToken),
-		mcpTokenHash:    make(map[string]string),
-		emailCodes:      make(map[string]core.EmailVerificationCode),
-		groups:          make(map[string]core.AccountGroup),
-		models:          make(map[string]core.ModelConfig),
-		clients:         make(map[string]core.APIClient),
-		responses:       make(map[string]core.OpenAIResponseBinding),
-		clientSpend:     make(map[string]core.ClientSpend),
-		billing:         make(map[string]core.BillingReservation),
-		planGroups:      make(map[string]core.BillingPlanGroup),
-		plans:           make(map[string]core.BillingPlan),
-		entitlements:    make(map[string]core.UserPlanEntitlement),
-		allocations:     make(map[string]core.BillingFundingAllocation),
-		planLedger:      make([]core.PlanQuotaLedgerEntry, 0),
-		ledger:          make([]core.BillingLedgerEntry, 0),
-		payments:        make(map[string]core.PaymentOrder),
-		refunds:         make(map[string]core.PaymentRefund),
-		messages:        make(map[string]core.SiteMessage),
-		messageRead:     make(map[string]core.SiteMessageRead),
-		supportTickets:  make(map[string]core.SupportTicket),
-		supportMessages: make(map[string][]core.SupportMessage),
-		documents:       make(map[string]core.Document),
-		docRedirects:    make(map[string]core.DocumentRedirect),
-		monitorTargets:  make(map[string]core.MonitorTarget),
-		monitorResults:  make([]core.MonitorResult, 0),
-		audit:           make([]core.AuditEvent, 0, defaultAuditLimit),
-		limit:           defaultAuditLimit,
-		usageMaxAge:     defaultUsageLogMaxAge,
-		ledgerMaxAge:    defaultBillingLedgerRetentionAge,
+		accounts:          make(map[string]core.Account),
+		users:             make(map[string]core.User),
+		sessions:          make(map[string]core.UserSession),
+		mcpTokens:         make(map[string]core.MCPToken),
+		mcpTokenHash:      make(map[string]string),
+		emailCodes:        make(map[string]core.EmailVerificationCode),
+		passwordResets:    make(map[string]core.PasswordResetToken),
+		passwordResetHash: make(map[string]string),
+		groups:            make(map[string]core.AccountGroup),
+		models:            make(map[string]core.ModelConfig),
+		clients:           make(map[string]core.APIClient),
+		responses:         make(map[string]core.OpenAIResponseBinding),
+		clientSpend:       make(map[string]core.ClientSpend),
+		billing:           make(map[string]core.BillingReservation),
+		planGroups:        make(map[string]core.BillingPlanGroup),
+		plans:             make(map[string]core.BillingPlan),
+		entitlements:      make(map[string]core.UserPlanEntitlement),
+		allocations:       make(map[string]core.BillingFundingAllocation),
+		planLedger:        make([]core.PlanQuotaLedgerEntry, 0),
+		ledger:            make([]core.BillingLedgerEntry, 0),
+		payments:          make(map[string]core.PaymentOrder),
+		refunds:           make(map[string]core.PaymentRefund),
+		messages:          make(map[string]core.SiteMessage),
+		messageRead:       make(map[string]core.SiteMessageRead),
+		supportTickets:    make(map[string]core.SupportTicket),
+		supportMessages:   make(map[string][]core.SupportMessage),
+		documents:         make(map[string]core.Document),
+		docRedirects:      make(map[string]core.DocumentRedirect),
+		monitorTargets:    make(map[string]core.MonitorTarget),
+		monitorResults:    make([]core.MonitorResult, 0),
+		audit:             make([]core.AuditEvent, 0, defaultAuditLimit),
+		limit:             defaultAuditLimit,
+		usageMaxAge:       defaultUsageLogMaxAge,
+		ledgerMaxAge:      defaultBillingLedgerRetentionAge,
 	}
 }
 
@@ -644,6 +656,12 @@ func (r *MemoryRepository) deleteUserLocked(id string, now time.Time) error {
 			delete(r.sessions, tokenHash)
 		}
 	}
+	for resetID, token := range r.passwordResets {
+		if strings.TrimSpace(token.UserID) == id {
+			delete(r.passwordResetHash, token.TokenHash)
+			delete(r.passwordResets, resetID)
+		}
+	}
 	for tokenID, token := range r.mcpTokens {
 		if token.OwnerUserID == id {
 			delete(r.mcpTokenHash, token.TokenHash)
@@ -716,6 +734,29 @@ func (r *MemoryRepository) DeleteUserSession(tokenHash string) error {
 		return ErrNotFound
 	}
 	delete(r.sessions, tokenHash)
+	return nil
+}
+
+func (r *MemoryRepository) DeleteUserSessionsByUser(userID string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return ErrNotFound
+	}
+	found := false
+	for tokenHash, session := range r.sessions {
+		if strings.TrimSpace(session.UserID) == userID {
+			delete(r.sessions, tokenHash)
+			found = true
+		}
+	}
+	if !found {
+		if _, ok := r.users[userID]; !ok {
+			return ErrNotFound
+		}
+	}
 	return nil
 }
 
@@ -908,6 +949,135 @@ func (r *MemoryRepository) DeleteEmailVerificationCode(id string) error {
 		return ErrNotFound
 	}
 	delete(r.emailCodes, id)
+	return nil
+}
+
+func (r *MemoryRepository) CreatePasswordResetToken(token core.PasswordResetToken) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	now := time.Now().UTC()
+	token.ID = strings.TrimSpace(token.ID)
+	token.UserID = strings.TrimSpace(token.UserID)
+	token.Email = strings.ToLower(strings.TrimSpace(token.Email))
+	token.TokenHash = strings.TrimSpace(token.TokenHash)
+	if token.ID == "" || token.UserID == "" || token.Email == "" || token.TokenHash == "" {
+		return fmt.Errorf("password reset token is incomplete")
+	}
+	if _, ok := r.users[token.UserID]; !ok {
+		return ErrNotFound
+	}
+	if token.ExpiresAt.IsZero() {
+		return fmt.Errorf("password reset token expiry is required")
+	}
+	if token.CreatedAt.IsZero() {
+		token.CreatedAt = now
+	}
+	token.UpdatedAt = now
+	if existingID, ok := r.passwordResetHash[token.TokenHash]; ok && existingID != token.ID {
+		return fmt.Errorf("password reset token hash already exists")
+	}
+	if existing, ok := r.passwordResets[token.ID]; ok && existing.TokenHash != token.TokenHash {
+		delete(r.passwordResetHash, existing.TokenHash)
+	}
+	r.passwordResets[token.ID] = clonePasswordResetToken(token)
+	r.passwordResetHash[token.TokenHash] = token.ID
+	return nil
+}
+
+func (r *MemoryRepository) GetPasswordResetTokenByHash(tokenHash string) (core.PasswordResetToken, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	id, ok := r.passwordResetHash[strings.TrimSpace(tokenHash)]
+	if !ok {
+		return core.PasswordResetToken{}, ErrNotFound
+	}
+	token, ok := r.passwordResets[id]
+	if !ok {
+		return core.PasswordResetToken{}, ErrNotFound
+	}
+	return clonePasswordResetToken(token), nil
+}
+
+func (r *MemoryRepository) LatestPasswordResetToken(email string) (core.PasswordResetToken, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	email = strings.ToLower(strings.TrimSpace(email))
+	var latest core.PasswordResetToken
+	for _, token := range r.passwordResets {
+		if strings.ToLower(strings.TrimSpace(token.Email)) != email {
+			continue
+		}
+		if latest.ID == "" || token.CreatedAt.After(latest.CreatedAt) {
+			latest = token
+		}
+	}
+	if latest.ID == "" {
+		return core.PasswordResetToken{}, ErrNotFound
+	}
+	return clonePasswordResetToken(latest), nil
+}
+
+func (r *MemoryRepository) CountPasswordResetTokensSince(email string, since time.Time) int {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	email = strings.ToLower(strings.TrimSpace(email))
+	count := 0
+	for _, token := range r.passwordResets {
+		if strings.ToLower(strings.TrimSpace(token.Email)) == email && !token.CreatedAt.Before(since) {
+			count++
+		}
+	}
+	return count
+}
+
+func (r *MemoryRepository) UpdatePasswordResetToken(token core.PasswordResetToken) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	token.ID = strings.TrimSpace(token.ID)
+	if token.ID == "" {
+		return fmt.Errorf("password reset token id is required")
+	}
+	existing, ok := r.passwordResets[token.ID]
+	if !ok {
+		return ErrNotFound
+	}
+	token.UserID = strings.TrimSpace(token.UserID)
+	token.Email = strings.ToLower(strings.TrimSpace(token.Email))
+	token.TokenHash = strings.TrimSpace(token.TokenHash)
+	if token.UserID == "" || token.Email == "" || token.TokenHash == "" {
+		return fmt.Errorf("password reset token is incomplete")
+	}
+	if token.TokenHash != existing.TokenHash {
+		if existingID, ok := r.passwordResetHash[token.TokenHash]; ok && existingID != token.ID {
+			return fmt.Errorf("password reset token hash already exists")
+		}
+		delete(r.passwordResetHash, existing.TokenHash)
+		r.passwordResetHash[token.TokenHash] = token.ID
+	}
+	token.UpdatedAt = time.Now().UTC()
+	r.passwordResets[token.ID] = clonePasswordResetToken(token)
+	return nil
+}
+
+func (r *MemoryRepository) DeletePasswordResetToken(id string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return fmt.Errorf("password reset token id is required")
+	}
+	token, ok := r.passwordResets[id]
+	if !ok {
+		return ErrNotFound
+	}
+	delete(r.passwordResetHash, token.TokenHash)
+	delete(r.passwordResets, id)
 	return nil
 }
 
@@ -4228,6 +4398,12 @@ func cloneEmailVerificationCode(code core.EmailVerificationCode) core.EmailVerif
 	copyCode := code
 	copyCode.UsedAt = cloneTimePtr(code.UsedAt)
 	return copyCode
+}
+
+func clonePasswordResetToken(token core.PasswordResetToken) core.PasswordResetToken {
+	copyToken := token
+	copyToken.UsedAt = cloneTimePtr(token.UsedAt)
+	return copyToken
 }
 
 func emailKey(email string) string {

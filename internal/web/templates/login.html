@@ -7,6 +7,7 @@
         <p class="panel-note">{{t "login_summary"}}</p>
       </div>
     </div>
+    {{if .Notice}}<div class="notice success" data-clear-url-params="notice">{{.Notice}}</div>{{end}}
     {{if .Message}}<div class="notice error">{{.Message}}</div>{{end}}
     <form class="grid-form single-column" method="post" action="/login">
       <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
@@ -46,6 +47,7 @@
       </label>
       <div class="form-actions full-span auth-actions">
         <button type="submit">{{t "login"}}</button>
+        <a class="button-link ghost-link" href="/password/forgot">{{t "forgot_password"}}</a>
         {{if .AllowPublicRegistration}}
         <a class="button-link ghost-link" href="/register">{{t "register"}}</a>
         {{end}}

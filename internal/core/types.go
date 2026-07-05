@@ -1294,6 +1294,17 @@ type EmailVerificationCode struct {
 	UpdatedAt   time.Time
 }
 
+type PasswordResetToken struct {
+	ID        string
+	UserID    string
+	Email     string
+	TokenHash string
+	ExpiresAt time.Time
+	UsedAt    *time.Time
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 type UserOAuthIdentity struct {
 	Provider string
 	Subject  string

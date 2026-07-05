@@ -267,6 +267,42 @@ func TestLogicalBillingRestoreDefaultsOldPlanGroupRatio(t *testing.T) {
 	}
 }
 
+func TestLogicalUserRestoreAcceptsOldBackupWithoutEmailIndexAndPasswordResetTable(t *testing.T) {
+	source := filepath.Join(t.TempDir(), "source.db")
+	target := filepath.Join(t.TempDir(), "target.db")
+	initLogicalTestDB(t, source)
+	initLogicalTestDB(t, target)
+	setLogicalPayload(t, source, "users", "legacy_user", `{"ID":"legacy_user","Username":"legacy","Email":"legacy@example.com"}`)
+	setLogicalPayload(t, target, "users", "stale_user", `{"ID":"stale_user","Username":"stale","Email":"stale@example.com"}`)
+	setLogicalPasswordResetToken(t, target, "stale_reset", "stale_user", "stale@example.com")
+
+	var buf bytes.Buffer
+	if _, err := Write(&buf, Options{StatePath: source, DataSets: []string{DataSetUsers}}); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	oldBackup := removeLogicalBackupColumn(t, buf.Bytes(), "users", "email_key")
+	oldBackup = removeLogicalBackupTable(t, oldBackup, "password_reset_tokens")
+	if err := ReadAndRestore(bytes.NewReader(oldBackup), Options{StatePath: target, DataSets: []string{DataSetUsers}}); err != nil {
+		t.Fatalf("ReadAndRestore returned error: %v", err)
+	}
+
+	repo, err := storage.NewSQLiteRepository(target, "")
+	if err != nil {
+		t.Fatalf("NewSQLiteRepository target returned error: %v", err)
+	}
+	defer repo.Close()
+	user, err := repo.FindUserByEmail("Legacy@Example.com")
+	if err != nil {
+		t.Fatalf("FindUserByEmail returned error: %v", err)
+	}
+	if user.ID != "legacy_user" {
+		t.Fatalf("restored user ID = %q, want legacy_user", user.ID)
+	}
+	if got := countRows(t, target, "password_reset_tokens"); got != 0 {
+		t.Fatalf("password_reset_tokens count = %d, want 0 for old backup without table", got)
+	}
+}
+
 func TestSQLitePhysicalBackupUsesSnapshotWithoutSidecars(t *testing.T) {
 	source := filepath.Join(t.TempDir(), "source.db")
 	initPhysicalTestDB(t, source, map[string]string{"before": "1"})
@@ -333,7 +369,7 @@ func TestLogicalDataSetsIncludeRuntimeTables(t *testing.T) {
 	if !containsString(tablesForDataSets([]string{DataSetUsers}), "mcp_tokens") {
 		t.Fatalf("users tables = %#v, want mcp_tokens", tablesForDataSets([]string{DataSetUsers}))
 	}
-	for _, table := range []string{"user_oauth_identities", "user_invitation_codes"} {
+	for _, table := range []string{"user_oauth_identities", "user_invitation_codes", "password_reset_tokens"} {
 		if !containsString(tablesForDataSets([]string{DataSetUsers}), table) {
 			t.Fatalf("users tables = %#v, want %s", tablesForDataSets([]string{DataSetUsers}), table)
 		}
@@ -341,7 +377,7 @@ func TestLogicalDataSetsIncludeRuntimeTables(t *testing.T) {
 	if !postgresForeignKeyChecksContain("mcp_tokens", "owner_user_id", "users") {
 		t.Fatalf("postgres FK checks = %#v, want mcp_tokens.owner_user_id -> users.id", postgresForeignKeyChecks)
 	}
-	for _, table := range []string{"user_oauth_identities", "user_invitation_codes"} {
+	for _, table := range []string{"user_oauth_identities", "user_invitation_codes", "password_reset_tokens"} {
 		if !postgresForeignKeyChecksContain(table, "user_id", "users") {
 			t.Fatalf("postgres FK checks = %#v, want %s.user_id -> users.id", postgresForeignKeyChecks, table)
 		}
@@ -1588,6 +1624,23 @@ func setLogicalPayload(t *testing.T, path, table, id, payload string) {
 	}
 }
 
+func setLogicalPasswordResetToken(t *testing.T, path, id, userID, email string) {
+	t.Helper()
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	nowNS := time.Now().UTC().UnixNano()
+	payload := `{"ID":"` + id + `","UserID":"` + userID + `","Email":"` + email + `","TokenHash":"hash_` + id + `"}`
+	if _, err := db.Exec(`
+		INSERT OR REPLACE INTO password_reset_tokens(id, token_hash, user_id, email_key, expires_at_ns, created_at_ns, updated_at_ns, payload)
+		VALUES(?, ?, ?, ?, ?, ?, ?, ?)
+	`, id, "hash_"+id, userID, strings.ToLower(strings.TrimSpace(email)), nowNS+int64(time.Hour), nowNS, nowNS, payload); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func getLogicalPayload(t *testing.T, path, table, keyColumn, key string) string {
 	t.Helper()
 	db, err := sql.Open("sqlite", path)
@@ -1707,6 +1760,70 @@ func removeLogicalBackupColumn(t *testing.T, rawBackup []byte, tableName, column
 					table.Rows[rowIndex] = append(row[:columnIndex], row[columnIndex+1:]...)
 				}
 			}
+			body, err = json.Marshal(payload)
+			if err != nil {
+				t.Fatal(err)
+			}
+			header.Size = int64(len(body))
+		}
+		if err := tw.WriteHeader(header); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tw.Write(body); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := outGz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return out.Bytes()
+}
+
+func removeLogicalBackupTable(t *testing.T, rawBackup []byte, tableName string) []byte {
+	t.Helper()
+	gz, err := gzip.NewReader(bytes.NewReader(rawBackup))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer gz.Close()
+
+	var out bytes.Buffer
+	outGz := gzip.NewWriter(&out)
+	tw := tar.NewWriter(outGz)
+	tr := tar.NewReader(gz)
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, err := io.ReadAll(tr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if header.Name == "data/logical.json" {
+			var payload logicalDataBackup
+			if err := json.Unmarshal(body, &payload); err != nil {
+				t.Fatal(err)
+			}
+			found := false
+			tables := payload.Tables[:0]
+			for _, table := range payload.Tables {
+				if table.Name == tableName {
+					found = true
+					continue
+				}
+				tables = append(tables, table)
+			}
+			if !found {
+				t.Fatalf("table %s not found in logical backup", tableName)
+			}
+			payload.Tables = tables
 			body, err = json.Marshal(payload)
 			if err != nil {
 				t.Fatal(err)

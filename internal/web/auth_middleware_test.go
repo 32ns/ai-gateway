@@ -8423,6 +8423,184 @@ func TestLoginPageShowsEnabledOAuthProviders(t *testing.T) {
 	}
 }
 
+func TestPasswordResetFlowSendsLinkAndUpdatesPassword(t *testing.T) {
+	type sentEmail struct {
+		Subject string
+		Text    string
+	}
+	sent := make(chan sentEmail, 1)
+	cloudmail := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/login":
+			_, _ = w.Write([]byte(`{"code":200,"data":{"token":"cloud-token"}}`))
+		case "/api/account/list":
+			_, _ = w.Write([]byte(`{"code":200,"data":[{"accountId":2,"email":"mail@example.com"}]}`))
+		case "/api/email/send":
+			var payload struct {
+				ReceiveEmail []string `json:"receiveEmail"`
+				Subject      string   `json:"subject"`
+				Text         string   `json:"text"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				t.Errorf("decode reset email payload: %v", err)
+			}
+			if len(payload.ReceiveEmail) != 1 || payload.ReceiveEmail[0] != "alice@example.com" {
+				t.Errorf("receiveEmail = %#v", payload.ReceiveEmail)
+			}
+			sent <- sentEmail{Subject: payload.Subject, Text: payload.Text}
+			_, _ = w.Write([]byte(`{"code":200,"data":{"emailId":1}}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer cloudmail.Close()
+
+	repo := storage.NewMemoryRepository()
+	registry := providers.NewRegistry(&providers.OpenAIAdapter{}, &providers.ClaudeAdapter{})
+	control := controlplane.New(repo, registry)
+	settings := core.DefaultSystemSettings()
+	settings.Runtime.PublicBaseURL = "https://gateway.example.com"
+	settings.Email.Provider = core.EmailProviderCloudMail
+	settings.Email.CloudMailBaseURL = cloudmail.URL
+	settings.Email.CloudMailEmail = "mail@example.com"
+	settings.Email.CloudMailPassword = "secret"
+	settings.Email.CloudMailAccountID = 2
+	settings.Email.CodeTTLSeconds = 600
+	settings.Email.SendCooldownSeconds = 10
+	settings.Email.HourlySendLimit = 5
+	if _, err := control.UpdateSystemSettings(settings); err != nil {
+		t.Fatalf("UpdateSystemSettings returned error: %v", err)
+	}
+	createdUser, err := control.CreateUser(controlplane.UserInput{
+		Username:      "alice",
+		Password:      "old-secret",
+		Role:          core.UserRoleUser,
+		Enabled:       true,
+		Email:         "alice@example.com",
+		EmailVerified: true,
+	})
+	if err != nil {
+		t.Fatalf("CreateUser returned error: %v", err)
+	}
+	oldSessionToken, _, err := control.CreateUserSession(createdUser.ID)
+	if err != nil {
+		t.Fatalf("CreateUserSession returned error: %v", err)
+	}
+	server := NewServer(control, nil, "data/state.db")
+	handler := server.Handler()
+
+	loginReq := httptest.NewRequest(http.MethodGet, "/login", nil)
+	loginRec := httptest.NewRecorder()
+	handler.ServeHTTP(loginRec, loginReq)
+	if !strings.Contains(loginRec.Body.String(), `href="/password/forgot"`) {
+		t.Fatalf("login page missing forgot password link: %s", loginRec.Body.String())
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/password/forgot", nil)
+	getRec := httptest.NewRecorder()
+	handler.ServeHTTP(getRec, getReq)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("forgot get status = %d, want %d body=%s", getRec.Code, http.StatusOK, getRec.Body.String())
+	}
+	csrfCookie, ok := responseCookie(getRec.Result(), consoleCSRFCookieName)
+	if !ok {
+		t.Fatal("expected csrf cookie")
+	}
+	form := url.Values{}
+	form.Set("csrf_token", csrfCookie.Value)
+	form.Set("email", "Alice@Example.COM")
+	postReq := httptest.NewRequest(http.MethodPost, "/password/forgot", strings.NewReader(form.Encode()))
+	postReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	postReq.AddCookie(csrfCookie)
+	postRec := httptest.NewRecorder()
+	handler.ServeHTTP(postRec, postReq)
+	if postRec.Code != http.StatusOK {
+		t.Fatalf("forgot post status = %d, want %d body=%s", postRec.Code, http.StatusOK, postRec.Body.String())
+	}
+	if !strings.Contains(postRec.Body.String(), "password reset link has been sent") {
+		t.Fatalf("forgot post missing generic success: %s", postRec.Body.String())
+	}
+
+	var email sentEmail
+	select {
+	case email = <-sent:
+	case <-time.After(time.Second):
+		t.Fatal("password reset email was not sent")
+	}
+	if !strings.Contains(email.Subject, "Reset your") {
+		t.Fatalf("reset email subject = %q", email.Subject)
+	}
+	resetLink := extractPasswordResetLink(t, email.Text)
+	if !strings.HasPrefix(resetLink, "https://gateway.example.com/password/reset?token=") {
+		t.Fatalf("reset link = %q", resetLink)
+	}
+	parsedLink, err := url.Parse(resetLink)
+	if err != nil {
+		t.Fatalf("parse reset link: %v", err)
+	}
+	token := parsedLink.Query().Get("token")
+	if token == "" {
+		t.Fatalf("reset link missing token: %q", resetLink)
+	}
+
+	resetGetReq := httptest.NewRequest(http.MethodGet, "/password/reset?token="+url.QueryEscape(token), nil)
+	resetGetRec := httptest.NewRecorder()
+	handler.ServeHTTP(resetGetRec, resetGetReq)
+	if resetGetRec.Code != http.StatusOK {
+		t.Fatalf("reset get status = %d, want %d body=%s", resetGetRec.Code, http.StatusOK, resetGetRec.Body.String())
+	}
+	resetCSRFCookie, ok := responseCookie(resetGetRec.Result(), consoleCSRFCookieName)
+	if !ok {
+		t.Fatal("expected reset csrf cookie")
+	}
+
+	resetForm := url.Values{}
+	resetForm.Set("csrf_token", resetCSRFCookie.Value)
+	resetForm.Set("token", token)
+	resetForm.Set("new_password", "new-secret")
+	resetForm.Set("new_password_confirm", "new-secret")
+	resetPostReq := httptest.NewRequest(http.MethodPost, "/password/reset", strings.NewReader(resetForm.Encode()))
+	resetPostReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resetPostReq.AddCookie(resetCSRFCookie)
+	resetPostRec := httptest.NewRecorder()
+	handler.ServeHTTP(resetPostRec, resetPostReq)
+	if resetPostRec.Code != http.StatusSeeOther {
+		t.Fatalf("reset post status = %d, want %d body=%s", resetPostRec.Code, http.StatusSeeOther, resetPostRec.Body.String())
+	}
+	if location := resetPostRec.Header().Get("Location"); !strings.HasPrefix(location, "/login?") || !strings.Contains(location, "notice=") {
+		t.Fatalf("reset post Location = %q", location)
+	}
+	if _, err := control.AuthenticateUser("alice", "old-secret"); err == nil {
+		t.Fatal("old password should not authenticate after reset")
+	}
+	if _, err := control.AuthenticateUser("alice", "new-secret"); err != nil {
+		t.Fatalf("new password should authenticate: %v", err)
+	}
+	if _, err := control.UserBySessionToken(oldSessionToken); err == nil {
+		t.Fatal("old session should be invalidated after password reset")
+	}
+
+	reuseReq := httptest.NewRequest(http.MethodGet, "/password/reset?token="+url.QueryEscape(token), nil)
+	reuseRec := httptest.NewRecorder()
+	handler.ServeHTTP(reuseRec, reuseReq)
+	if reuseRec.Code != http.StatusBadRequest || !strings.Contains(reuseRec.Body.String(), "invalid or has expired") {
+		t.Fatalf("used token response = %d body=%s", reuseRec.Code, reuseRec.Body.String())
+	}
+}
+
+func extractPasswordResetLink(t *testing.T, body string) string {
+	t.Helper()
+	for _, field := range strings.Fields(body) {
+		field = strings.TrimSpace(field)
+		field = strings.TrimRight(field, ".,)")
+		if strings.Contains(field, "/password/reset?token=") {
+			return field
+		}
+	}
+	t.Fatalf("reset email body missing reset link: %q", body)
+	return ""
+}
+
 func TestLoginOAuthStartRedirectsToProvider(t *testing.T) {
 	repo := storage.NewMemoryRepository()
 	settings := core.DefaultSystemSettings()

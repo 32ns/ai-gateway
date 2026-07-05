@@ -201,11 +201,12 @@ func upsertUserMetadataTx(tx *sql.Tx, user core.User) error {
 		enabled = 1
 	}
 	_, err = tx.Exec(
-		`INSERT INTO users(id, username_key, username, role, enabled, inviter_user_id, created_at_ns, updated_at_ns, last_login_at_ns, payload)
-		VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`INSERT INTO users(id, username_key, username, email_key, role, enabled, inviter_user_id, created_at_ns, updated_at_ns, last_login_at_ns, payload)
+		VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			username_key = excluded.username_key,
 			username = excluded.username,
+			email_key = excluded.email_key,
 			role = excluded.role,
 			enabled = excluded.enabled,
 			inviter_user_id = excluded.inviter_user_id,
@@ -216,6 +217,7 @@ func upsertUserMetadataTx(tx *sql.Tx, user core.User) error {
 		user.ID,
 		usernameKey(user.Username),
 		strings.TrimSpace(user.Username),
+		emailKey(user.Email),
 		string(user.Role),
 		enabled,
 		strings.TrimSpace(user.InviterUserID),
@@ -579,6 +581,9 @@ func (r *SQLiteRepository) deleteUserDataTx(tx *sql.Tx, userID, email string, cl
 	if _, err := tx.Exec(`DELETE FROM user_sessions WHERE user_id = ?`, userID); err != nil {
 		return err
 	}
+	if _, err := tx.Exec(`DELETE FROM password_reset_tokens WHERE user_id = ?`, userID); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(`DELETE FROM site_message_reads WHERE user_id = ?`, userID); err != nil {
 		return err
 	}
@@ -733,6 +738,26 @@ func (r *SQLiteRepository) DeleteUserSession(tokenHash string) error {
 	return nil
 }
 
+func (r *SQLiteRepository) DeleteUserSessionsByUser(userID string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return ErrNotFound
+	}
+	result, err := r.db.Exec(`DELETE FROM user_sessions WHERE user_id = ?`, userID)
+	if err != nil {
+		return err
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		if _, err := r.getPayloadByID("users", userID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (r *SQLiteRepository) DeleteExpiredUserSessions(now time.Time) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -850,6 +875,161 @@ func (r *SQLiteRepository) DeleteEmailVerificationCode(id string) error {
 		return fmt.Errorf("email verification code id is required")
 	}
 	result, err := r.db.Exec(`DELETE FROM email_verification_codes WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (r *SQLiteRepository) CreatePasswordResetToken(token core.PasswordResetToken) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	now := time.Now().UTC()
+	token.ID = strings.TrimSpace(token.ID)
+	token.UserID = strings.TrimSpace(token.UserID)
+	token.Email = strings.ToLower(strings.TrimSpace(token.Email))
+	token.TokenHash = strings.TrimSpace(token.TokenHash)
+	if token.ID == "" || token.UserID == "" || token.Email == "" || token.TokenHash == "" {
+		return fmt.Errorf("password reset token is incomplete")
+	}
+	if token.ExpiresAt.IsZero() {
+		return fmt.Errorf("password reset token expiry is required")
+	}
+	if token.CreatedAt.IsZero() {
+		token.CreatedAt = now
+	}
+	token.UpdatedAt = now
+	payload, err := json.Marshal(clonePasswordResetToken(token))
+	if err != nil {
+		return err
+	}
+	_, err = r.db.Exec(
+		`INSERT INTO password_reset_tokens(id, token_hash, user_id, email_key, expires_at_ns, used_at_ns, created_at_ns, updated_at_ns, payload)
+		VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		token.ID,
+		token.TokenHash,
+		token.UserID,
+		emailKey(token.Email),
+		sqliteTimeNS(token.ExpiresAt),
+		sqliteTimeNS(valueTime(token.UsedAt)),
+		sqliteTimeNS(token.CreatedAt),
+		sqliteTimeNS(token.UpdatedAt),
+		string(payload),
+	)
+	return err
+}
+
+func (r *SQLiteRepository) GetPasswordResetTokenByHash(tokenHash string) (core.PasswordResetToken, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var payload string
+	err := r.db.QueryRow(`SELECT payload FROM password_reset_tokens WHERE token_hash = ?`, strings.TrimSpace(tokenHash)).Scan(&payload)
+	if errors.Is(err, sql.ErrNoRows) {
+		return core.PasswordResetToken{}, ErrNotFound
+	}
+	if err != nil {
+		return core.PasswordResetToken{}, err
+	}
+	var token core.PasswordResetToken
+	if err := json.Unmarshal([]byte(payload), &token); err != nil {
+		return core.PasswordResetToken{}, err
+	}
+	return clonePasswordResetToken(token), nil
+}
+
+func (r *SQLiteRepository) LatestPasswordResetToken(email string) (core.PasswordResetToken, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var payload string
+	err := r.db.QueryRow(
+		`SELECT payload FROM password_reset_tokens WHERE email_key = ? ORDER BY created_at_ns DESC LIMIT 1`,
+		emailKey(email),
+	).Scan(&payload)
+	if errors.Is(err, sql.ErrNoRows) {
+		return core.PasswordResetToken{}, ErrNotFound
+	}
+	if err != nil {
+		return core.PasswordResetToken{}, err
+	}
+	var token core.PasswordResetToken
+	if err := json.Unmarshal([]byte(payload), &token); err != nil {
+		return core.PasswordResetToken{}, err
+	}
+	return clonePasswordResetToken(token), nil
+}
+
+func (r *SQLiteRepository) CountPasswordResetTokensSince(email string, since time.Time) int {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var count int
+	if err := r.db.QueryRow(
+		`SELECT COUNT(*) FROM password_reset_tokens WHERE email_key = ? AND created_at_ns >= ?`,
+		emailKey(email),
+		sqliteTimeNS(since),
+	).Scan(&count); err != nil {
+		return 0
+	}
+	return count
+}
+
+func (r *SQLiteRepository) UpdatePasswordResetToken(token core.PasswordResetToken) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	token.ID = strings.TrimSpace(token.ID)
+	if token.ID == "" {
+		return fmt.Errorf("password reset token id is required")
+	}
+	token.UserID = strings.TrimSpace(token.UserID)
+	token.Email = strings.ToLower(strings.TrimSpace(token.Email))
+	token.TokenHash = strings.TrimSpace(token.TokenHash)
+	if token.UserID == "" || token.Email == "" || token.TokenHash == "" {
+		return fmt.Errorf("password reset token is incomplete")
+	}
+	token.UpdatedAt = time.Now().UTC()
+	payload, err := json.Marshal(clonePasswordResetToken(token))
+	if err != nil {
+		return err
+	}
+	result, err := r.db.Exec(
+		`UPDATE password_reset_tokens
+		SET token_hash = ?, user_id = ?, email_key = ?, expires_at_ns = ?, used_at_ns = ?, created_at_ns = ?, updated_at_ns = ?, payload = ?
+		WHERE id = ?`,
+		token.TokenHash,
+		token.UserID,
+		emailKey(token.Email),
+		sqliteTimeNS(token.ExpiresAt),
+		sqliteTimeNS(valueTime(token.UsedAt)),
+		sqliteTimeNS(token.CreatedAt),
+		sqliteTimeNS(token.UpdatedAt),
+		string(payload),
+		token.ID,
+	)
+	if err != nil {
+		return err
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (r *SQLiteRepository) DeletePasswordResetToken(id string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return fmt.Errorf("password reset token id is required")
+	}
+	result, err := r.db.Exec(`DELETE FROM password_reset_tokens WHERE id = ?`, id)
 	if err != nil {
 		return err
 	}
