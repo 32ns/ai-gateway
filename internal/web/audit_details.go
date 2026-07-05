@@ -181,6 +181,9 @@ func auditActionSummaryLines(locale string, event core.AuditEvent, fields []audi
 		if limit := strings.TrimSpace(values["plan_concurrent_request_limit"]); limit != "" {
 			parts = append(parts, auditStaticLabel(locale, "套餐并发请求上限：", "Plan concurrent request limit: ")+limit)
 		}
+		if limit := strings.TrimSpace(values["user_ip_concurrent_request_limit"]); limit != "" {
+			parts = append(parts, auditStaticLabel(locale, "单用户同 IP 并发请求上限：", "Per-user same-IP concurrent request limit: ")+limit)
+		}
 		if len(parts) > 0 {
 			return []auditDetailLine{{Label: auditChangeLabel(locale), Value: strings.Join(parts, auditStaticLabel(locale, "；", "; "))}}
 		}
@@ -659,6 +662,8 @@ func auditExtendedMessageFieldLabel(locale, key string) string {
 		return auditStaticLabel(locale, "用户并发请求上限", "Per-user concurrent request limit")
 	case "plan_concurrent_request_limit":
 		return auditStaticLabel(locale, "套餐并发请求上限", "Plan concurrent request limit")
+	case "user_ip_concurrent_request_limit":
+		return auditStaticLabel(locale, "单用户同 IP 并发请求上限", "Per-user same-IP concurrent request limit")
 	case "user_request_rate_limit_per_minute":
 		return auditStaticLabel(locale, "用户请求速率上限（次/分钟）", "Per-user request rate per minute")
 	case "user_concurrent_request_limit_override":

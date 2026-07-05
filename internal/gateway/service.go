@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/netip"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -34,6 +36,7 @@ type Service struct {
 	userConcurrencyMu sync.Mutex
 	userConcurrency   map[string]int
 	planConcurrency   map[string]int
+	userIPConcurrency map[string]int
 	userRateMu        sync.Mutex
 	userRateNext      map[string]time.Time
 	userRateCleanupAt time.Time
@@ -73,6 +76,8 @@ const maxPreOutputSameAccountStreamRetries = 1
 var ErrModelUnavailable = errors.New("model unavailable")
 var ErrUserConcurrentRequestLimitExceeded = errors.New("user concurrent request limit exceeded")
 var ErrPlanConcurrentRequestLimitExceeded = errors.New("plan concurrent request limit exceeded")
+var ErrUserIPConcurrentRequestLimitExceeded = errors.New("user ip concurrent request limit exceeded")
+var ErrUserRequestRateLimitExceeded = errors.New("user request rate limit exceeded")
 
 func streamEventRecordsFirstOutput(event *core.StreamEvent) bool {
 	if event == nil || streamEventIsResponsesCompletionSignal(event.RawEvent) {
@@ -877,12 +882,13 @@ func (e *AccessError) Unwrap() error {
 
 func New(repo storage.Repository, router *routing.Router, engine *failover.Engine) *Service {
 	return &Service{
-		repo:            repo,
-		router:          router,
-		failover:        engine,
-		userConcurrency: make(map[string]int),
-		planConcurrency: make(map[string]int),
-		userRateNext:    make(map[string]time.Time),
+		repo:              repo,
+		router:            router,
+		failover:          engine,
+		userConcurrency:   make(map[string]int),
+		planConcurrency:   make(map[string]int),
+		userIPConcurrency: make(map[string]int),
+		userRateNext:      make(map[string]time.Time),
 	}
 }
 
@@ -956,7 +962,7 @@ func (s *Service) userConcurrentRequestLimit(client *core.APIClient) int {
 	return *user.ConcurrentRequestLimitOverride
 }
 
-func (s *Service) reserveUserConcurrentRequestSlot(client *core.APIClient) (func(), error) {
+func (s *Service) reserveUserConcurrentRequestSlot(client *core.APIClient, clientIP string) (func(), error) {
 	releaseUser, err := s.reserveUserConcurrencySlot(client)
 	if err != nil {
 		return func() {}, err
@@ -966,18 +972,25 @@ func (s *Service) reserveUserConcurrentRequestSlot(client *core.APIClient) (func
 		releaseUser()
 		return func() {}, err
 	}
+	releaseUserIP, err := s.reserveUserIPConcurrencySlot(client, clientIP)
+	if err != nil {
+		releasePlan()
+		releaseUser()
+		return func() {}, err
+	}
 	return func() {
+		releaseUserIP()
 		releasePlan()
 		releaseUser()
 	}, nil
 }
 
-func (s *Service) reserveUserRequestSlot(ctx context.Context, client *core.APIClient) (func(), error) {
-	release, err := s.reserveUserConcurrentRequestSlot(client)
+func (s *Service) reserveUserRequestSlot(_ context.Context, client *core.APIClient, clientIP string) (func(), error) {
+	release, err := s.reserveUserConcurrentRequestSlot(client, clientIP)
 	if err != nil {
 		return func() {}, err
 	}
-	if err := s.waitUserRequestRate(ctx, client); err != nil {
+	if err := s.reserveUserRequestRateSlot(client); err != nil {
 		release()
 		return func() {}, err
 	}
@@ -1085,6 +1098,61 @@ func (s *Service) reservePlanConcurrencySlot(client *core.APIClient) (func(), er
 	}, nil
 }
 
+func (s *Service) userIPConcurrentRequestLimit() int {
+	limit := s.currentSystemSettings().Runtime.UserIPConcurrentRequestLimit
+	if limit < 0 {
+		return 0
+	}
+	return limit
+}
+
+func (s *Service) reserveUserIPConcurrencySlot(client *core.APIClient, clientIP string) (func(), error) {
+	limit := s.userIPConcurrentRequestLimit()
+	if limit <= 0 {
+		return func() {}, nil
+	}
+	key := userIPConcurrencyKey(client, clientIP)
+	if key == "" {
+		return func() {}, nil
+	}
+
+	s.userConcurrencyMu.Lock()
+	defer s.userConcurrencyMu.Unlock()
+	if s.userIPConcurrency == nil {
+		s.userIPConcurrency = make(map[string]int)
+	}
+	active := s.userIPConcurrency[key]
+	if active >= limit {
+		return func() {}, &ConcurrencyLimitError{
+			StatusCode: http.StatusTooManyRequests,
+			Code:       ErrorCodeRateLimitExceeded,
+			Message:    "too many concurrent requests for this user ip",
+			Scope:      "user_ip",
+			UserKey:    key,
+			Limit:      limit,
+			Active:     active,
+			Err:        ErrUserIPConcurrentRequestLimitExceeded,
+		}
+	}
+	s.userIPConcurrency[key] = active + 1
+	released := false
+	return func() {
+		if released {
+			return
+		}
+		released = true
+		s.userConcurrencyMu.Lock()
+		defer s.userConcurrencyMu.Unlock()
+		active := s.userIPConcurrency[key]
+		switch {
+		case active <= 1:
+			delete(s.userIPConcurrency, key)
+		default:
+			s.userIPConcurrency[key] = active - 1
+		}
+	}, nil
+}
+
 func (s *Service) userRequestRateLimitPerMinute(client *core.APIClient) int {
 	limit := s.currentSystemSettings().Runtime.UserRequestRateLimitPerMinute
 	if s == nil || s.repo == nil || client == nil {
@@ -1114,7 +1182,7 @@ func (s *Service) userRequestRateLimitPerMinute(client *core.APIClient) int {
 	return limit
 }
 
-func (s *Service) waitUserRequestRate(ctx context.Context, client *core.APIClient) error {
+func (s *Service) reserveUserRequestRateSlot(client *core.APIClient) error {
 	if s == nil {
 		return nil
 	}
@@ -1125,9 +1193,6 @@ func (s *Service) waitUserRequestRate(ctx context.Context, client *core.APIClien
 	key := userConcurrencyKey(client)
 	if key == "" {
 		return nil
-	}
-	if ctx == nil {
-		ctx = context.Background()
 	}
 	interval := time.Minute / time.Duration(limit)
 	if interval <= 0 {
@@ -1140,46 +1205,22 @@ func (s *Service) waitUserRequestRate(ctx context.Context, client *core.APIClien
 		s.userRateNext = make(map[string]time.Time)
 	}
 	s.cleanupUserRequestRateLocked(now)
-	scheduled := s.userRateNext[key]
-	if scheduled.Before(now) {
-		scheduled = now
+	nextAllowed := s.userRateNext[key]
+	if nextAllowed.After(now) {
+		s.userRateMu.Unlock()
+		return &ConcurrencyLimitError{
+			StatusCode: http.StatusTooManyRequests,
+			Code:       ErrorCodeRateLimitExceeded,
+			Message:    "too many requests for this user",
+			Scope:      "rate",
+			UserKey:    key,
+			Limit:      limit,
+			Err:        ErrUserRequestRateLimitExceeded,
+		}
 	}
-	next := scheduled.Add(interval)
-	s.userRateNext[key] = next
+	s.userRateNext[key] = now.Add(interval)
 	s.userRateMu.Unlock()
-
-	if !scheduled.After(now) {
-		return nil
-	}
-	timer := time.NewTimer(time.Until(scheduled))
-	defer timer.Stop()
-	select {
-	case <-timer.C:
-		return nil
-	case <-ctx.Done():
-		s.rollbackUserRequestRate(key, scheduled, next)
-		return ctx.Err()
-	}
-}
-
-func (s *Service) rollbackUserRequestRate(key string, scheduled, next time.Time) {
-	if s == nil || strings.TrimSpace(key) == "" {
-		return
-	}
-	s.userRateMu.Lock()
-	defer s.userRateMu.Unlock()
-	if s.userRateNext == nil {
-		return
-	}
-	current := s.userRateNext[key]
-	if !current.Equal(next) {
-		return
-	}
-	if scheduled.After(time.Now()) {
-		s.userRateNext[key] = scheduled
-		return
-	}
-	delete(s.userRateNext, key)
+	return nil
 }
 
 func (s *Service) cleanupUserRequestRateLocked(now time.Time) {
@@ -1207,6 +1248,36 @@ func userConcurrencyKey(client *core.APIClient) string {
 	return strings.TrimSpace(client.ID)
 }
 
+func userIPConcurrencyKey(client *core.APIClient, clientIP string) string {
+	userKey := userConcurrencyKey(client)
+	if userKey == "" {
+		return ""
+	}
+	ip := normalizeUserIPConcurrencyIP(clientIP)
+	if ip == "" {
+		return ""
+	}
+	return userKey + "\x00" + ip
+}
+
+func normalizeUserIPConcurrencyIP(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	if host, _, err := net.SplitHostPort(value); err == nil {
+		value = host
+	}
+	value = strings.Trim(strings.TrimSpace(value), "[]")
+	if value == "" {
+		return ""
+	}
+	if addr, err := netip.ParseAddr(value); err == nil {
+		return addr.String()
+	}
+	return value
+}
+
 func (s *Service) Execute(ctx context.Context, req *core.GatewayRequest) (*core.GatewayResponse, error) {
 	requestID := s.newRequestID()
 	requestedModel := strings.TrimSpace(req.Model)
@@ -1215,7 +1286,7 @@ func (s *Service) Execute(ctx context.Context, req *core.GatewayRequest) (*core.
 	if err != nil {
 		return nil, err
 	}
-	release, err := s.reserveUserRequestSlot(ctx, client)
+	release, err := s.reserveUserRequestSlot(ctx, client, req.ClientIP)
 	if err != nil {
 		return nil, err
 	}
@@ -1300,7 +1371,7 @@ func (s *Service) Embed(ctx context.Context, req *core.EmbeddingRequest) (*core.
 	if err != nil {
 		return nil, err
 	}
-	release, err := s.reserveUserRequestSlot(ctx, client)
+	release, err := s.reserveUserRequestSlot(ctx, client, req.ClientIP)
 	if err != nil {
 		return nil, err
 	}
@@ -1385,7 +1456,7 @@ func (s *Service) Moderate(ctx context.Context, req *core.ModerationRequest) (*c
 	if err != nil {
 		return nil, err
 	}
-	release, err := s.reserveUserRequestSlot(ctx, client)
+	release, err := s.reserveUserRequestSlot(ctx, client, req.ClientIP)
 	if err != nil {
 		return nil, err
 	}
@@ -1469,7 +1540,7 @@ func (s *Service) GenerateImage(ctx context.Context, req *core.ImageGenerationRe
 	if err != nil {
 		return nil, err
 	}
-	release, err := s.reserveUserRequestSlot(ctx, client)
+	release, err := s.reserveUserRequestSlot(ctx, client, req.ClientIP)
 	if err != nil {
 		return nil, err
 	}
@@ -1554,7 +1625,7 @@ func (s *Service) StreamImageGeneration(ctx context.Context, req *core.ImageGene
 	if err != nil {
 		return err
 	}
-	release, err := s.reserveUserRequestSlot(ctx, client)
+	release, err := s.reserveUserRequestSlot(ctx, client, req.ClientIP)
 	if err != nil {
 		return err
 	}
@@ -1675,7 +1746,7 @@ func (s *Service) ProcessImageMultipart(ctx context.Context, req *core.ImageMult
 	if err != nil {
 		return nil, err
 	}
-	release, err := s.reserveUserRequestSlot(ctx, client)
+	release, err := s.reserveUserRequestSlot(ctx, client, req.ClientIP)
 	if err != nil {
 		return nil, err
 	}
@@ -1760,7 +1831,7 @@ func (s *Service) StreamImageMultipart(ctx context.Context, req *core.ImageMulti
 	if err != nil {
 		return err
 	}
-	release, err := s.reserveUserRequestSlot(ctx, client)
+	release, err := s.reserveUserRequestSlot(ctx, client, req.ClientIP)
 	if err != nil {
 		return err
 	}
@@ -1881,7 +1952,7 @@ func (s *Service) CreateSpeech(ctx context.Context, req *core.AudioSpeechRequest
 	if err != nil {
 		return nil, err
 	}
-	release, err := s.reserveUserRequestSlot(ctx, client)
+	release, err := s.reserveUserRequestSlot(ctx, client, req.ClientIP)
 	if err != nil {
 		return nil, err
 	}
@@ -1965,7 +2036,7 @@ func (s *Service) ProcessAudioMultipart(ctx context.Context, req *core.AudioMult
 	if err != nil {
 		return nil, err
 	}
-	release, err := s.reserveUserRequestSlot(ctx, client)
+	release, err := s.reserveUserRequestSlot(ctx, client, req.ClientIP)
 	if err != nil {
 		return nil, err
 	}
@@ -2049,7 +2120,7 @@ func (s *Service) CountTokens(ctx context.Context, req *core.TokenCountRequest) 
 	if err != nil {
 		return nil, err
 	}
-	release, err := s.reserveUserRequestSlot(ctx, client)
+	release, err := s.reserveUserRequestSlot(ctx, client, req.ClientIP)
 	if err != nil {
 		return nil, err
 	}
@@ -2134,7 +2205,7 @@ func (s *Service) ExecuteStream(ctx context.Context, req *core.GatewayRequest, e
 	if err != nil {
 		return err
 	}
-	release, err := s.reserveUserRequestSlot(ctx, client)
+	release, err := s.reserveUserRequestSlot(ctx, client, req.ClientIP)
 	if err != nil {
 		return err
 	}

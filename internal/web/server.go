@@ -1007,6 +1007,7 @@ func systemSettingsFromForm(r *http.Request, existing core.SystemSettings) core.
 		RegistrationEmailAllowlist:        parseEmailListFormValue(r.FormValue("registration_email_allowlist")),
 		UserConcurrentRequestLimit:        parseIntFormValue(r.FormValue("user_concurrent_request_limit")),
 		PlanConcurrentRequestLimit:        parseIntFormValue(r.FormValue("plan_concurrent_request_limit")),
+		UserIPConcurrentRequestLimit:      parseIntFormValue(r.FormValue("user_ip_concurrent_request_limit")),
 		UserRequestRateLimitPerMinute:     parseIntFormValue(r.FormValue("user_request_rate_limit_per_minute")),
 		ResponsesWebSocketUpstreamEnabled: responsesWebSocketUpstreamEnabled,
 	}

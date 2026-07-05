@@ -99,7 +99,7 @@ func (s *ResponsesWebSocketSession) Execute(ctx context.Context, req *core.Respo
 		return service.executeResponsesStream(ctx, req, emit, true)
 	}
 
-	release, err := service.reserveUserRequestSlot(ctx, client)
+	release, err := service.reserveUserRequestSlot(ctx, client, req.ClientIP)
 	if err != nil {
 		return err
 	}

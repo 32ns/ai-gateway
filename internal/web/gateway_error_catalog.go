@@ -70,7 +70,7 @@ func gatewayErrorCatalog(locale string) []gatewayErrorGroup {
 				errorCode(gateway.ErrorCodeBillingAmountOverflow, text("计费", "Billing"), text("计费金额超过可处理范围", "Billing amount exceeds the supported range")),
 				errorCode(gateway.ErrorCodeBillingOwnerMismatch, text("计费", "Billing"), text("API Key 归属用户和计费用户不一致", "API key owner does not match billing user")),
 				errorCode(gateway.ErrorCodeBillingConflict, text("计费", "Billing"), text("计费请求存在冲突或重复结算", "Billing request conflict or duplicate settlement detected")),
-				errorCode(gateway.ErrorCodeRateLimitExceeded, text("限流", "Rate limit"), text("用户或套餐并发请求数超过限制", "User or plan concurrent request limit exceeded")),
+				errorCode(gateway.ErrorCodeRateLimitExceeded, text("限流", "Rate limit"), text("用户、套餐、同 IP 并发请求数或请求速率超过限制", "User, plan, same-IP concurrent request, or request rate limit exceeded")),
 			},
 		},
 		{

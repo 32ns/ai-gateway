@@ -48,7 +48,7 @@ func (s *Service) ExecuteResponses(ctx context.Context, req *core.ResponsesReque
 	if err := s.applyResponsesAccountBinding(req, client); err != nil {
 		return nil, err
 	}
-	release, err := s.reserveUserRequestSlot(ctx, client)
+	release, err := s.reserveUserRequestSlot(ctx, client, req.ClientIP)
 	if err != nil {
 		return nil, err
 	}
@@ -272,7 +272,7 @@ func (s *Service) executeResponsesStream(ctx context.Context, req *core.Response
 	if err := s.applyResponsesAccountBinding(req, client); err != nil {
 		return err
 	}
-	release, err := s.reserveUserRequestSlot(ctx, client)
+	release, err := s.reserveUserRequestSlot(ctx, client, req.ClientIP)
 	if err != nil {
 		return err
 	}

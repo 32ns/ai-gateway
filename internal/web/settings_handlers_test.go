@@ -21,6 +21,7 @@ func TestSystemSettingsFromFormParsesUserConcurrentRequestLimit(t *testing.T) {
 	form := url.Values{}
 	form.Set("user_concurrent_request_limit", "3")
 	form.Set("plan_concurrent_request_limit", "2")
+	form.Set("user_ip_concurrent_request_limit", "4")
 	form.Set("user_request_rate_limit_per_minute", "60")
 	form.Set("responses_websocket_upstream_present", "1")
 	form.Set("responses_websocket_upstream_enabled", "on")
@@ -41,6 +42,9 @@ func TestSystemSettingsFromFormParsesUserConcurrentRequestLimit(t *testing.T) {
 	}
 	if settings.Runtime.PlanConcurrentRequestLimit != 2 {
 		t.Fatalf("PlanConcurrentRequestLimit = %d, want 2", settings.Runtime.PlanConcurrentRequestLimit)
+	}
+	if settings.Runtime.UserIPConcurrentRequestLimit != 4 {
+		t.Fatalf("UserIPConcurrentRequestLimit = %d, want 4", settings.Runtime.UserIPConcurrentRequestLimit)
 	}
 	if settings.Runtime.UserRequestRateLimitPerMinute != 60 {
 		t.Fatalf("UserRequestRateLimitPerMinute = %d, want 60", settings.Runtime.UserRequestRateLimitPerMinute)
@@ -252,7 +256,35 @@ func TestSettingsPageRendersUserConcurrentRequestLimitField(t *testing.T) {
 	server.renderSettingsPage(rec, req, core.DefaultSystemSettings(), false, "", http.StatusOK)
 
 	body := rec.Body.String()
-	for _, want := range []string{`name="user_concurrent_request_limit"`, `name="plan_concurrent_request_limit"`, `name="user_request_rate_limit_per_minute"`, `name="registration_username_min_length"`, `name="usage_log_max_age_days"`, `name="billing_ledger_retention_days"`, `min="3" max="365" name="billing_ledger_retention_days"`, `data-group-settings-open="email-template-editor"`, `name="email_template_subject"`, `name="payment_recharge_input_mode"`, "验证邮件模版", "用户名最小长度", "用户并发请求上限", "套餐并发请求上限", "用户请求速率上限（次/分钟）", "使用日志保留天数", "财务流水保留天数", "充值输入口径", "按人民币支付金额输入", `href="#settings-image"`, "图片设置", "image_user_console_enabled", "向普通用户显示生图工作台", "image_backend", "保存后立即生效的本地上限。用户或套餐并发请求设为 0 表示不限制；请求速率设为 0 表示不做排队延迟。财务流水最少保留 3 天。"} {
+	for _, want := range []string{
+		`name="user_concurrent_request_limit"`,
+		`name="plan_concurrent_request_limit"`,
+		`name="user_ip_concurrent_request_limit"`,
+		`name="user_request_rate_limit_per_minute"`,
+		`name="registration_username_min_length"`,
+		`name="usage_log_max_age_days"`,
+		`name="billing_ledger_retention_days"`,
+		`min="3" max="365" name="billing_ledger_retention_days"`,
+		`data-group-settings-open="email-template-editor"`,
+		`name="email_template_subject"`,
+		`name="payment_recharge_input_mode"`,
+		"验证邮件模版",
+		"用户名最小长度",
+		"用户并发请求上限",
+		"套餐并发请求上限",
+		"单用户同 IP 并发请求上限",
+		"用户请求速率上限（次/分钟）",
+		"使用日志保留天数",
+		"财务流水保留天数",
+		"充值输入口径",
+		"按人民币支付金额输入",
+		`href="#settings-image"`,
+		"图片设置",
+		"image_user_console_enabled",
+		"向普通用户显示生图工作台",
+		"image_backend",
+		"保存后立即生效的本地上限。用户、套餐或单用户同 IP 并发请求设为 0 表示不限制；请求速率设为 0 表示不触发 429 限速。财务流水最少保留 3 天。",
+	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("settings page missing %q: %s", want, body)
 		}
@@ -518,7 +550,14 @@ func TestUsersPageRendersConcurrentRequestLimitOverrideControls(t *testing.T) {
 		t.Fatalf("status = %d, want %d body=%s", rec.Code, http.StatusOK, rec.Body.String())
 	}
 	body := rec.Body.String()
-	for _, want := range []string{`name="concurrent_request_limit"`, `name="request_rate_limit_per_minute"`, `value="0"`, "单用户并发请求上限", "单用户请求速率上限（次/分钟）", "留空继承系统默认"} {
+	for _, want := range []string{
+		`name="concurrent_request_limit"`,
+		`name="request_rate_limit_per_minute"`,
+		`value="0"`,
+		"单用户并发请求上限",
+		"单用户请求速率上限（次/分钟）",
+		"留空继承系统默认",
+	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("users page missing %q: %s", want, body)
 		}

@@ -211,6 +211,7 @@ type GatewayRequest struct {
 	RawMessages           json.RawMessage            `json:"-"`
 	RawBody               json.RawMessage            `json:"-"`
 	Client                *APIClient                 `json:"-"`
+	ClientIP              string                     `json:"-"`
 	UpstreamMode          string                     `json:"-"`
 	Stream                bool                       `json:"stream"`
 	StreamIncludeUsage    *bool                      `json:"-"`
@@ -241,6 +242,7 @@ type ResponsesRequest struct {
 	Model                 string             `json:"model"`
 	RawBody               json.RawMessage    `json:"-"`
 	Client                *APIClient         `json:"-"`
+	ClientIP              string             `json:"-"`
 	Transport             ResponsesTransport `json:"-"`
 	Stream                bool               `json:"stream"`
 	Compact               bool               `json:"-"`
@@ -302,6 +304,7 @@ type EmbeddingRequest struct {
 	Dimensions     *int              `json:"dimensions,omitempty"`
 	User           string            `json:"user,omitempty"`
 	Client         *APIClient        `json:"-"`
+	ClientIP       string            `json:"-"`
 	Metadata       map[string]string `json:"metadata,omitempty"`
 }
 
@@ -325,6 +328,7 @@ type ModerationRequest struct {
 	Model    string            `json:"model"`
 	Input    any               `json:"input"`
 	Client   *APIClient        `json:"-"`
+	ClientIP string            `json:"-"`
 	Metadata map[string]string `json:"metadata,omitempty"`
 	RawBody  json.RawMessage   `json:"-"`
 }
@@ -341,6 +345,7 @@ type ImageGenerationRequest struct {
 	Model    string                     `json:"model"`
 	Prompt   string                     `json:"prompt"`
 	Client   *APIClient                 `json:"-"`
+	ClientIP string                     `json:"-"`
 	Metadata map[string]string          `json:"metadata,omitempty"`
 	Extra    map[string]json.RawMessage `json:"extra,omitempty"`
 	RawBody  json.RawMessage            `json:"-"`
@@ -361,6 +366,7 @@ type ImageMultipartRequest struct {
 	ContentType string            `json:"content_type"`
 	Body        []byte            `json:"-"`
 	Client      *APIClient        `json:"-"`
+	ClientIP    string            `json:"-"`
 	Metadata    map[string]string `json:"metadata,omitempty"`
 	FormFields  map[string]string `json:"-"`
 }
@@ -380,6 +386,7 @@ type AudioSpeechRequest struct {
 	Input    string                     `json:"input"`
 	Voice    string                     `json:"voice"`
 	Client   *APIClient                 `json:"-"`
+	ClientIP string                     `json:"-"`
 	Metadata map[string]string          `json:"metadata,omitempty"`
 	Extra    map[string]json.RawMessage `json:"extra,omitempty"`
 	RawBody  json.RawMessage            `json:"-"`
@@ -400,6 +407,7 @@ type AudioMultipartRequest struct {
 	ContentType string            `json:"content_type"`
 	Body        []byte            `json:"-"`
 	Client      *APIClient        `json:"-"`
+	ClientIP    string            `json:"-"`
 	Metadata    map[string]string `json:"metadata,omitempty"`
 	FormFields  map[string]string `json:"-"`
 }
@@ -416,6 +424,7 @@ type AudioMultipartResponse struct {
 type TokenCountRequest struct {
 	Model    string            `json:"model"`
 	Client   *APIClient        `json:"-"`
+	ClientIP string            `json:"-"`
 	Metadata map[string]string `json:"metadata,omitempty"`
 	RawBody  json.RawMessage   `json:"-"`
 }
@@ -657,6 +666,7 @@ type SystemRuntimeSettings struct {
 	RegistrationEmailAllowlist        []string
 	UserConcurrentRequestLimit        int
 	PlanConcurrentRequestLimit        int
+	UserIPConcurrentRequestLimit      int
 	UserRequestRateLimitPerMinute     int
 	ResponsesWebSocketUpstreamEnabled *bool
 }
@@ -953,6 +963,9 @@ func NormalizeSystemSettings(settings SystemSettings) SystemSettings {
 	}
 	if settings.Runtime.PlanConcurrentRequestLimit < 0 {
 		settings.Runtime.PlanConcurrentRequestLimit = 0
+	}
+	if settings.Runtime.UserIPConcurrentRequestLimit < 0 {
+		settings.Runtime.UserIPConcurrentRequestLimit = 0
 	}
 	if settings.Runtime.UserRequestRateLimitPerMinute < 0 {
 		settings.Runtime.UserRequestRateLimitPerMinute = 0

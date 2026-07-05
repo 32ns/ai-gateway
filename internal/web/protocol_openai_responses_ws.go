@@ -38,6 +38,7 @@ func (s *Server) handleOpenAIResponsesWebSocket(w http.ResponseWriter, r *http.R
 	conn.SetReadLimit(openAIResponsesWebSocketReadLimit)
 
 	protocolClient := protocolClientPointerFromContext(r.Context())
+	requestClientIP := clientIP(r)
 	headers := openAIResponsesWebSocketHeadersFromRequest(r)
 	gatewaySession := openAIResponsesWebSocketGatewaySession(nil)
 	if s.gateway != nil {
@@ -201,7 +202,7 @@ func (s *Server) handleOpenAIResponsesWebSocket(w http.ResponseWriter, r *http.R
 					return
 				}
 			}
-			req, err := s.openAIResponsesWebSocketRequest(message.payload, protocolClient, headers, sessionModel)
+			req, err := s.openAIResponsesWebSocketRequest(message.payload, protocolClient, requestClientIP, headers, sessionModel)
 			if err != nil {
 				_ = writeError("invalid_request_error", err.Error())
 				return
@@ -396,7 +397,7 @@ func (s *Server) proxyOpenAIResponsesWebSocketTurn(ctx context.Context, sendText
 	return err
 }
 
-func (s *Server) openAIResponsesWebSocketRequest(payload []byte, client *core.APIClient, headers map[string]string, fallbackModel string) (*core.ResponsesRequest, error) {
+func (s *Server) openAIResponsesWebSocketRequest(payload []byte, client *core.APIClient, clientIP string, headers map[string]string, fallbackModel string) (*core.ResponsesRequest, error) {
 	normalized, _, err := normalizeOpenAIResponsesWebSocketPayload(payload)
 	if err != nil {
 		return nil, err
@@ -418,6 +419,7 @@ func (s *Server) openAIResponsesWebSocketRequest(payload []byte, client *core.AP
 		Model:              req.Model,
 		RawBody:            json.RawMessage(normalized),
 		Client:             client,
+		ClientIP:           clientIP,
 		Transport:          core.ResponsesTransportWebSocket,
 		Stream:             true,
 		Generate:           req.Generate,

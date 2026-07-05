@@ -43,6 +43,7 @@ func (s *Server) handleOpenAICompletions(w http.ResponseWriter, r *http.Request)
 		RawMessages:         raw["messages"],
 		RawBody:             json.RawMessage(bodyBytes),
 		Client:              protocolClient,
+		ClientIP:            clientIP(r),
 		Stream:              req.Stream,
 		StreamIncludeUsage:  streamIncludeUsage,
 		MaxTokens:           req.MaxTokens,
@@ -144,6 +145,7 @@ func (s *Server) handleOpenAIResponsesRequest(w http.ResponseWriter, r *http.Req
 		Model:              req.Model,
 		RawBody:            json.RawMessage(bodyBytes),
 		Client:             protocolClient,
+		ClientIP:           clientIP(r),
 		Transport:          core.ResponsesTransportHTTP,
 		Stream:             req.Stream,
 		Compact:            compact,
@@ -482,6 +484,7 @@ func (s *Server) handleOpenAIEmbeddings(w http.ResponseWriter, r *http.Request) 
 		Dimensions:     req.Dimensions,
 		User:           strings.TrimSpace(req.User),
 		Client:         protocolClient,
+		ClientIP:       clientIP(r),
 		Metadata:       req.Metadata,
 	}
 
@@ -532,10 +535,11 @@ func (s *Server) handleOpenAIModerations(w http.ResponseWriter, r *http.Request)
 
 	protocolClient := protocolClientPointerFromContext(r.Context())
 	resp, err := s.gateway.Moderate(r.Context(), &core.ModerationRequest{
-		Model:   req.Model,
-		Input:   req.Input,
-		Client:  protocolClient,
-		RawBody: json.RawMessage(bodyBytes),
+		Model:    req.Model,
+		Input:    req.Input,
+		Client:   protocolClient,
+		ClientIP: clientIP(r),
+		RawBody:  json.RawMessage(bodyBytes),
 	})
 	if err != nil {
 		s.writeGatewayError(w, err)
@@ -587,6 +591,7 @@ func (s *Server) handleOpenAIImageGenerations(w http.ResponseWriter, r *http.Req
 			Model:    req.Model,
 			Prompt:   req.Prompt,
 			Client:   protocolClient,
+			ClientIP: clientIP(r),
 			Metadata: metadata,
 			Extra:    raw,
 			RawBody:  json.RawMessage(bodyBytes),
@@ -602,6 +607,7 @@ func (s *Server) handleOpenAIImageGenerations(w http.ResponseWriter, r *http.Req
 		Model:    req.Model,
 		Prompt:   req.Prompt,
 		Client:   protocolClient,
+		ClientIP: clientIP(r),
 		Metadata: metadata,
 		Extra:    raw,
 		RawBody:  json.RawMessage(bodyBytes),
@@ -652,12 +658,13 @@ func (s *Server) handleOpenAIAudioSpeech(w http.ResponseWriter, r *http.Request)
 
 	protocolClient := protocolClientPointerFromContext(r.Context())
 	resp, err := s.gateway.CreateSpeech(r.Context(), &core.AudioSpeechRequest{
-		Model:   req.Model,
-		Input:   req.Input,
-		Voice:   openAIAudioVoiceString(req.Voice),
-		Client:  protocolClient,
-		Extra:   raw,
-		RawBody: json.RawMessage(bodyBytes),
+		Model:    req.Model,
+		Input:    req.Input,
+		Voice:    openAIAudioVoiceString(req.Voice),
+		Client:   protocolClient,
+		ClientIP: clientIP(r),
+		Extra:    raw,
+		RawBody:  json.RawMessage(bodyBytes),
 	})
 	if err != nil {
 		s.writeGatewayError(w, err)
@@ -706,6 +713,7 @@ func (s *Server) handleOpenAIAudioMultipart(endpoint string) http.HandlerFunc {
 			ContentType: contentType,
 			Body:        bodyBytes,
 			Client:      protocolClient,
+			ClientIP:    clientIP(r),
 			FormFields:  fields,
 		})
 		if err != nil {
@@ -760,6 +768,7 @@ func (s *Server) handleOpenAIImageMultipart(endpoint string) http.HandlerFunc {
 				ContentType: contentType,
 				Body:        bodyBytes,
 				Client:      protocolClient,
+				ClientIP:    clientIP(r),
 				Metadata:    metadata,
 				FormFields:  fields,
 			}); err != nil {
@@ -776,6 +785,7 @@ func (s *Server) handleOpenAIImageMultipart(endpoint string) http.HandlerFunc {
 			ContentType: contentType,
 			Body:        bodyBytes,
 			Client:      protocolClient,
+			ClientIP:    clientIP(r),
 			Metadata:    metadata,
 			FormFields:  fields,
 		})
@@ -798,9 +808,9 @@ func (s *Server) handleOpenAIImageMultipart(endpoint string) http.HandlerFunc {
 }
 
 const (
-	defaultOpenAIModerationModel      = "omni-moderation-latest"
-	defaultOpenAIImageGenerationGPT   = "gpt-image-2"
-	defaultOpenAIImageEditModel       = defaultOpenAIImageGenerationGPT
+	defaultOpenAIModerationModel    = "omni-moderation-latest"
+	defaultOpenAIImageGenerationGPT = "gpt-image-2"
+	defaultOpenAIImageEditModel     = defaultOpenAIImageGenerationGPT
 )
 
 func defaultOpenAIImageGenerationModel(raw map[string]json.RawMessage) string {
@@ -905,6 +915,7 @@ func (s *Server) handleAnthropicCountTokens(w http.ResponseWriter, r *http.Reque
 	resp, err := s.gateway.CountTokens(r.Context(), &core.TokenCountRequest{
 		Model:    req.Model,
 		Client:   protocolClient,
+		ClientIP: clientIP(r),
 		Metadata: anthropicProtocolMetadataForClient(r, nil, protocolClient),
 		RawBody:  json.RawMessage(bodyBytes),
 	})
@@ -965,6 +976,7 @@ func (s *Server) handleAnthropicMessages(w http.ResponseWriter, r *http.Request)
 		Messages:     make([]core.Message, 0, len(req.Messages)+1),
 		RawBody:      json.RawMessage(bodyBytes),
 		Client:       protocolClient,
+		ClientIP:     clientIP(r),
 		UpstreamMode: "anthropic_messages",
 		Stream:       req.Stream,
 		MaxTokens:    req.MaxTokens,

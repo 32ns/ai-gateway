@@ -79,6 +79,7 @@ type imageLabInputImagePayload struct {
 
 type imageLabGenerateOptions struct {
 	Client      core.APIClient
+	ClientIP    string
 	Prompt      string
 	Ratio       string
 	Resolution  string
@@ -535,6 +536,7 @@ func (s *Server) parseImageLabGenerateOptions(w http.ResponseWriter, r *http.Req
 
 	return imageLabGenerateOptions{
 		Client:      client,
+		ClientIP:    clientIP(r),
 		Prompt:      prompt,
 		Ratio:       ratio,
 		Resolution:  resolution,
@@ -659,6 +661,7 @@ func (s *Server) generateImageLabText(ctx context.Context, options imageLabGener
 		Model:    options.Model,
 		Prompt:   options.Prompt,
 		Client:   &options.Client,
+		ClientIP: options.ClientIP,
 		Extra:    extra,
 		RawBody:  json.RawMessage(rawBody),
 		Metadata: imageLabRequestMetadata(options, index, "generation"),
@@ -687,6 +690,7 @@ func (s *Server) generateImageLabEdit(ctx context.Context, options imageLabGener
 		Body:        body,
 		FormFields:  formFields,
 		Client:      &options.Client,
+		ClientIP:    options.ClientIP,
 		Metadata:    imageLabRequestMetadata(options, index, "edit"),
 	})
 	if err != nil {
