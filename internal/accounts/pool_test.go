@@ -901,6 +901,39 @@ func TestCandidatesDoNotAppendBackupWhenPrimaryCandidateSetIsCapped(t *testing.T
 	}
 }
 
+func TestMonitorCandidatesIncludeBackupsWhenPrimaryCandidateSetWouldBeCapped(t *testing.T) {
+	repo := storage.NewMemoryRepository()
+	for index := range maxProviderCandidates + 1 {
+		_ = repo.UpsertAccount(core.Account{
+			ID:       fmt.Sprintf("primary_%02d", index),
+			Provider: core.ProviderOpenAI,
+			Label:    fmt.Sprintf("Primary %d", index),
+			Status:   core.AccountStatusActive,
+			Priority: 100,
+			Weight:   100,
+		})
+	}
+	if err := repo.UpsertAccount(core.Account{
+		ID:       "backup",
+		Provider: core.ProviderOpenAI,
+		Label:    "Backup",
+		Status:   core.AccountStatusActive,
+		Backup:   true,
+		Priority: 1000,
+		Weight:   1000,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	candidates := NewPool(repo).MonitorCandidates(core.ProviderOpenAI, &core.APIClient{ID: "monitor:default"})
+	if len(candidates) != maxProviderCandidates+2 {
+		t.Fatalf("monitor candidate count = %d, want %d", len(candidates), maxProviderCandidates+2)
+	}
+	if candidates[len(candidates)-1].ID != "backup" {
+		t.Fatalf("last monitor candidate = %q, want backup after all primaries", candidates[len(candidates)-1].ID)
+	}
+}
+
 func TestCandidatesAppendBackupWhenPrimaryCandidatesAllUnavailable(t *testing.T) {
 	repo := storage.NewMemoryRepository()
 	until := time.Now().UTC().Add(time.Hour)

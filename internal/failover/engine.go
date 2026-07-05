@@ -119,6 +119,7 @@ type attemptExecutor[T any] struct {
 	noAccount         func([]core.AttemptRecord, core.ProviderKind) []core.AttemptRecord
 	selectCandidates  func(*Engine, core.ProviderKind, *core.APIClient) []core.Account
 	ignoreBreakers    bool
+	shouldContinue    func(context.Context, error, failureModality) bool
 	supported         func(providers.Adapter) bool
 	invoke            func(context.Context, providers.Adapter, core.RouteDecision) (T, error)
 }
@@ -748,6 +749,12 @@ func gatewayRequestCandidates(req *core.GatewayRequest) func(*Engine, core.Provi
 	}
 }
 
+func monitorProbeCandidates(req *core.GatewayRequest) func(*Engine, core.ProviderKind, *core.APIClient) []core.Account {
+	return func(e *Engine, provider core.ProviderKind, client *core.APIClient) []core.Account {
+		return e.monitorProbeCandidates(provider, client, req)
+	}
+}
+
 func gatewayRequestNoAccount(req *core.GatewayRequest) func([]core.AttemptRecord, core.ProviderKind) []core.AttemptRecord {
 	return func(attempts []core.AttemptRecord, provider core.ProviderKind) []core.AttemptRecord {
 		if req != nil && req.StrictAccountAffinity && strings.TrimSpace(req.PreferredAccountID) != "" {
@@ -788,6 +795,20 @@ func (e *Engine) responsesCandidates(provider core.ProviderKind, client *core.AP
 func (e *Engine) gatewayRequestCandidates(provider core.ProviderKind, client *core.APIClient, req *core.GatewayRequest) []core.Account {
 	if req == nil || !req.StrictAccountAffinity || strings.TrimSpace(req.PreferredAccountID) == "" {
 		return filterExcludedGatewayAccounts(defaultCandidates(e, provider, client), req)
+	}
+	account, ok := e.boundAccountCandidate(provider, client, req.PreferredAccountID)
+	if !ok {
+		return nil
+	}
+	return filterExcludedGatewayAccounts([]core.Account{account}, req)
+}
+
+func (e *Engine) monitorProbeCandidates(provider core.ProviderKind, client *core.APIClient, req *core.GatewayRequest) []core.Account {
+	if e == nil || e.pool == nil {
+		return nil
+	}
+	if req == nil || !req.StrictAccountAffinity || strings.TrimSpace(req.PreferredAccountID) == "" {
+		return filterExcludedGatewayAccounts(e.pool.MonitorCandidates(provider, client), req)
 	}
 	account, ok := e.boundAccountCandidate(provider, client, req.PreferredAccountID)
 	if !ok {
@@ -1112,6 +1133,10 @@ func executeAcrossAccounts[T any](e *Engine, ctx context.Context, plan core.Rout
 
 func executeAccountAttempt[T any](e *Engine, ctx context.Context, plan core.RoutePlan, client *core.APIClient, provider core.ProviderKind, adapter providers.Adapter, account core.Account, attempts []core.AttemptRecord, exec attemptExecutor[T]) (attemptOutcome[T], []core.AttemptRecord, bool, error) {
 	var zero attemptOutcome[T]
+	shouldContinue := exec.shouldContinue
+	if shouldContinue == nil {
+		shouldContinue = shouldContinueFailover
+	}
 	notifyAttemptStarted(ctx, runningAttempt(provider, account))
 	attemptCtx := ctx
 	var cancel context.CancelFunc
@@ -1126,7 +1151,7 @@ func executeAccountAttempt[T any](e *Engine, ctx context.Context, plan core.Rout
 		attempt := invokeErrorAttempt(provider, account, "refresh_error", err)
 		notifyAttemptFinished(ctx, attempt)
 		attempts = append(attempts, attempt)
-		if !shouldContinueFailover(ctx, err, failureModalityAccount) {
+		if !shouldContinue(ctx, err, failureModalityAccount) {
 			return zero, attempts, false, &ExecutionError{Attempts: attempts}
 		}
 		return zero, attempts, false, nil
@@ -1186,7 +1211,7 @@ func executeAccountAttempt[T any](e *Engine, ctx context.Context, plan core.Rout
 	finalDecision = softRetryDecision
 	err = softRetryErr
 	e.markFailureForModality(finalDecision.Account, err, failureModality)
-	if !shouldContinueFailover(ctx, err, failureModality) {
+	if !shouldContinue(ctx, err, failureModality) {
 		return zero, attempts, false, &ExecutionError{Attempts: attempts}
 	}
 	return zero, attempts, false, nil
@@ -1403,10 +1428,21 @@ func (e *Engine) markFailureForModality(account core.Account, err error, modalit
 }
 
 func (e *Engine) Execute(ctx context.Context, plan core.RoutePlan, client *core.APIClient, req *core.GatewayRequest) (*InvocationResult, error) {
+	monitorProbe := monitorProbeRequiresContent(req, client)
+	selectCandidates := gatewayRequestCandidates(req)
+	if monitorProbe {
+		selectCandidates = monitorProbeCandidates(req)
+	}
 	outcome, attempts, err := executeAcrossAccounts[*core.GatewayResponse](e, ctx, plan, client, attemptExecutor[*core.GatewayResponse]{
-		selectCandidates: gatewayRequestCandidates(req),
+		selectCandidates: selectCandidates,
 		noAccount:        gatewayRequestNoAccount(req),
 		ignoreBreakers:   gatewayRequestIgnoreBreakers(req),
+		shouldContinue: func(ctx context.Context, err error, modality failureModality) bool {
+			if monitorProbe {
+				return shouldContinueMonitorProbeFailover(ctx, err, modality)
+			}
+			return shouldContinueFailover(ctx, err, modality)
+		},
 		invoke: func(ctx context.Context, adapter providers.Adapter, decision core.RouteDecision) (*core.GatewayResponse, error) {
 			resp, err := adapter.Invoke(ctx, decision, req)
 			if err != nil {
@@ -1427,6 +1463,22 @@ func (e *Engine) Execute(ctx context.Context, plan core.RoutePlan, client *core.
 		return nil, err
 	}
 	return &InvocationResult{Response: outcome.response, Attempts: attempts}, nil
+}
+
+func shouldContinueMonitorProbeFailover(ctx context.Context, err error, modality failureModality) bool {
+	if shouldContinueFailover(ctx, err, modality) {
+		return true
+	}
+	if err == nil || contextDone(ctx) {
+		return false
+	}
+	switch providers.ErrorCode(err) {
+	case providers.ErrorCodeUpstreamNotFound,
+		providers.ErrorCodeUpstreamRejected:
+		return true
+	default:
+		return false
+	}
 }
 
 func monitorProbeRequiresContent(req *core.GatewayRequest, client *core.APIClient) bool {

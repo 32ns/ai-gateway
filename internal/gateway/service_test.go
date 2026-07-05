@@ -458,6 +458,211 @@ func TestProbeMonitorTargetUsesRoutedGroupAndStopsAfterSuccess(t *testing.T) {
 	}
 }
 
+type notFoundThenBackupMonitorProbeAdapter struct {
+	monitorProbeAdapter
+}
+
+func (a *notFoundThenBackupMonitorProbeAdapter) Invoke(_ context.Context, decision core.RouteDecision, _ *core.GatewayRequest) (*core.GatewayResponse, error) {
+	a.seen = append(a.seen, decision.Account.ID)
+	if decision.Account.ID == "acct_default_primary" {
+		return nil, &providers.InvokeError{
+			Code:      providers.ErrorCodeUpstreamNotFound,
+			Temporary: false,
+			Cooldown:  2 * time.Minute,
+			Err:       errors.New("upstream route not found"),
+		}
+	}
+	return &core.GatewayResponse{
+		ID:           "resp_monitor_probe_backup",
+		Model:        decision.Model,
+		Provider:     decision.Provider,
+		AccountID:    decision.Account.ID,
+		AccountLabel: decision.Account.Label,
+		Content:      "pong",
+		FinishReason: "stop",
+		CreatedAt:    time.Now().UTC(),
+		Usage:        core.Usage{PromptTokens: 1, CompletionTokens: 1, TotalTokens: 2},
+	}, nil
+}
+
+func TestProbeMonitorTargetFallsBackAfterPlainUpstreamNotFound(t *testing.T) {
+	repo := storage.NewMemoryRepository()
+	if err := repo.UpsertModel(core.ModelConfig{
+		ID:            "gpt-5",
+		Provider:      core.ProviderOpenAI,
+		UpstreamID:    "gpt-5",
+		Enabled:       true,
+		VisibleGroups: []string{core.DefaultAccountGroupName},
+		Source:        core.ModelSourceManual,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, account := range []core.Account{
+		{
+			ID:         "acct_default_primary",
+			Provider:   core.ProviderOpenAI,
+			Label:      "Default Primary",
+			Group:      core.DefaultAccountGroupName,
+			Status:     core.AccountStatusActive,
+			Priority:   300,
+			Weight:     100,
+			Credential: core.Credential{Mode: "manual-token", AccessToken: "primary-token"},
+		},
+		{
+			ID:         "acct_default_backup",
+			Provider:   core.ProviderOpenAI,
+			Label:      "Default Backup",
+			Group:      core.DefaultAccountGroupName,
+			Status:     core.AccountStatusActive,
+			Backup:     true,
+			Priority:   200,
+			Weight:     100,
+			Credential: core.Credential{Mode: "manual-token", AccessToken: "backup-token"},
+		},
+	} {
+		if err := repo.UpsertAccount(account); err != nil {
+			t.Fatal(err)
+		}
+	}
+	adapter := &notFoundThenBackupMonitorProbeAdapter{}
+	service := New(
+		repo,
+		routing.NewRouter(),
+		failover.NewEngine(accounts.NewPool(repo), providers.NewRegistry(adapter)),
+	)
+
+	result, err := service.ProbeMonitorTarget(context.Background(), MonitorProbeInput{
+		TargetID:     "target_plain_not_found",
+		AccountGroup: core.DefaultAccountGroupName,
+		Model:        "gpt-5",
+		Timeout:      time.Second,
+	})
+	if err != nil {
+		t.Fatalf("ProbeMonitorTarget returned error: %v", err)
+	}
+	if result.Status != core.MonitorStatusDegraded {
+		t.Fatalf("status = %q, want %q", result.Status, core.MonitorStatusDegraded)
+	}
+	if result.AccountID != "acct_default_backup" || result.AccountLabel != "Default Backup" {
+		t.Fatalf("successful account = %q/%q, want acct_default_backup/Default Backup", result.AccountID, result.AccountLabel)
+	}
+	if got, want := adapter.seen, []string{"acct_default_primary", "acct_default_backup"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("adapter accounts = %#v, want %#v", got, want)
+	}
+	if len(result.Attempts) != 2 {
+		t.Fatalf("attempts = %#v, want primary not_found and backup success", result.Attempts)
+	}
+	if result.Attempts[0].AccountID != "acct_default_primary" || result.Attempts[0].ErrorCode != providers.ErrorCodeUpstreamNotFound {
+		t.Fatalf("first attempt = %#v, want primary upstream_not_found", result.Attempts[0])
+	}
+	if result.Attempts[1].AccountID != "acct_default_backup" || result.Attempts[1].Status != "ok" {
+		t.Fatalf("second attempt = %#v, want backup ok", result.Attempts[1])
+	}
+}
+
+type cappedPrimariesThenBackupMonitorProbeAdapter struct {
+	monitorProbeAdapter
+}
+
+func (a *cappedPrimariesThenBackupMonitorProbeAdapter) Invoke(_ context.Context, decision core.RouteDecision, _ *core.GatewayRequest) (*core.GatewayResponse, error) {
+	a.seen = append(a.seen, decision.Account.ID)
+	if !decision.Account.Backup {
+		return nil, &providers.InvokeError{
+			Code:      providers.ErrorCodeUpstreamNotFound,
+			Temporary: false,
+			Cooldown:  2 * time.Minute,
+			Err:       errors.New("upstream route not found"),
+		}
+	}
+	return &core.GatewayResponse{
+		ID:           "resp_monitor_probe_capped_backup",
+		Model:        decision.Model,
+		Provider:     decision.Provider,
+		AccountID:    decision.Account.ID,
+		AccountLabel: decision.Account.Label,
+		Content:      "pong",
+		FinishReason: "stop",
+		CreatedAt:    time.Now().UTC(),
+		Usage:        core.Usage{PromptTokens: 1, CompletionTokens: 1, TotalTokens: 2},
+	}, nil
+}
+
+func TestProbeMonitorTargetFallsBackToBackupAfterCappedPrimaryFailures(t *testing.T) {
+	repo := storage.NewMemoryRepository()
+	if err := repo.UpsertModel(core.ModelConfig{
+		ID:            "gpt-5",
+		Provider:      core.ProviderOpenAI,
+		UpstreamID:    "gpt-5",
+		Enabled:       true,
+		VisibleGroups: []string{core.DefaultAccountGroupName},
+		Source:        core.ModelSourceManual,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	const primaryCount = 24
+	for index := range primaryCount {
+		if err := repo.UpsertAccount(core.Account{
+			ID:         fmt.Sprintf("acct_default_primary_%02d", index),
+			Provider:   core.ProviderOpenAI,
+			Label:      fmt.Sprintf("Default Primary %02d", index),
+			Group:      core.DefaultAccountGroupName,
+			Status:     core.AccountStatusActive,
+			Priority:   300,
+			Weight:     100,
+			Credential: core.Credential{Mode: "manual-token", AccessToken: fmt.Sprintf("primary-token-%02d", index)},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := repo.UpsertAccount(core.Account{
+		ID:         "acct_default_backup",
+		Provider:   core.ProviderOpenAI,
+		Label:      "Default Backup",
+		Group:      core.DefaultAccountGroupName,
+		Status:     core.AccountStatusActive,
+		Backup:     true,
+		Priority:   1000,
+		Weight:     1000,
+		Credential: core.Credential{Mode: "manual-token", AccessToken: "backup-token"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	adapter := &cappedPrimariesThenBackupMonitorProbeAdapter{}
+	service := New(
+		repo,
+		routing.NewRouter(),
+		failover.NewEngine(accounts.NewPool(repo), providers.NewRegistry(adapter)),
+	)
+
+	result, err := service.ProbeMonitorTarget(context.Background(), MonitorProbeInput{
+		TargetID:     "target_capped_primary_failures",
+		AccountGroup: core.DefaultAccountGroupName,
+		Model:        "gpt-5",
+		Timeout:      time.Second,
+	})
+	if err != nil {
+		t.Fatalf("ProbeMonitorTarget returned error: %v", err)
+	}
+	if result.Status != core.MonitorStatusDegraded {
+		t.Fatalf("status = %q, want %q", result.Status, core.MonitorStatusDegraded)
+	}
+	if result.AccountID != "acct_default_backup" || result.AccountLabel != "Default Backup" {
+		t.Fatalf("successful account = %q/%q, want acct_default_backup/Default Backup", result.AccountID, result.AccountLabel)
+	}
+	if len(adapter.seen) != primaryCount+1 {
+		t.Fatalf("adapter saw %d accounts, want %d: %#v", len(adapter.seen), primaryCount+1, adapter.seen)
+	}
+	if adapter.seen[len(adapter.seen)-1] != "acct_default_backup" {
+		t.Fatalf("last attempted account = %q, want backup", adapter.seen[len(adapter.seen)-1])
+	}
+	if len(result.Attempts) != primaryCount+1 {
+		t.Fatalf("attempts = %d, want %d", len(result.Attempts), primaryCount+1)
+	}
+	if result.Attempts[len(result.Attempts)-1].AccountID != "acct_default_backup" || result.Attempts[len(result.Attempts)-1].Status != "ok" {
+		t.Fatalf("last attempt = %#v, want backup ok", result.Attempts[len(result.Attempts)-1])
+	}
+}
+
 type timeoutThenSuccessMonitorProbeAdapter struct {
 	monitorProbeAdapter
 	alwaysTimeout bool

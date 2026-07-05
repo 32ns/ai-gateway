@@ -36,6 +36,7 @@ type candidateKind string
 const (
 	candidateKindDefault candidateKind = ""
 	candidateKindImage   candidateKind = "image"
+	candidateKindMonitor candidateKind = "monitor"
 )
 
 func NewPool(repo storage.Repository) *Pool {
@@ -50,6 +51,10 @@ func (p *Pool) ImageCandidates(provider core.ProviderKind, client *core.APIClien
 	return p.candidates(provider, client, candidateKindImage)
 }
 
+func (p *Pool) MonitorCandidates(provider core.ProviderKind, client *core.APIClient) []core.Account {
+	return p.candidates(provider, client, candidateKindMonitor)
+}
+
 func (p *Pool) candidates(provider core.ProviderKind, client *core.APIClient, kind candidateKind) []core.Account {
 	snapshot := p.snapshot()
 	accounts := snapshot.byProvider[provider]
@@ -58,7 +63,7 @@ func (p *Pool) candidates(provider core.ProviderKind, client *core.APIClient, ki
 	groupRestricted := client != nil
 	stickyClientID := stickyClientKey(client)
 	hasStickyRank := stickyClientID != ""
-	limit := minInt(len(accounts), candidateLimit(kind))
+	limit := candidateLimit(kind, len(accounts))
 	if limit == 0 {
 		return nil
 	}
@@ -74,13 +79,15 @@ func (p *Pool) candidates(provider core.ProviderKind, client *core.APIClient, ki
 	if needsRuntimeFilter {
 		now = time.Now().UTC()
 	}
-	var primaryRanked [maxImageProviderCandidates]core.Account
-	var primaryStickyRanks [maxImageProviderCandidates]uint32
-	var backupRanked [maxImageProviderCandidates]core.Account
-	var backupStickyRanks [maxImageProviderCandidates]uint32
-	count := 0
+	primaryRanked := make([]core.Account, 0, limit)
+	backupRanked := make([]core.Account, 0, limit)
+	var primaryStickyRanks []uint32
+	var backupStickyRanks []uint32
+	if hasStickyRank {
+		primaryStickyRanks = make([]uint32, 0, limit)
+		backupStickyRanks = make([]uint32, 0, limit)
+	}
 	primaryEligibleCount := 0
-	backupCount := 0
 	for _, account := range accounts {
 		if needsRuntimeFilter {
 			account = core.NormalizeAccountRuntimeState(account, now)
@@ -96,20 +103,20 @@ func (p *Pool) candidates(provider core.ProviderKind, client *core.APIClient, ki
 			stickyRank = stickyAccountRank(stickyClientID, provider, account.ID)
 		}
 		if account.Backup {
-			backupCount = insertRankedAccountCandidate(&backupRanked, &backupStickyRanks, backupCount, account, stickyRank, hasStickyRank, limit, kind, now)
+			backupRanked, backupStickyRanks = insertRankedAccountCandidate(backupRanked, backupStickyRanks, account, stickyRank, hasStickyRank, limit, kind, now)
 			continue
 		}
 		primaryEligibleCount++
-		count = insertRankedAccountCandidate(&primaryRanked, &primaryStickyRanks, count, account, stickyRank, hasStickyRank, limit, kind, now)
+		primaryRanked, primaryStickyRanks = insertRankedAccountCandidate(primaryRanked, primaryStickyRanks, account, stickyRank, hasStickyRank, limit, kind, now)
 	}
-	if count == 0 && backupCount == 0 {
+	if len(primaryRanked) == 0 && len(backupRanked) == 0 {
 		return nil
 	}
-	includeBackups := primaryEligibleCount == count || count == 0
-	out := make([]core.Account, 0, count+backupCount)
-	out = append(out, primaryRanked[:count]...)
+	includeBackups := primaryEligibleCount == len(primaryRanked) || len(primaryRanked) == 0
+	out := make([]core.Account, 0, len(primaryRanked)+len(backupRanked))
+	out = append(out, primaryRanked...)
 	if includeBackups {
-		out = append(out, backupRanked[:backupCount]...)
+		out = append(out, backupRanked...)
 	}
 	if useCandidateCache {
 		p.storeCachedCandidates(cacheKey, out)
@@ -124,17 +131,26 @@ func candidateAccountAvailable(account core.Account, now time.Time, kind candida
 	return core.AccountAvailableForRouting(account, now)
 }
 
-func candidateLimit(kind candidateKind) int {
-	if kind == candidateKindImage {
-		return maxImageProviderCandidates
+func candidateLimit(kind candidateKind, available int) int {
+	if available <= 0 {
+		return 0
 	}
-	return maxProviderCandidates
+	switch kind {
+	case candidateKindImage:
+		return minInt(available, maxImageProviderCandidates)
+	case candidateKindMonitor:
+		return available
+	default:
+		return minInt(available, maxProviderCandidates)
+	}
 }
 
-func insertRankedAccountCandidate(ranked *[maxImageProviderCandidates]core.Account, stickyRanks *[maxImageProviderCandidates]uint32, count int, account core.Account, stickyRank uint32, hasStickyRank bool, limit int, kind candidateKind, now time.Time) int {
-	insertAt := count
-	for i := 0; i < count; i++ {
-		existing := ranked[i]
+func insertRankedAccountCandidate(ranked []core.Account, stickyRanks []uint32, account core.Account, stickyRank uint32, hasStickyRank bool, limit int, kind candidateKind, now time.Time) ([]core.Account, []uint32) {
+	if limit <= 0 {
+		return ranked, stickyRanks
+	}
+	insertAt := len(ranked)
+	for i, existing := range ranked {
 		var existingStickyRank uint32
 		if hasStickyRank {
 			existingStickyRank = stickyRanks[i]
@@ -144,26 +160,34 @@ func insertRankedAccountCandidate(ranked *[maxImageProviderCandidates]core.Accou
 			break
 		}
 	}
-	if insertAt == count {
-		if count >= limit {
-			return count
+	if insertAt == len(ranked) {
+		if len(ranked) >= limit {
+			return ranked, stickyRanks
 		}
-		ranked[count] = account
+		ranked = append(ranked, account)
 		if hasStickyRank {
-			stickyRanks[count] = stickyRank
+			stickyRanks = append(stickyRanks, stickyRank)
 		}
-		return count + 1
+		return ranked, stickyRanks
 	}
-	if count < limit {
-		count++
+	if len(ranked) >= limit {
+		copy(ranked[insertAt+1:], ranked[insertAt:len(ranked)-1])
+		ranked[insertAt] = account
+		if hasStickyRank {
+			copy(stickyRanks[insertAt+1:], stickyRanks[insertAt:len(stickyRanks)-1])
+			stickyRanks[insertAt] = stickyRank
+		}
+		return ranked, stickyRanks
 	}
-	copy(ranked[insertAt+1:count], ranked[insertAt:count-1])
+	ranked = append(ranked, core.Account{})
+	copy(ranked[insertAt+1:], ranked[insertAt:len(ranked)-1])
 	ranked[insertAt] = account
 	if hasStickyRank {
-		copy(stickyRanks[insertAt+1:count], stickyRanks[insertAt:count-1])
+		stickyRanks = append(stickyRanks, 0)
+		copy(stickyRanks[insertAt+1:], stickyRanks[insertAt:len(stickyRanks)-1])
 		stickyRanks[insertAt] = stickyRank
 	}
-	return count
+	return ranked, stickyRanks
 }
 
 func accountCandidateLess(a core.Account, aStickyRank uint32, b core.Account, bStickyRank uint32, hasStickyRank bool, kind candidateKind, now time.Time) bool {
