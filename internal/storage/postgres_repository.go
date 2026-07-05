@@ -92,6 +92,7 @@ func (r *PostgresRepository) FinanceOverviewStats(startOfDay, endOfDay time.Time
 		TotalUsers:               item.TotalUsers,
 		TotalClients:             item.TotalClients,
 		ActiveClients:            item.ActiveClients,
+		TodayTotalTokens:         item.TodayTotalTokens,
 	}
 }
 

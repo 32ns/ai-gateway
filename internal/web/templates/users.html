@@ -7,6 +7,7 @@
   <div class="kv"><span>{{t "historical_recharge"}}</span><strong>{{formatUSD .UserRechargeNanoUSD}}</strong></div>
   <div class="kv"><span>{{t "historical_spend"}}</span><strong>{{formatUSD .UserSpendNanoUSD}}</strong></div>
   <div class="kv"><span>{{t "user_concurrent_request_limit_override"}}</span><strong>{{userConcurrentRequestLimitText $user}}</strong></div>
+  <div class="kv"><span>{{t "user_ip_concurrent_request_limit_override"}}</span><strong>{{userIPConcurrentRequestLimitText $user}}</strong></div>
   <div class="kv"><span>{{t "user_request_rate_limit_override"}}</span><strong>{{userRequestRateLimitText $user}}</strong></div>
   <div class="kv"><span>{{t "status"}}</span><span class="pill {{if $user.Enabled}}tone-good{{else}}tone-muted{{end}}">{{boolStateText $user.Enabled}}</span></div>
   <div class="kv"><span>{{t "inviter"}}</span><strong>{{if $user.InviterUserID}}{{with userIdentity $user.InviterUserID}}{{if .Known}}{{.Username}}{{else}}{{t "unknown"}}{{end}}{{end}}{{else}}-{{end}}</strong></div>
@@ -240,6 +241,11 @@
         <p class="field-note">{{t "user_concurrent_request_limit_override_hint"}}</p>
       </label>
       <label>
+        <span>{{t "user_ip_concurrent_request_limit_override"}}</span>
+        <input type="number" min="0" max="100000" name="ip_concurrent_request_limit" placeholder="{{t "unlimited"}}">
+        <p class="field-note">{{t "user_ip_concurrent_request_limit_override_hint"}}</p>
+      </label>
+      <label>
         <span>{{t "user_request_rate_limit_override"}}</span>
         <input type="number" min="0" max="100000" name="request_rate_limit_per_minute" placeholder="{{t "inherit_system_default"}}">
         <p class="field-note">{{t "user_request_rate_limit_override_hint"}}</p>
@@ -403,6 +409,11 @@
                     <span>{{t "user_concurrent_request_limit_override"}}</span>
                     <input type="number" min="0" max="100000" name="concurrent_request_limit" value="{{userConcurrentRequestLimitValue $user}}" placeholder="{{t "inherit_system_default"}}">
                     <p class="field-note">{{t "user_concurrent_request_limit_override_hint"}}</p>
+                  </label>
+                  <label>
+                    <span>{{t "user_ip_concurrent_request_limit_override"}}</span>
+                    <input type="number" min="0" max="100000" name="ip_concurrent_request_limit" value="{{userIPConcurrentRequestLimitValue $user}}" placeholder="{{t "unlimited"}}">
+                    <p class="field-note">{{t "user_ip_concurrent_request_limit_override_hint"}}</p>
                   </label>
                   <label>
                     <span>{{t "user_request_rate_limit_override"}}</span>

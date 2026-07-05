@@ -668,6 +668,8 @@ func auditExtendedMessageFieldLabel(locale, key string) string {
 		return auditStaticLabel(locale, "用户请求速率上限（次/分钟）", "Per-user request rate per minute")
 	case "user_concurrent_request_limit_override":
 		return auditStaticLabel(locale, "单用户并发请求上限", "User concurrent request limit")
+	case "user_ip_concurrent_request_limit_override":
+		return auditStaticLabel(locale, "\u5355\u7528\u6237\u540c IP \u5e76\u53d1\u8bf7\u6c42\u4e0a\u9650", "User same-IP concurrent request limit")
 	case "user_request_rate_limit_override":
 		return auditStaticLabel(locale, "单用户请求速率上限（次/分钟）", "User request rate per minute")
 	case "username":
@@ -727,7 +729,7 @@ func auditMessageFieldValue(locale, key, value string) string {
 		return auditSourceText(locale, value)
 	case "status":
 		return auditStatusValueText(locale, value)
-	case "user_concurrent_request_limit_override", "user_request_rate_limit_override":
+	case "user_concurrent_request_limit_override", "user_ip_concurrent_request_limit_override", "user_request_rate_limit_override":
 		return auditUserConcurrentRequestLimitOverrideText(locale, value)
 	}
 	return auditHumanMessageText(locale, value)

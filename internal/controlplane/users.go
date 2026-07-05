@@ -37,6 +37,7 @@ type UserInput struct {
 	Role                              core.UserRole
 	Enabled                           bool
 	ConcurrentRequestLimitOverride    *int
+	IPConcurrentRequestLimitOverride  *int
 	RequestRateLimitPerMinuteOverride *int
 	BalanceNanoUSD                    int64
 	Email                             string
@@ -341,6 +342,7 @@ func (s *Service) CreateUser(input UserInput) (core.User, error) {
 		Role:                              normalizeUserRole(input.Role),
 		Enabled:                           input.Enabled,
 		ConcurrentRequestLimitOverride:    cloneInt(input.ConcurrentRequestLimitOverride),
+		IPConcurrentRequestLimitOverride:  cloneInt(input.IPConcurrentRequestLimitOverride),
 		RequestRateLimitPerMinuteOverride: cloneInt(input.RequestRateLimitPerMinuteOverride),
 		BalanceNanoUSD:                    input.BalanceNanoUSD,
 		Email:                             normalizeEmail(input.Email),
@@ -469,6 +471,7 @@ func (s *Service) UpdateUser(id string, input UserInput) (core.User, error) {
 	user.Role = nextRole
 	user.Enabled = nextEnabled
 	user.ConcurrentRequestLimitOverride = cloneInt(input.ConcurrentRequestLimitOverride)
+	user.IPConcurrentRequestLimitOverride = cloneInt(input.IPConcurrentRequestLimitOverride)
 	user.RequestRateLimitPerMinuteOverride = cloneInt(input.RequestRateLimitPerMinuteOverride)
 	if strings.TrimSpace(input.Password) != "" {
 		passwordHash, err := hashPassword(input.Password)

@@ -68,6 +68,13 @@ func (r *PostgresRepository) FinanceOverviewStats(startOfDay, endOfDay time.Time
 	stats.TodayBalanceSpendNanoUSD = addNanoUSDSaturating(stats.TodaySpendNanoUSD, -stats.TodayPlanSpendNanoUSD)
 	_ = r.db.QueryRow(`SELECT COUNT(*) FROM billing_requests WHERE status = ?`, string(core.BillingRequestUsageMissing)).Scan(&stats.UsageMissingCount)
 	_ = r.db.QueryRow(`SELECT COUNT(*) FROM billing_requests WHERE status = ?`, string(core.BillingRequestReserved)).Scan(&stats.UnsettledRequestCount)
+	_ = r.db.QueryRow(`
+		SELECT COALESCE(SUM(total_tokens), 0)
+		FROM finance_token_daily_rollups
+		WHERE user_id = ''
+			AND date >= ?
+			AND date < ?
+	`, startOfDay.Format("2006-01-02"), endOfDay.Format("2006-01-02")).Scan(&stats.TodayTotalTokens)
 	stats.ReconcileIssueCount = r.financeReconcileIssueCountLocked(time.Now().UTC())
 	return stats
 }

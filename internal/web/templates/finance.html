@@ -35,7 +35,7 @@
   <div class="metric"><span class="metric-label">{{t "today_balance_spend"}}</span><strong>{{formatUSD .Finance.Overview.TodayBalanceSpendNanoUSD}}</strong></div>
   <div class="metric"><span class="metric-label">{{t "today_plan_spend"}}</span><strong>{{formatUSD .Finance.Overview.TodayPlanSpendNanoUSD}}</strong></div>
   <div class="metric"><span class="metric-label">{{t "paid_payment_amount"}}</span><strong>{{formatUSD .Finance.Overview.PaidOrderNanoUSD}}</strong></div>
-  <div class="metric"><span class="metric-label">{{t "finance_risk_items"}}</span><strong>{{len .Finance.Overview.ReconcileIssues}}</strong></div>
+  <div class="metric"><span class="metric-label">{{t "finance_today_token_usage"}}</span><strong>{{formatInteger .Finance.Overview.TodayTotalTokens}}</strong></div>
 </section>
 
 <section class="finance-workspace" data-partial="finance-workspace">
@@ -275,7 +275,7 @@
             <td>{{formatTime .CreatedAt}}</td>
             <td>
               {{with userIdentity .UserID}}
-              {{if .Known}}<strong>{{.Username}}</strong>{{else}}<code>{{.ID}}</code>{{end}}
+              <a class="usage-user-link" href="{{userSearchPageURL .ID}}">{{if .Known}}<strong>{{.Username}}</strong>{{else}}<code>{{.ID}}</code>{{end}}</a>
               {{end}}
             </td>
             <td>{{billingLedgerKindText .Kind}}</td>
@@ -353,7 +353,7 @@
             <td>{{formatTime .CreatedAt}}</td>
             <td>
               {{with userIdentity .UserID}}
-              {{if .Known}}<strong>{{.Username}}</strong>{{else}}<code>{{.ID}}</code>{{end}}
+              <a class="usage-user-link" href="{{userSearchPageURL .ID}}">{{if .Known}}<strong>{{.Username}}</strong>{{else}}<code>{{.ID}}</code>{{end}}</a>
               {{end}}
             </td>
             <td><code>{{.OutTradeNo}}</code></td>

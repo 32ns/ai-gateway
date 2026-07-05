@@ -587,6 +587,10 @@ func renderFuncMap(s *Server, locale string, data any) template.FuncMap {
 		"userConcurrentRequestLimitText": func(user core.User) string {
 			return userConcurrentRequestLimitText(locale, user)
 		},
+		"userIPConcurrentRequestLimitValue": userIPConcurrentRequestLimitValue,
+		"userIPConcurrentRequestLimitText": func(user core.User) string {
+			return userIPConcurrentRequestLimitText(locale, user)
+		},
 		"userRequestRateLimitValue": userRequestRateLimitValue,
 		"userRequestRateLimitText": func(user core.User) string {
 			return userRequestRateLimitText(locale, user)
@@ -894,6 +898,23 @@ func userConcurrentRequestLimitText(locale string, user core.User) string {
 		return translate(locale, "unlimited")
 	}
 	return fmt.Sprint(*user.ConcurrentRequestLimitOverride)
+}
+
+func userIPConcurrentRequestLimitValue(user core.User) string {
+	if user.IPConcurrentRequestLimitOverride == nil {
+		return ""
+	}
+	return fmt.Sprint(*user.IPConcurrentRequestLimitOverride)
+}
+
+func userIPConcurrentRequestLimitText(locale string, user core.User) string {
+	if user.IPConcurrentRequestLimitOverride == nil {
+		return translate(locale, "unlimited")
+	}
+	if *user.IPConcurrentRequestLimitOverride == 0 {
+		return translate(locale, "unlimited")
+	}
+	return fmt.Sprint(*user.IPConcurrentRequestLimitOverride)
 }
 
 func userRequestRateLimitValue(user core.User) string {

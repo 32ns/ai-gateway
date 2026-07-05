@@ -115,6 +115,9 @@ func TestFinancePageAggregatesBillingAndPayments(t *testing.T) {
 	if got := page.Overview.TodaySpendNanoUSD; got != actualSpend {
 		t.Fatalf("today spend = %d, want %d", got, actualSpend)
 	}
+	if got := page.Overview.TodayTotalTokens; got != 15 {
+		t.Fatalf("today total tokens = %d, want 15", got)
+	}
 	if len(page.Daily) != 14 {
 		t.Fatalf("daily len = %d, want 14", len(page.Daily))
 	}

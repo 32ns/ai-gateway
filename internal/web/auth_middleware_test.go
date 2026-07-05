@@ -2390,6 +2390,25 @@ func TestFinancePageRendersOverview(t *testing.T) {
 	if _, _, err := repo.AdjustUserBalance(admin.ID, -2*core.NanoUSDPerUSD, "finance adjustment"); err != nil {
 		t.Fatalf("AdjustUserBalance returned error: %v", err)
 	}
+	if _, err := repo.ReserveBilling(core.BillingReservationInput{
+		RequestID:       "req_finance_tokens",
+		ClientID:        "client_finance",
+		UserID:          admin.ID,
+		Model:           "gpt-4.1",
+		ReservedNanoUSD: core.NanoUSDPerUSD,
+		Fingerprint:     "req_finance_tokens",
+	}); err != nil {
+		t.Fatalf("ReserveBilling returned error: %v", err)
+	}
+	if _, err := repo.SettleBilling(core.BillingSettlementInput{
+		RequestID:     "req_finance_tokens",
+		ClientID:      "client_finance",
+		Model:         "gpt-4.1",
+		Usage:         core.Usage{PromptTokens: 12000, CompletionTokens: 345, TotalTokens: 12345},
+		ActualNanoUSD: core.NanoUSDPerUSD,
+	}); err != nil {
+		t.Fatalf("SettleBilling returned error: %v", err)
+	}
 
 	server := NewServer(control, nil, "data/state.db")
 	handler := authenticatedAdminHandler(t, control, server.Handler())
@@ -2404,7 +2423,7 @@ func TestFinancePageRendersOverview(t *testing.T) {
 	if strings.Contains(body, `data-deferred-url="/admin/finance?partial=finance-page"`) {
 		t.Fatalf("finance page should not render an empty deferred shell: %s", body)
 	}
-	for _, want := range []string{"Total Balance", "Balance Spend", "Plan Spend", "Daily Report", "Model Usage", "Payment Orders", "Usage Charges", "Reconciliation"} {
+	for _, want := range []string{"Total Balance", "Balance Spend", "Plan Spend", "Today&#39;s Token Usage", "12,345", "Daily Report", "Model Usage", "Payment Orders", "Usage Charges", "Reconciliation"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("finance page missing %q: %s", want, body)
 		}
@@ -2422,7 +2441,7 @@ func TestFinancePageRendersOverview(t *testing.T) {
 		t.Fatalf("partial status = %d, want %d body=%s", rec.Code, http.StatusOK, rec.Body.String())
 	}
 	body = rec.Body.String()
-	for _, want := range []string{"Total Balance", "Daily Report", "Model Usage", "Payment Orders", "Usage Charges", "Reconciliation"} {
+	for _, want := range []string{"Total Balance", "Today&#39;s Token Usage", "12,345", "Daily Report", "Model Usage", "Payment Orders", "Usage Charges", "Reconciliation"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("finance partial missing %q: %s", want, body)
 		}
@@ -2454,6 +2473,9 @@ func TestFinancePageRendersOverview(t *testing.T) {
 	}
 	if !strings.Contains(body, ">admin</strong>") || strings.Contains(body, `<code>`+admin.ID+`</code>`) {
 		t.Fatalf("orders tab should render username instead of visible user id: %s", body)
+	}
+	if !strings.Contains(body, `href="`+userSearchPageURL(admin.ID)+`"><strong>admin</strong></a>`) {
+		t.Fatalf("orders tab should link username to user page: %s", body)
 	}
 
 	req = httptest.NewRequest(http.MethodGet, "/admin/finance?tab=orders&order_status=", nil)

@@ -54,7 +54,6 @@ func TestMemoryRepositorySystemSettings(t *testing.T) {
 	settings.Runtime.RegistrationEmailAllowlist = []string{" @Example.COM ", "@qq.com", "@example.com"}
 	settings.Runtime.UserConcurrentRequestLimit = 3
 	settings.Runtime.PlanConcurrentRequestLimit = 2
-	settings.Runtime.UserIPConcurrentRequestLimit = 4
 	settings.Runtime.UserRequestRateLimitPerMinute = 60
 	settings.Registration.NewUserRewardEnabled = true
 	settings.Registration.NewUserRewardNanoUSD = 1750
@@ -106,9 +105,6 @@ func TestMemoryRepositorySystemSettings(t *testing.T) {
 	}
 	if stored.Runtime.PlanConcurrentRequestLimit != 2 {
 		t.Fatalf("PlanConcurrentRequestLimit = %d, want 2", stored.Runtime.PlanConcurrentRequestLimit)
-	}
-	if stored.Runtime.UserIPConcurrentRequestLimit != 4 {
-		t.Fatalf("UserIPConcurrentRequestLimit = %d, want 4", stored.Runtime.UserIPConcurrentRequestLimit)
 	}
 	if stored.Runtime.UserRequestRateLimitPerMinute != 60 {
 		t.Fatalf("UserRequestRateLimitPerMinute = %d, want 60", stored.Runtime.UserRequestRateLimitPerMinute)
@@ -165,7 +161,6 @@ func TestSQLiteRepositoryPersistsSystemSettings(t *testing.T) {
 	settings.Runtime.RegistrationEmailAllowlist = []string{"@example.com"}
 	settings.Runtime.UserConcurrentRequestLimit = 4
 	settings.Runtime.PlanConcurrentRequestLimit = 6
-	settings.Runtime.UserIPConcurrentRequestLimit = 8
 	settings.Runtime.UserRequestRateLimitPerMinute = 90
 	settings.OAuth.GoogleLoginEnabled = true
 	settings.OAuth.GoogleLoginClientID = "google-client"
@@ -226,9 +221,6 @@ func TestSQLiteRepositoryPersistsSystemSettings(t *testing.T) {
 	}
 	if stored.Runtime.PlanConcurrentRequestLimit != 6 {
 		t.Fatalf("PlanConcurrentRequestLimit = %d, want 6", stored.Runtime.PlanConcurrentRequestLimit)
-	}
-	if stored.Runtime.UserIPConcurrentRequestLimit != 8 {
-		t.Fatalf("UserIPConcurrentRequestLimit = %d, want 8", stored.Runtime.UserIPConcurrentRequestLimit)
 	}
 	if stored.Runtime.UserRequestRateLimitPerMinute != 90 {
 		t.Fatalf("UserRequestRateLimitPerMinute = %d, want 90", stored.Runtime.UserRequestRateLimitPerMinute)

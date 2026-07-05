@@ -115,6 +115,7 @@ type FinanceOverviewStats struct {
 	TotalUsers               int
 	TotalClients             int
 	ActiveClients            int
+	TodayTotalTokens         int64
 }
 
 type FinanceEntityCounts struct {

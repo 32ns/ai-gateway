@@ -590,6 +590,61 @@ func TestUpdateUserStoresConcurrentRequestLimitOverride(t *testing.T) {
 	}
 }
 
+func TestUpdateUserStoresIPConcurrentRequestLimitOverride(t *testing.T) {
+	repo := storage.NewMemoryRepository()
+	initialLimit := 2
+	if err := repo.UpsertUser(core.User{
+		ID:                               "user_ip_concurrency",
+		Username:                         "ip-limited",
+		Role:                             core.UserRoleUser,
+		Enabled:                          true,
+		IPConcurrentRequestLimitOverride: &initialLimit,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	service := New(repo, providers.NewRegistry(&providers.OpenAIAdapter{}))
+	limit := 5
+	user, err := service.UpdateUser("user_ip_concurrency", UserInput{
+		Username:                         "ip-limited",
+		Role:                             core.UserRoleUser,
+		Enabled:                          true,
+		IPConcurrentRequestLimitOverride: &limit,
+	})
+	if err != nil {
+		t.Fatalf("UpdateUser returned error: %v", err)
+	}
+	if user.IPConcurrentRequestLimitOverride == nil || *user.IPConcurrentRequestLimitOverride != 5 {
+		t.Fatalf("IPConcurrentRequestLimitOverride = %#v, want 5", user.IPConcurrentRequestLimitOverride)
+	}
+
+	unlimited := 0
+	user, err = service.UpdateUser("user_ip_concurrency", UserInput{
+		Username:                         "ip-limited",
+		Role:                             core.UserRoleUser,
+		Enabled:                          true,
+		IPConcurrentRequestLimitOverride: &unlimited,
+	})
+	if err != nil {
+		t.Fatalf("UpdateUser unlimited returned error: %v", err)
+	}
+	if user.IPConcurrentRequestLimitOverride == nil || *user.IPConcurrentRequestLimitOverride != 0 {
+		t.Fatalf("IPConcurrentRequestLimitOverride = %#v, want 0", user.IPConcurrentRequestLimitOverride)
+	}
+
+	user, err = service.UpdateUser("user_ip_concurrency", UserInput{
+		Username: "ip-limited",
+		Role:     core.UserRoleUser,
+		Enabled:  true,
+	})
+	if err != nil {
+		t.Fatalf("UpdateUser inherit returned error: %v", err)
+	}
+	if user.IPConcurrentRequestLimitOverride != nil {
+		t.Fatalf("IPConcurrentRequestLimitOverride = %#v, want nil", user.IPConcurrentRequestLimitOverride)
+	}
+}
+
 func TestUpdateUserStoresRequestRateLimitOverride(t *testing.T) {
 	repo := storage.NewMemoryRepository()
 	initialLimit := 30

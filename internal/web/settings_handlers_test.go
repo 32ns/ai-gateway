@@ -21,7 +21,6 @@ func TestSystemSettingsFromFormParsesUserConcurrentRequestLimit(t *testing.T) {
 	form := url.Values{}
 	form.Set("user_concurrent_request_limit", "3")
 	form.Set("plan_concurrent_request_limit", "2")
-	form.Set("user_ip_concurrent_request_limit", "4")
 	form.Set("user_request_rate_limit_per_minute", "60")
 	form.Set("responses_websocket_upstream_present", "1")
 	form.Set("responses_websocket_upstream_enabled", "on")
@@ -29,9 +28,9 @@ func TestSystemSettingsFromFormParsesUserConcurrentRequestLimit(t *testing.T) {
 	form.Set("usage_log_max_age_days", "5")
 	form.Set("billing_ledger_retention_days", "14")
 	form.Set("image_user_console_enabled", "on")
-	form.Set("email_template_subject", "注册验证码")
-	form.Set("email_template_text", "验证码：{{code}}")
-	form.Set("email_template_html", "<p>验证码：<b>{{code}}</b></p>")
+	form.Set("email_template_subject", "\u6ce8\u518c\u9a8c\u8bc1\u7801")
+	form.Set("email_template_text", "\u9a8c\u8bc1\u7801\uff1a{{code}}")
+	form.Set("email_template_html", "<p>\u9a8c\u8bc1\u7801\uff1a<b>{{code}}</b></p>")
 
 	req := httptest.NewRequest(http.MethodPost, "/admin/settings", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -42,9 +41,6 @@ func TestSystemSettingsFromFormParsesUserConcurrentRequestLimit(t *testing.T) {
 	}
 	if settings.Runtime.PlanConcurrentRequestLimit != 2 {
 		t.Fatalf("PlanConcurrentRequestLimit = %d, want 2", settings.Runtime.PlanConcurrentRequestLimit)
-	}
-	if settings.Runtime.UserIPConcurrentRequestLimit != 4 {
-		t.Fatalf("UserIPConcurrentRequestLimit = %d, want 4", settings.Runtime.UserIPConcurrentRequestLimit)
 	}
 	if settings.Runtime.UserRequestRateLimitPerMinute != 60 {
 		t.Fatalf("UserRequestRateLimitPerMinute = %d, want 60", settings.Runtime.UserRequestRateLimitPerMinute)
@@ -64,7 +60,7 @@ func TestSystemSettingsFromFormParsesUserConcurrentRequestLimit(t *testing.T) {
 	if !core.ImageUserConsoleEnabled(settings.Image) {
 		t.Fatalf("ImageUserConsoleEnabled = false, want true")
 	}
-	if settings.Email.VerificationSubjectTemplate != "注册验证码" || settings.Email.VerificationTextTemplate != "验证码：{{code}}" || settings.Email.VerificationHTMLTemplate != "<p>验证码：<b>{{code}}</b></p>" {
+	if settings.Email.VerificationSubjectTemplate != "\u6ce8\u518c\u9a8c\u8bc1\u7801" || settings.Email.VerificationTextTemplate != "\u9a8c\u8bc1\u7801\uff1a{{code}}" || settings.Email.VerificationHTMLTemplate != "<p>\u9a8c\u8bc1\u7801\uff1a<b>{{code}}</b></p>" {
 		t.Fatalf("email templates = %#v", settings.Email)
 	}
 }
@@ -259,7 +255,6 @@ func TestSettingsPageRendersUserConcurrentRequestLimitField(t *testing.T) {
 	for _, want := range []string{
 		`name="user_concurrent_request_limit"`,
 		`name="plan_concurrent_request_limit"`,
-		`name="user_ip_concurrent_request_limit"`,
 		`name="user_request_rate_limit_per_minute"`,
 		`name="registration_username_min_length"`,
 		`name="usage_log_max_age_days"`,
@@ -268,31 +263,32 @@ func TestSettingsPageRendersUserConcurrentRequestLimitField(t *testing.T) {
 		`data-group-settings-open="email-template-editor"`,
 		`name="email_template_subject"`,
 		`name="payment_recharge_input_mode"`,
-		"验证邮件模版",
-		"用户名最小长度",
-		"用户并发请求上限",
-		"套餐并发请求上限",
-		"单用户同 IP 并发请求上限",
-		"用户请求速率上限（次/分钟）",
-		"使用日志保留天数",
-		"财务流水保留天数",
-		"充值输入口径",
-		"按人民币支付金额输入",
+		"\u9a8c\u8bc1\u90ae\u4ef6\u6a21\u7248",
+		"\u7528\u6237\u540d\u6700\u5c0f\u957f\u5ea6",
+		"\u7528\u6237\u5e76\u53d1\u8bf7\u6c42\u4e0a\u9650",
+		"\u5957\u9910\u5e76\u53d1\u8bf7\u6c42\u4e0a\u9650",
+		"\u7528\u6237\u8bf7\u6c42\u901f\u7387\u4e0a\u9650\uff08\u6b21/\u5206\u949f\uff09",
+		"\u4f7f\u7528\u65e5\u5fd7\u4fdd\u7559\u5929\u6570",
+		"\u8d22\u52a1\u6d41\u6c34\u4fdd\u7559\u5929\u6570",
+		"\u5145\u503c\u8f93\u5165\u53e3\u5f84",
+		"\u6309\u4eba\u6c11\u5e01\u652f\u4ed8\u91d1\u989d\u8f93\u5165",
 		`href="#settings-image"`,
-		"图片设置",
+		"\u56fe\u7247\u8bbe\u7f6e",
 		"image_user_console_enabled",
-		"向普通用户显示生图工作台",
+		"\u5411\u666e\u901a\u7528\u6237\u663e\u793a\u751f\u56fe\u5de5\u4f5c\u53f0",
 		"image_backend",
-		"保存后立即生效的本地上限。用户、套餐或单用户同 IP 并发请求设为 0 表示不限制；请求速率设为 0 表示不触发 429 限速。财务流水最少保留 3 天。",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("settings page missing %q: %s", want, body)
 		}
 	}
-	if strings.Contains(body, `name="usage_log_max_rows"`) || strings.Contains(body, "使用日志保留数量") {
+	if strings.Contains(body, `name="usage_log_max_rows"`) || strings.Contains(body, "\u4f7f\u7528\u65e5\u5fd7\u4fdd\u7559\u6570\u91cf") {
 		t.Fatalf("settings page should not render usage log row limit: %s", body)
 	}
-	for _, hidden := range []string{`name="backup_android_auto_enabled"`, `name="backup_android_time"`, `name="backup_android_data" value="billing"`, "自动备份到 Android"} {
+	if strings.Contains(body, `name="user_ip_concurrent_request_limit"`) || strings.Contains(body, "\u5355\u7528\u6237\u540c IP \u5e76\u53d1\u8bf7\u6c42\u4e0a\u9650") {
+		t.Fatalf("settings page should not render user same-IP concurrency setting: %s", body)
+	}
+	for _, hidden := range []string{`name="backup_android_auto_enabled"`, `name="backup_android_time"`, `name="backup_android_data" value="billing"`, "\u81ea\u52a8\u5907\u4efd\u5230 Android"} {
 		if strings.Contains(body, hidden) {
 			t.Fatalf("settings page should hide PersonalPay Android backup without PersonalPay integration, found %q: %s", hidden, body)
 		}
@@ -329,7 +325,7 @@ func TestSettingsPageRendersAndroidBackupWhenPersonalPayIntegrated(t *testing.T)
 	server.renderSettingsPage(rec, req, settings, false, "", http.StatusOK)
 
 	body := rec.Body.String()
-	for _, want := range []string{`name="backup_android_auto_enabled" checked`, `name="backup_android_time" value="02:30"`, `name="backup_android_data" value="billing" checked`, "自动备份到 Android"} {
+	for _, want := range []string{`name="backup_android_auto_enabled" checked`, `name="backup_android_time" value="02:30"`, `name="backup_android_data" value="billing" checked`, "\u81ea\u52a8\u5907\u4efd\u5230 Android"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("settings page missing PersonalPay backup field %q: %s", want, body)
 		}
@@ -351,9 +347,9 @@ func TestSettingsPageRendersPersonalPayRuntime(t *testing.T) {
 
 	body := rec.Body.String()
 	for _, want := range []string{
-		"Android 设备",
-		"在线账号",
-		"还没有 Android 支付设备连接",
+		"Android \u8bbe\u5907",
+		"\u5728\u7ebf\u8d26\u53f7",
+		"\u8fd8\u6ca1\u6709 Android \u652f\u4ed8\u8bbe\u5907\u8fde\u63a5",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("settings page missing %q: %s", want, body)
@@ -375,7 +371,7 @@ func TestSettingsPageRendersPersonalPayReleaseOrderAction(t *testing.T) {
 				Accounts: []personalpay.Account{{
 					ID:          "device-1:wechat:account-1",
 					Channel:     personalpay.ChannelWeChat,
-					DisplayName: "微信账号",
+					DisplayName: "\u5fae\u4fe1\u8d26\u53f7",
 					Status:      personalpay.AccountOccupied,
 					OccupiedBy:  "pay_occupied",
 				}},
@@ -394,7 +390,7 @@ func TestSettingsPageRendersPersonalPayReleaseOrderAction(t *testing.T) {
 	body := rec.Body.String()
 	for _, want := range []string{
 		`/admin/personalpay/accounts/device-1:wechat:account-1/release`,
-		"释放订单",
+		"\u91ca\u653e\u8ba2\u5355",
 		"pay_occupied",
 	} {
 		if !strings.Contains(body, want) {
@@ -519,6 +515,52 @@ func TestUserInputFromFormParsesRequestRateLimitOverride(t *testing.T) {
 	}
 }
 
+func TestUserInputFromFormParsesIPConcurrentRequestLimitOverride(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   string
+		want    *int
+		wantErr bool
+	}{
+		{name: "unlimited empty", value: ""},
+		{name: "unlimited zero", value: "0", want: intPtr(0)},
+		{name: "positive", value: "12", want: intPtr(12)},
+		{name: "negative", value: "-1", wantErr: true},
+		{name: "invalid", value: "abc", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			form := url.Values{}
+			form.Set("username", "alice")
+			form.Set("role", string(core.UserRoleUser))
+			form.Set("enabled", "on")
+			form.Set("ip_concurrent_request_limit", tt.value)
+			req := httptest.NewRequest(http.MethodPost, "/admin/users/user_1/edit", strings.NewReader(form.Encode()))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+			input, err := userInputFromForm(req)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("userInputFromForm returned error: %v", err)
+			}
+			switch {
+			case tt.want == nil && input.IPConcurrentRequestLimitOverride != nil:
+				t.Fatalf("IPConcurrentRequestLimitOverride = %#v, want nil", input.IPConcurrentRequestLimitOverride)
+			case tt.want != nil && input.IPConcurrentRequestLimitOverride == nil:
+				t.Fatalf("IPConcurrentRequestLimitOverride = nil, want %d", *tt.want)
+			case tt.want != nil && *input.IPConcurrentRequestLimitOverride != *tt.want:
+				t.Fatalf("IPConcurrentRequestLimitOverride = %d, want %d", *input.IPConcurrentRequestLimitOverride, *tt.want)
+			}
+		})
+	}
+}
+
 func TestUsersPageRendersConcurrentRequestLimitOverrideControls(t *testing.T) {
 	repo := storage.NewMemoryRepository()
 	registry := providers.NewRegistry(&providers.OpenAIAdapter{})
@@ -533,6 +575,7 @@ func TestUsersPageRendersConcurrentRequestLimitOverrideControls(t *testing.T) {
 		Role:                              core.UserRoleUser,
 		Enabled:                           true,
 		ConcurrentRequestLimitOverride:    &unlimited,
+		IPConcurrentRequestLimitOverride:  &unlimited,
 		RequestRateLimitPerMinuteOverride: &unlimited,
 	})
 	if err != nil {
@@ -552,11 +595,13 @@ func TestUsersPageRendersConcurrentRequestLimitOverrideControls(t *testing.T) {
 	body := rec.Body.String()
 	for _, want := range []string{
 		`name="concurrent_request_limit"`,
+		`name="ip_concurrent_request_limit"`,
 		`name="request_rate_limit_per_minute"`,
 		`value="0"`,
-		"单用户并发请求上限",
-		"单用户请求速率上限（次/分钟）",
-		"留空继承系统默认",
+		"\u5355\u7528\u6237\u5e76\u53d1\u8bf7\u6c42\u4e0a\u9650",
+		"\u5355\u7528\u6237\u540c IP \u5e76\u53d1\u8bf7\u6c42\u4e0a\u9650",
+		"\u5355\u7528\u6237\u8bf7\u6c42\u901f\u7387\u4e0a\u9650\uff08\u6b21/\u5206\u949f\uff09",
+		"\u7559\u7a7a\u7ee7\u627f\u7cfb\u7edf\u9ed8\u8ba4",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("users page missing %q: %s", want, body)
@@ -570,7 +615,7 @@ func TestUsersPageRendersConcurrentRequestLimitOverrideControls(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("details status = %d, want %d body=%s", rec.Code, http.StatusOK, rec.Body.String())
 	}
-	if body := rec.Body.String(); !strings.Contains(body, ">不限<") {
+	if body := rec.Body.String(); !strings.Contains(body, ">\u4e0d\u9650<") {
 		t.Fatalf("user details missing unlimited override text: %s", body)
 	}
 }

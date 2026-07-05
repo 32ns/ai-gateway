@@ -704,10 +704,6 @@
         <input type="number" min="0" max="100000" name="plan_concurrent_request_limit" value="{{.Settings.Runtime.PlanConcurrentRequestLimit}}" form="system-settings-form">
       </label>
       <label>
-        <span>{{t "user_ip_concurrent_request_limit"}}</span>
-        <input type="number" min="0" max="100000" name="user_ip_concurrent_request_limit" value="{{.Settings.Runtime.UserIPConcurrentRequestLimit}}" form="system-settings-form">
-      </label>
-      <label>
         <span>{{t "user_request_rate_limit_per_minute"}}</span>
         <input type="number" min="0" max="100000" name="user_request_rate_limit_per_minute" value="{{.Settings.Runtime.UserRequestRateLimitPerMinute}}" form="system-settings-form">
       </label>

@@ -246,6 +246,9 @@ func auditUserUpdateChangeMessage(before, after core.User, hasBefore bool, passw
 		if after.ConcurrentRequestLimitOverride != nil {
 			fields = append(fields, auditMessageField{Key: "user_concurrent_request_limit_override", Value: auditOptionalIntValue(after.ConcurrentRequestLimitOverride)})
 		}
+		if after.IPConcurrentRequestLimitOverride != nil {
+			fields = append(fields, auditMessageField{Key: "user_ip_concurrent_request_limit_override", Value: auditOptionalIntValue(after.IPConcurrentRequestLimitOverride)})
+		}
 		if after.RequestRateLimitPerMinuteOverride != nil {
 			fields = append(fields, auditMessageField{Key: "user_request_rate_limit_override", Value: auditOptionalIntValue(after.RequestRateLimitPerMinuteOverride)})
 		}
@@ -256,6 +259,7 @@ func auditUserUpdateChangeMessage(before, after core.User, hasBefore bool, passw
 		auditTextChange("role", string(before.Role), string(after.Role)),
 		auditBoolChange("enabled", before.Enabled, after.Enabled),
 		auditOptionalIntChange("user_concurrent_request_limit_override", before.ConcurrentRequestLimitOverride, after.ConcurrentRequestLimitOverride),
+		auditOptionalIntChange("user_ip_concurrent_request_limit_override", before.IPConcurrentRequestLimitOverride, after.IPConcurrentRequestLimitOverride),
 		auditOptionalIntChange("user_request_rate_limit_override", before.RequestRateLimitPerMinuteOverride, after.RequestRateLimitPerMinuteOverride),
 	}
 	if passwordChanged {
@@ -292,9 +296,6 @@ func auditSystemSettingsChangeMessage(before, after core.SystemSettings, hasBefo
 		}
 		if after.Runtime.PlanConcurrentRequestLimit > 0 {
 			fields = append(fields, auditMessageField{Key: "plan_concurrent_request_limit", Value: strconv.Itoa(after.Runtime.PlanConcurrentRequestLimit)})
-		}
-		if after.Runtime.UserIPConcurrentRequestLimit > 0 {
-			fields = append(fields, auditMessageField{Key: "user_ip_concurrent_request_limit", Value: strconv.Itoa(after.Runtime.UserIPConcurrentRequestLimit)})
 		}
 		if after.Runtime.UserRequestRateLimitPerMinute > 0 {
 			fields = append(fields, auditMessageField{Key: "user_request_rate_limit_per_minute", Value: strconv.Itoa(after.Runtime.UserRequestRateLimitPerMinute)})
@@ -400,7 +401,6 @@ func auditSystemSettingsChangeMessage(before, after core.SystemSettings, hasBefo
 		auditTextChange("user_dashboard_custom_panel_html", before.UserDashboard.CustomPanelHTML, after.UserDashboard.CustomPanelHTML),
 		auditIntChange("user_concurrent_request_limit", before.Runtime.UserConcurrentRequestLimit, after.Runtime.UserConcurrentRequestLimit),
 		auditIntChange("plan_concurrent_request_limit", before.Runtime.PlanConcurrentRequestLimit, after.Runtime.PlanConcurrentRequestLimit),
-		auditIntChange("user_ip_concurrent_request_limit", before.Runtime.UserIPConcurrentRequestLimit, after.Runtime.UserIPConcurrentRequestLimit),
 		auditIntChange("audit_limit", before.Retention.AuditLimit, after.Retention.AuditLimit),
 		auditIntChange("usage_log_max_age_days", before.Retention.UsageLogMaxAgeDays, after.Retention.UsageLogMaxAgeDays),
 		auditIntChange("billing_ledger_retention_days", before.Retention.BillingLedgerRetentionDays, after.Retention.BillingLedgerRetentionDays),

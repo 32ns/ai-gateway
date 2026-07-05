@@ -80,6 +80,12 @@ func TestSQLiteRepositoryFinanceAggregateQueries(t *testing.T) {
 	}
 
 	startOfDay := time.Date(now.Local().Year(), now.Local().Month(), now.Local().Day(), 0, 0, 0, 0, now.Local().Location())
+	if _, err := repo.db.Exec(`
+		INSERT INTO finance_token_daily_rollups(date, user_id, username, request_count, prompt_tokens, cached_tokens, cache_creation_tokens, completion_tokens, image_output_tokens, total_tokens)
+		VALUES (?, '', '', 1, 999, 0, 0, 0, 0, 999)
+	`, startOfDay.AddDate(0, 0, -1).Format("2006-01-02")); err != nil {
+		t.Fatalf("insert historical token rollup returned error: %v", err)
+	}
 	stats := repo.FinanceOverviewStats(startOfDay, startOfDay.AddDate(0, 0, 1))
 	if stats.TotalUsers != 1 || stats.TotalClients != 1 || stats.ActiveClients != 1 {
 		t.Fatalf("counts = users %d clients %d active %d", stats.TotalUsers, stats.TotalClients, stats.ActiveClients)
@@ -89,6 +95,9 @@ func TestSQLiteRepositoryFinanceAggregateQueries(t *testing.T) {
 	}
 	if stats.TodayBalanceSpendNanoUSD != actualSpend || stats.TodayPlanSpendNanoUSD != 0 {
 		t.Fatalf("spend split = balance %d plan %d, want balance %d plan 0", stats.TodayBalanceSpendNanoUSD, stats.TodayPlanSpendNanoUSD, actualSpend)
+	}
+	if stats.TodayTotalTokens != 15 {
+		t.Fatalf("today total token usage = %d, want 15", stats.TodayTotalTokens)
 	}
 
 	income := repo.ListPaymentIncomeByDay(startOfDay, 1)
@@ -131,6 +140,54 @@ func TestSQLiteRepositoryFinanceAggregateQueries(t *testing.T) {
 	clients = repo.ListFinanceTopClientsBySpend(5)
 	if len(clients) != 1 || clients[0].ClientID != clientID || clients[0].ClientName != "Finance Aggregate Client" || clients[0].OwnerUserID != userID || clients[0].SpendUsedNanoUSD != actualSpend {
 		t.Fatalf("deleted top clients = %#v", clients)
+	}
+}
+
+func TestMemoryRepositoryFinanceOverviewStatsUsesTodayTokenUsage(t *testing.T) {
+	repo := NewMemoryRepository()
+	userID := "user_today_tokens"
+	clientID := "client_today_tokens"
+	if err := repo.UpsertUser(core.User{ID: userID, Username: "today-tokens", Enabled: true, BalanceNanoUSD: core.NanoUSDPerUSD}); err != nil {
+		t.Fatalf("UpsertUser returned error: %v", err)
+	}
+	if err := repo.UpsertClient(core.APIClient{ID: clientID, Name: "Today Tokens", APIKey: "gw_today_tokens", OwnerUserID: userID, Enabled: true}); err != nil {
+		t.Fatalf("UpsertClient returned error: %v", err)
+	}
+	settle := func(requestID string, totalTokens int) {
+		t.Helper()
+		if _, err := repo.ReserveBilling(core.BillingReservationInput{
+			RequestID:   requestID,
+			ClientID:    clientID,
+			UserID:      userID,
+			Model:       "gpt-token",
+			Fingerprint: requestID,
+		}); err != nil {
+			t.Fatalf("ReserveBilling(%s) returned error: %v", requestID, err)
+		}
+		if _, err := repo.SettleBilling(core.BillingSettlementInput{
+			RequestID:     requestID,
+			ClientID:      clientID,
+			Model:         "gpt-token",
+			Usage:         core.Usage{TotalTokens: totalTokens},
+			ActualNanoUSD: 1,
+		}); err != nil {
+			t.Fatalf("SettleBilling(%s) returned error: %v", requestID, err)
+		}
+	}
+	settle("req_today_tokens", 10)
+	settle("req_yesterday_tokens", 90)
+
+	repo.mu.Lock()
+	old := repo.billing[billingRequestKey("req_yesterday_tokens", clientID)]
+	old.CreatedAt = time.Now().AddDate(0, 0, -1)
+	repo.billing[billingRequestKey("req_yesterday_tokens", clientID)] = old
+	repo.mu.Unlock()
+
+	now := time.Now()
+	startOfDay := time.Date(now.Local().Year(), now.Local().Month(), now.Local().Day(), 0, 0, 0, 0, now.Local().Location())
+	stats := repo.FinanceOverviewStats(startOfDay, startOfDay.AddDate(0, 0, 1))
+	if stats.TodayTotalTokens != 10 {
+		t.Fatalf("today total token usage = %d, want 10", stats.TodayTotalTokens)
 	}
 }
 

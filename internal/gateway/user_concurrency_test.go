@@ -322,9 +322,8 @@ func TestReserveUserConcurrentRequestSlotReleasesUserSlotWhenPlanLimitFails(t *t
 
 func TestReserveUserIPConcurrencySlotRejectsSameUserSameIP(t *testing.T) {
 	repo := storage.NewMemoryRepository()
-	settings := core.DefaultSystemSettings()
-	settings.Runtime.UserIPConcurrentRequestLimit = 1
-	if err := repo.UpsertSystemSettings(settings); err != nil {
+	limit := 1
+	if err := repo.UpsertUser(core.User{ID: "user_ip", Username: "user-ip", Enabled: true, IPConcurrentRequestLimitOverride: &limit}); err != nil {
 		t.Fatal(err)
 	}
 	service := New(repo, nil, nil)
@@ -355,9 +354,11 @@ func TestReserveUserIPConcurrencySlotRejectsSameUserSameIP(t *testing.T) {
 
 func TestReserveUserIPConcurrencySlotAllowsDifferentIPOrUser(t *testing.T) {
 	repo := storage.NewMemoryRepository()
-	settings := core.DefaultSystemSettings()
-	settings.Runtime.UserIPConcurrentRequestLimit = 1
-	if err := repo.UpsertSystemSettings(settings); err != nil {
+	limit := 1
+	if err := repo.UpsertUser(core.User{ID: "user_ip_a", Username: "user-ip-a", Enabled: true, IPConcurrentRequestLimitOverride: &limit}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.UpsertUser(core.User{ID: "user_ip_b", Username: "user-ip-b", Enabled: true, IPConcurrentRequestLimitOverride: &limit}); err != nil {
 		t.Fatal(err)
 	}
 	service := New(repo, nil, nil)
@@ -386,8 +387,11 @@ func TestReserveUserRequestSlotReleasesConcurrencyWhenUserIPRejected(t *testing.
 	settings := core.DefaultSystemSettings()
 	settings.Runtime.UserConcurrentRequestLimit = 1
 	settings.Runtime.PlanConcurrentRequestLimit = 1
-	settings.Runtime.UserIPConcurrentRequestLimit = 1
 	if err := repo.UpsertSystemSettings(settings); err != nil {
+		t.Fatal(err)
+	}
+	ipLimit := 1
+	if err := repo.UpsertUser(core.User{ID: "user_ip_release", Username: "user-ip-release", Enabled: true, IPConcurrentRequestLimitOverride: &ipLimit}); err != nil {
 		t.Fatal(err)
 	}
 	service := New(repo, nil, nil)
@@ -599,9 +603,8 @@ func TestExecuteUserRequestRateLimitDoesNotAppendGatewayAudit(t *testing.T) {
 
 func TestExecuteRejectsSecondConcurrentRequestFromSameUserIP(t *testing.T) {
 	repo := storage.NewMemoryRepository()
-	settings := core.DefaultSystemSettings()
-	settings.Runtime.UserIPConcurrentRequestLimit = 1
-	if err := repo.UpsertSystemSettings(settings); err != nil {
+	ipLimit := 1
+	if err := repo.UpsertUser(core.User{ID: "user_ip_limit", Username: "user-ip-limit", Enabled: true, BalanceNanoUSD: core.NanoUSDPerUSD, IPConcurrentRequestLimitOverride: &ipLimit}); err != nil {
 		t.Fatal(err)
 	}
 	seedGatewayModel(t, repo, "gpt-4.1", core.ProviderOpenAI)

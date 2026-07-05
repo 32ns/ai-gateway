@@ -1098,16 +1098,23 @@ func (s *Service) reservePlanConcurrencySlot(client *core.APIClient) (func(), er
 	}, nil
 }
 
-func (s *Service) userIPConcurrentRequestLimit() int {
-	limit := s.currentSystemSettings().Runtime.UserIPConcurrentRequestLimit
-	if limit < 0 {
+func (s *Service) userIPConcurrentRequestLimit(client *core.APIClient) int {
+	if s == nil || s.repo == nil || client == nil {
 		return 0
 	}
-	return limit
+	ownerID := strings.TrimSpace(client.OwnerUserID)
+	if ownerID == "" {
+		return 0
+	}
+	user, err := s.repo.GetUser(ownerID)
+	if err != nil || user.IPConcurrentRequestLimitOverride == nil {
+		return 0
+	}
+	return *user.IPConcurrentRequestLimitOverride
 }
 
 func (s *Service) reserveUserIPConcurrencySlot(client *core.APIClient, clientIP string) (func(), error) {
-	limit := s.userIPConcurrentRequestLimit()
+	limit := s.userIPConcurrentRequestLimit(client)
 	if limit <= 0 {
 		return func() {}, nil
 	}

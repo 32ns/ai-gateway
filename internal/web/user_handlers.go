@@ -448,6 +448,9 @@ func (s *Server) handleUserCreateSubmit(w http.ResponseWriter, r *http.Request) 
 	if user.ConcurrentRequestLimitOverride != nil {
 		detail += " user_concurrent_request_limit_override=" + auditOptionalIntValue(user.ConcurrentRequestLimitOverride)
 	}
+	if user.IPConcurrentRequestLimitOverride != nil {
+		detail += " user_ip_concurrent_request_limit_override=" + auditOptionalIntValue(user.IPConcurrentRequestLimitOverride)
+	}
 	if user.RequestRateLimitPerMinuteOverride != nil {
 		detail += " user_request_rate_limit_override=" + auditOptionalIntValue(user.RequestRateLimitPerMinuteOverride)
 	}

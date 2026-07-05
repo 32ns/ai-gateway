@@ -66,6 +66,8 @@ func (r *MemoryRepository) FinanceOverviewStats(startOfDay, endOfDay time.Time) 
 	for _, request := range r.billing {
 		requests[billingRequestKey(request.RequestID, request.ClientID)] = struct{}{}
 		if memoryWithinWindow(request.CreatedAt, startOfDay, endOfDay) {
+			_, _, _, _, _, total := billingRequestTokenUsageAmount(request.Status, request.PromptTokens, request.CachedPromptTokens, request.CacheCreationTokens, request.CompletionTokens, request.ImageOutputTokens, request.TotalTokens)
+			stats.TodayTotalTokens = addTokenCountSaturating(stats.TodayTotalTokens, total)
 			spend := billingRequestUsageSpendAmount(request.Status, request.ReservedNanoUSD, request.ActualNanoUSD)
 			stats.TodaySpendNanoUSD = addNanoUSDSaturating(stats.TodaySpendNanoUSD, spend)
 			if core.NormalizeClientBillingSource(request.BillingSource) == core.ClientBillingSourcePlan {

@@ -40,6 +40,7 @@ func cloneAccountGroup(group core.AccountGroup) core.AccountGroup {
 func cloneUser(user core.User) core.User {
 	copyUser := user
 	copyUser.ConcurrentRequestLimitOverride = cloneIntPtr(user.ConcurrentRequestLimitOverride)
+	copyUser.IPConcurrentRequestLimitOverride = cloneIntPtr(user.IPConcurrentRequestLimitOverride)
 	copyUser.RequestRateLimitPerMinuteOverride = cloneIntPtr(user.RequestRateLimitPerMinuteOverride)
 	copyUser.LastLoginAt = cloneTimePtr(user.LastLoginAt)
 	copyUser.OAuthIdentities = slices.Clone(user.OAuthIdentities)

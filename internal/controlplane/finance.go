@@ -24,6 +24,7 @@ type FinanceOverview struct {
 	TotalUsers               int
 	TotalClients             int
 	ActiveClients            int
+	TodayTotalTokens         int64
 	RecentLedger             []core.BillingLedgerEntry
 	TopUsersBySpend          []FinanceUserSummary
 	TopClientsBySpend        []FinanceClientSpendSummary
@@ -247,6 +248,7 @@ func financeOverviewFromStats(stats storage.FinanceOverviewStats) FinanceOvervie
 		TotalUsers:               stats.TotalUsers,
 		TotalClients:             stats.TotalClients,
 		ActiveClients:            stats.ActiveClients,
+		TodayTotalTokens:         stats.TodayTotalTokens,
 		ReconcileIssues:          financeReconcileIssuePlaceholders(stats.ReconcileIssueCount),
 	}
 }

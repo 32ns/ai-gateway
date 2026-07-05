@@ -115,6 +115,7 @@ type FinanceOverviewStats struct {
 	TotalUsers               int
 	TotalClients             int
 	ActiveClients            int
+	TodayTotalTokens         int64
 }
 
 type FinanceEntityCounts struct {
@@ -642,4 +643,8 @@ func addNanoUSDSaturating(a, b int64) int64 {
 		return -1 << 63
 	}
 	return a + b
+}
+
+func addTokenCountSaturating(a, b int64) int64 {
+	return addNanoUSDSaturating(a, b)
 }

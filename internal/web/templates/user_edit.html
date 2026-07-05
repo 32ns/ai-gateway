@@ -38,6 +38,11 @@
       <p class="field-note">{{t "user_concurrent_request_limit_override_hint"}}</p>
     </label>
     <label>
+      <span>{{t "user_ip_concurrent_request_limit_override"}}</span>
+      <input type="number" min="0" max="100000" name="ip_concurrent_request_limit" value="{{userIPConcurrentRequestLimitValue .User}}" placeholder="{{t "unlimited"}}">
+      <p class="field-note">{{t "user_ip_concurrent_request_limit_override_hint"}}</p>
+    </label>
+    <label>
       <span>{{t "user_request_rate_limit_override"}}</span>
       <input type="number" min="0" max="100000" name="request_rate_limit_per_minute" value="{{userRequestRateLimitValue .User}}" placeholder="{{t "inherit_system_default"}}">
       <p class="field-note">{{t "user_request_rate_limit_override_hint"}}</p>

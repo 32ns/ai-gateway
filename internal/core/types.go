@@ -666,7 +666,6 @@ type SystemRuntimeSettings struct {
 	RegistrationEmailAllowlist        []string
 	UserConcurrentRequestLimit        int
 	PlanConcurrentRequestLimit        int
-	UserIPConcurrentRequestLimit      int
 	UserRequestRateLimitPerMinute     int
 	ResponsesWebSocketUpstreamEnabled *bool
 }
@@ -963,9 +962,6 @@ func NormalizeSystemSettings(settings SystemSettings) SystemSettings {
 	}
 	if settings.Runtime.PlanConcurrentRequestLimit < 0 {
 		settings.Runtime.PlanConcurrentRequestLimit = 0
-	}
-	if settings.Runtime.UserIPConcurrentRequestLimit < 0 {
-		settings.Runtime.UserIPConcurrentRequestLimit = 0
 	}
 	if settings.Runtime.UserRequestRateLimitPerMinute < 0 {
 		settings.Runtime.UserRequestRateLimitPerMinute = 0
@@ -1281,6 +1277,7 @@ type User struct {
 	Role                              UserRole
 	Enabled                           bool
 	ConcurrentRequestLimitOverride    *int
+	IPConcurrentRequestLimitOverride  *int
 	RequestRateLimitPerMinuteOverride *int
 	BalanceNanoUSD                    int64
 	Email                             string

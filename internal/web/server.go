@@ -1007,7 +1007,6 @@ func systemSettingsFromForm(r *http.Request, existing core.SystemSettings) core.
 		RegistrationEmailAllowlist:        parseEmailListFormValue(r.FormValue("registration_email_allowlist")),
 		UserConcurrentRequestLimit:        parseIntFormValue(r.FormValue("user_concurrent_request_limit")),
 		PlanConcurrentRequestLimit:        parseIntFormValue(r.FormValue("plan_concurrent_request_limit")),
-		UserIPConcurrentRequestLimit:      parseIntFormValue(r.FormValue("user_ip_concurrent_request_limit")),
 		UserRequestRateLimitPerMinute:     parseIntFormValue(r.FormValue("user_request_rate_limit_per_minute")),
 		ResponsesWebSocketUpstreamEnabled: responsesWebSocketUpstreamEnabled,
 	}
@@ -1154,6 +1153,10 @@ func userInputFromForm(r *http.Request) (controlplane.UserInput, error) {
 	if err != nil {
 		return controlplane.UserInput{}, err
 	}
+	ipConcurrentRequestLimit, err := parseUserIPConcurrentRequestLimitOverride(r.FormValue("ip_concurrent_request_limit"))
+	if err != nil {
+		return controlplane.UserInput{}, err
+	}
 	requestRateLimit, err := parseUserRequestRateLimitOverride(r.FormValue("request_rate_limit_per_minute"))
 	if err != nil {
 		return controlplane.UserInput{}, err
@@ -1164,12 +1167,17 @@ func userInputFromForm(r *http.Request) (controlplane.UserInput, error) {
 		Role:                              core.UserRole(r.FormValue("role")),
 		Enabled:                           r.FormValue("enabled") == "on",
 		ConcurrentRequestLimitOverride:    concurrentRequestLimit,
+		IPConcurrentRequestLimitOverride:  ipConcurrentRequestLimit,
 		RequestRateLimitPerMinuteOverride: requestRateLimit,
 	}, nil
 }
 
 func parseUserConcurrentRequestLimitOverride(value string) (*int, error) {
 	return parseOptionalNonNegativeInt(value, "concurrent request limit")
+}
+
+func parseUserIPConcurrentRequestLimitOverride(value string) (*int, error) {
+	return parseOptionalNonNegativeInt(value, "ip concurrent request limit")
 }
 
 func parseUserRequestRateLimitOverride(value string) (*int, error) {
