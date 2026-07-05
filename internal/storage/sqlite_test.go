@@ -46,6 +46,78 @@ func TestSQLiteRepositoryEnablesForeignKeysOnPooledConnections(t *testing.T) {
 	}
 }
 
+func TestSQLiteRepositoryDoesNotCompactOnOpen(t *testing.T) {
+	tempDir := t.TempDir()
+	statePath := filepath.Join(tempDir, "state.db")
+
+	repo, err := NewSQLiteRepository(statePath, "")
+	if err != nil {
+		t.Fatalf("NewSQLiteRepository returned error: %v", err)
+	}
+
+	if _, err := repo.db.Exec(`CREATE TABLE startup_compact_probe(id INTEGER PRIMARY KEY, payload TEXT)`); err != nil {
+		t.Fatalf("create startup compact probe table: %v", err)
+	}
+	tx, err := repo.db.Begin()
+	if err != nil {
+		t.Fatalf("begin startup compact probe insert: %v", err)
+	}
+	stmt, err := tx.Prepare(`INSERT INTO startup_compact_probe(payload) VALUES(?)`)
+	if err != nil {
+		_ = tx.Rollback()
+		t.Fatalf("prepare startup compact probe insert: %v", err)
+	}
+	payload := strings.Repeat("x", 4096)
+	for i := int64(0); i < minSQLiteVacuumFreePages+256; i++ {
+		if _, err := stmt.Exec(payload); err != nil {
+			_ = stmt.Close()
+			_ = tx.Rollback()
+			t.Fatalf("insert startup compact probe row %d: %v", i, err)
+		}
+	}
+	if err := stmt.Close(); err != nil {
+		_ = tx.Rollback()
+		t.Fatalf("close startup compact probe statement: %v", err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("commit startup compact probe rows: %v", err)
+	}
+	if _, err := repo.db.Exec(`DELETE FROM startup_compact_probe`); err != nil {
+		t.Fatalf("delete startup compact probe rows: %v", err)
+	}
+	if _, err := repo.db.Exec(`PRAGMA wal_checkpoint(TRUNCATE)`); err != nil {
+		t.Fatalf("checkpoint startup compact probe rows: %v", err)
+	}
+	freeBefore, pageBefore := sqlitePageStats(t, repo.db)
+	if freeBefore < minSQLiteVacuumFreePages || freeBefore*4 < pageBefore {
+		t.Skipf("sqlite did not create enough free pages for compact test: free=%d pages=%d", freeBefore, pageBefore)
+	}
+	if err := repo.Close(); err != nil {
+		t.Fatalf("close sqlite repository: %v", err)
+	}
+
+	reopened, err := NewSQLiteRepository(statePath, "")
+	if err != nil {
+		t.Fatalf("reopen sqlite repository: %v", err)
+	}
+	t.Cleanup(func() { _ = reopened.Close() })
+	freeAfter, pageAfter := sqlitePageStats(t, reopened.db)
+	if freeAfter < minSQLiteVacuumFreePages || freeAfter*4 < pageAfter {
+		t.Fatalf("sqlite repository compacted during open: before free=%d pages=%d; after free=%d pages=%d", freeBefore, pageBefore, freeAfter, pageAfter)
+	}
+}
+
+func sqlitePageStats(t *testing.T, db *sql.DB) (freePages, pageCount int64) {
+	t.Helper()
+	if err := db.QueryRow(`PRAGMA freelist_count`).Scan(&freePages); err != nil {
+		t.Fatalf("query sqlite freelist_count: %v", err)
+	}
+	if err := db.QueryRow(`PRAGMA page_count`).Scan(&pageCount); err != nil {
+		t.Fatalf("query sqlite page_count: %v", err)
+	}
+	return freePages, pageCount
+}
+
 func TestSQLiteRepositoryMigratesBillingPlanGroupQuotaPriceRatio(t *testing.T) {
 	tempDir := t.TempDir()
 	statePath := filepath.Join(tempDir, "state.db")

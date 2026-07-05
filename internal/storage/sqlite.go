@@ -114,7 +114,7 @@ func (r *SQLiteRepository) init() error {
 	if err := r.validateCredentialsLocked(); err != nil {
 		return err
 	}
-	return r.compactIfWasteHighLocked()
+	return nil
 }
 
 func (r *SQLiteRepository) ConfigureAuditLimit(limit int) error {
