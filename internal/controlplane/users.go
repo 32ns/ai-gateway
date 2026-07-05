@@ -603,7 +603,7 @@ func (s *Service) deleteSingleUser(id string) error {
 }
 
 func (s *Service) AuthenticateUser(username, password string) (core.User, error) {
-	user, err := s.repo.FindUserByUsername(username)
+	user, err := s.findUserByLoginIdentifier(username)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return core.User{}, ErrInvalidCredentials
@@ -614,6 +614,20 @@ func (s *Service) AuthenticateUser(username, password string) (core.User, error)
 		return core.User{}, ErrInvalidCredentials
 	}
 	return s.RecordUserLogin(user.ID)
+}
+
+func (s *Service) findUserByLoginIdentifier(identifier string) (core.User, error) {
+	user, err := s.repo.FindUserByUsername(identifier)
+	if err == nil {
+		return user, nil
+	}
+	if !errors.Is(err, storage.ErrNotFound) {
+		return core.User{}, err
+	}
+	if !strings.Contains(strings.TrimSpace(identifier), "@") {
+		return core.User{}, storage.ErrNotFound
+	}
+	return s.repo.FindUserByEmail(identifier)
 }
 
 func (s *Service) AuthenticateOAuthUser(input OAuthUserInput) (core.User, bool, error) {

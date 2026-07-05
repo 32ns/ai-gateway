@@ -4313,6 +4313,53 @@ func TestChangeUserPasswordRequiresCurrentPassword(t *testing.T) {
 	}
 }
 
+func TestPasswordResetAllowsLoginWithEmail(t *testing.T) {
+	base := storage.NewMemoryRepository()
+	repo := storage.NewCachedRepository(base)
+	service := New(repo, providers.NewRegistry(&providers.OpenAIAdapter{}))
+
+	user, err := service.CreateUser(UserInput{
+		Username:      "alice",
+		Password:      "old-secret",
+		Role:          core.UserRoleUser,
+		Enabled:       true,
+		Email:         "alice@example.com",
+		EmailVerified: true,
+	})
+	if err != nil {
+		t.Fatalf("CreateUser returned error: %v", err)
+	}
+	if _, err := service.AuthenticateUser("alice", "old-secret"); err != nil {
+		t.Fatalf("old password should authenticate before reset: %v", err)
+	}
+
+	rawToken := "email-reset-token"
+	now := time.Now().UTC()
+	if err := repo.CreatePasswordResetToken(core.PasswordResetToken{
+		ID:        "reset_email_login",
+		UserID:    user.ID,
+		Email:     "alice@example.com",
+		TokenHash: passwordResetTokenHash(rawToken),
+		ExpiresAt: now.Add(time.Hour),
+		CreatedAt: now,
+	}); err != nil {
+		t.Fatalf("CreatePasswordResetToken returned error: %v", err)
+	}
+
+	if err := service.CompletePasswordReset(rawToken, "new-secret"); err != nil {
+		t.Fatalf("CompletePasswordReset returned error: %v", err)
+	}
+	if _, err := service.AuthenticateUser("alice@example.com", "new-secret"); err != nil {
+		t.Fatalf("email login with reset password returned error: %v", err)
+	}
+	if _, err := service.AuthenticateUser("alice", "new-secret"); err != nil {
+		t.Fatalf("username login with reset password returned error: %v", err)
+	}
+	if _, err := service.AuthenticateUser("alice@example.com", "old-secret"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("email login with old password err = %v, want invalid credentials", err)
+	}
+}
+
 func TestDisabledClientOwnerCannotAuthorizeProtocolKey(t *testing.T) {
 	repo := storage.NewMemoryRepository()
 	service := New(repo, providers.NewRegistry(&providers.OpenAIAdapter{}))
