@@ -145,6 +145,7 @@ func NewServerWithOptions(control *controlplane.Service, gatewayService *gateway
 		loginLimiter:            newIPRateLimiter(),
 		oauthMergeStates:        make(map[string]profileOAuthMergeState),
 	}
+	server.clearImageLabStoredResults()
 	if gatewayService != nil {
 		gatewayService.WithBillingEvents(func(event gateway.BillingEvent) {
 			if billingEventShouldRefreshFinance(event.Reason) {

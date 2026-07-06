@@ -273,7 +273,7 @@ func TestImageLabJobsAreScopedToCurrentUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnsureAdminUser returned error: %v", err)
 	}
-	server := NewServer(control, nil, "data/state.db")
+	server := NewServer(control, nil, filepath.Join(t.TempDir(), "state.db"))
 	job, err := newImageLabJob(alice.ID, imageLabGenerateOptions{
 		Client:      core.APIClient{ID: "client_alice", OwnerUserID: alice.ID},
 		Prompt:      "alice secret prompt",
@@ -287,7 +287,16 @@ func TestImageLabJobsAreScopedToCurrentUser(t *testing.T) {
 		t.Fatalf("newImageLabJob returned error: %v", err)
 	}
 	job.snapshot.Status = imageLabTaskStatusCompleted
-	job.snapshot.Results[0] = &imageLabResultEvent{OK: true, Image: "data:image/png;base64,alice_secret", MIME: "image/png"}
+	storedResult := server.storeImageLabResult(job.snapshot.ID, imageLabResultEvent{
+		Index:   0,
+		OK:      true,
+		B64JSON: "YWxpY2Vfc2VjcmV0",
+		MIME:    "image/png",
+	})
+	if !storedResult.OK || storedResult.Image != imageLabResultFileURL(job.snapshot.ID, 0) || storedResult.FilePath == "" {
+		t.Fatalf("stored result = %#v", storedResult)
+	}
+	job.snapshot.Results[0] = &storedResult
 	server.imageLabJobs.mu.Lock()
 	server.imageLabJobs.jobs[job.snapshot.ID] = job
 	server.imageLabJobs.mu.Unlock()
@@ -296,8 +305,18 @@ func TestImageLabJobsAreScopedToCurrentUser(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/images/api/jobs", nil)
 	aliceHandler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "alice_secret") {
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), imageLabResultFileURL(job.snapshot.ID, 0)) {
 		t.Fatalf("owner jobs status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if strings.Contains(rec.Body.String(), "alice_secret") || strings.Contains(rec.Body.String(), "data:image") {
+		t.Fatalf("owner jobs leaked raw image bytes: %s", rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, imageLabResultFileURL(job.snapshot.ID, 0), nil)
+	aliceHandler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || rec.Body.String() != "alice_secret" || !strings.HasPrefix(rec.Header().Get("Content-Type"), "image/png") {
+		t.Fatalf("owner result file status=%d content-type=%q body=%q", rec.Code, rec.Header().Get("Content-Type"), rec.Body.String())
 	}
 
 	for name, handler := range map[string]http.Handler{
@@ -310,7 +329,7 @@ func TestImageLabJobsAreScopedToCurrentUser(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("%s jobs list status=%d body=%s", name, rec.Code, rec.Body.String())
 		}
-		if strings.Contains(rec.Body.String(), job.snapshot.ID) || strings.Contains(rec.Body.String(), "alice_secret") {
+		if strings.Contains(rec.Body.String(), job.snapshot.ID) || strings.Contains(rec.Body.String(), "alice_secret") || strings.Contains(rec.Body.String(), imageLabResultFileURL(job.snapshot.ID, 0)) {
 			t.Fatalf("%s jobs list leaked alice job: %s", name, rec.Body.String())
 		}
 
@@ -322,6 +341,16 @@ func TestImageLabJobsAreScopedToCurrentUser(t *testing.T) {
 		}
 		if strings.Contains(rec.Body.String(), "alice_secret") {
 			t.Fatalf("%s foreign job response leaked image: %s", name, rec.Body.String())
+		}
+
+		rec = httptest.NewRecorder()
+		req = httptest.NewRequest(http.MethodGet, imageLabResultFileURL(job.snapshot.ID, 0), nil)
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("%s foreign result file status=%d body=%s", name, rec.Code, rec.Body.String())
+		}
+		if strings.Contains(rec.Body.String(), "alice_secret") {
+			t.Fatalf("%s foreign result response leaked image: %s", name, rec.Body.String())
 		}
 	}
 }
@@ -387,6 +416,74 @@ func TestImageLabUserConsoleToggleHidesUsersButAllowsAdmins(t *testing.T) {
 	adminHandler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("admin image page status = %d, want %d body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+}
+
+func TestImageLabCleanupRemovesExpiredStoredFiles(t *testing.T) {
+	repo := storage.NewMemoryRepository()
+	control := controlplane.New(repo, providers.NewRegistry(&providers.OpenAIAdapter{}))
+	user, err := control.CreateUser(controlplane.UserInput{Username: "image-user", Password: "image-secret", Role: core.UserRoleUser, Enabled: true})
+	if err != nil {
+		t.Fatalf("CreateUser returned error: %v", err)
+	}
+	server := NewServer(control, nil, filepath.Join(t.TempDir(), "state.db"))
+	job, err := newImageLabJob(user.ID, imageLabGenerateOptions{
+		Client:      core.APIClient{ID: "client_image", OwnerUserID: user.ID},
+		Prompt:      "expired prompt",
+		Ratio:       "1:1",
+		Resolution:  "standard",
+		DisplaySize: "1024x1024",
+		Model:       "gpt-image-2",
+		Count:       1,
+	})
+	if err != nil {
+		t.Fatalf("newImageLabJob returned error: %v", err)
+	}
+	result := server.storeImageLabResult(job.snapshot.ID, imageLabResultEvent{
+		Index:   0,
+		OK:      true,
+		B64JSON: "ZXhwaXJlZA==",
+		MIME:    "image/png",
+	})
+	if !result.OK || result.FilePath == "" {
+		t.Fatalf("stored result = %#v", result)
+	}
+	if err := os.WriteFile(filepath.Join(server.imageLabJobResultDir(job.snapshot.ID), "leftover.tmp"), []byte("partial"), 0600); err != nil {
+		t.Fatalf("write leftover temp file: %v", err)
+	}
+	job.snapshot.Status = imageLabTaskStatusCompleted
+	job.snapshot.UpdatedAt = time.Now().Add(-imageLabJobRetention - time.Minute).UnixMilli()
+	job.snapshot.Results[0] = &result
+	server.imageLabJobs.mu.Lock()
+	server.imageLabJobs.jobs[job.snapshot.ID] = job
+	server.imageLabJobs.mu.Unlock()
+
+	server.imageLabJobs.cleanup(server, time.Now())
+
+	if _, ok := server.imageLabJobs.Get(user.ID, job.snapshot.ID); ok {
+		t.Fatalf("expired job still available")
+	}
+	if _, err := os.Stat(server.imageLabJobResultDir(job.snapshot.ID)); !os.IsNotExist(err) {
+		t.Fatalf("expired stored image dir still exists or stat err=%v", err)
+	}
+}
+
+func TestImageLabServerStartupClearsOrphanStoredFiles(t *testing.T) {
+	repo := storage.NewMemoryRepository()
+	control := controlplane.New(repo, providers.NewRegistry(&providers.OpenAIAdapter{}))
+	statePath := filepath.Join(t.TempDir(), "state.db")
+	orphanPath := filepath.Join(filepath.Dir(statePath), "image-lab", "imglab_orphan", "000.png")
+	if err := os.MkdirAll(filepath.Dir(orphanPath), 0700); err != nil {
+		t.Fatalf("mkdir orphan dir: %v", err)
+	}
+	if err := os.WriteFile(orphanPath, []byte("orphan"), 0600); err != nil {
+		t.Fatalf("write orphan image: %v", err)
+	}
+
+	server := NewServer(control, nil, statePath)
+
+	if _, err := os.Stat(server.imageLabResultRootDir()); !os.IsNotExist(err) {
+		t.Fatalf("orphan image-lab root still exists or stat err=%v", err)
 	}
 }
 
@@ -464,17 +561,30 @@ func TestImageLabGenerateCreatesBackgroundTaskUsingImageGenerationsEndpoint(t *t
 	if snapshot.Status != "completed" {
 		t.Fatalf("snapshot status = %q body=%#v", snapshot.Status, snapshot)
 	}
-	if len(snapshot.Results) != 1 || snapshot.Results[0] == nil || !snapshot.Results[0].OK || snapshot.Results[0].Image != "data:image/png;base64,aW1hZ2U=" || snapshot.Results[0].MIME != "image/png" {
+	resultURL := imageLabResultFileURL(created.ID, 0)
+	if len(snapshot.Results) != 1 || snapshot.Results[0] == nil || !snapshot.Results[0].OK || snapshot.Results[0].Image != resultURL || snapshot.Results[0].MIME != "image/png" || snapshot.Results[0].RemoteURL != "" {
 		t.Fatalf("snapshot results = %#v", snapshot.Results)
 	}
-	if _, err := os.Stat(filepath.Join(filepath.Dir(statePath), "image-lab")); !os.IsNotExist(err) {
-		t.Fatalf("image-lab storage dir exists or stat err=%v", err)
+	if strings.Contains(snapshot.Results[0].Image, "data:image") {
+		t.Fatalf("snapshot kept raw data URL: %#v", snapshot.Results[0])
+	}
+	if _, err := os.Stat(filepath.Join(server.imageLabJobResultDir(created.ID), "000.png")); err != nil {
+		t.Fatalf("stored image file stat err=%v", err)
+	}
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, resultURL, nil)
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || rec.Body.String() != "image" || !strings.HasPrefix(rec.Header().Get("Content-Type"), "image/png") {
+		t.Fatalf("result file status=%d content-type=%q body=%q", rec.Code, rec.Header().Get("Content-Type"), rec.Body.String())
 	}
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodDelete, "/images/api/jobs/"+created.ID, nil)
 	handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("delete task status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if _, err := os.Stat(server.imageLabJobResultDir(created.ID)); !os.IsNotExist(err) {
+		t.Fatalf("stored image dir still exists or stat err=%v", err)
 	}
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/images/api/jobs", nil)
@@ -585,7 +695,7 @@ func TestImageLabGenerateRunsMultipleImagesAcrossAvailableAccounts(t *testing.T)
 		}
 	}
 	gatewayService := gateway.New(repo, routing.NewRouter(), failover.NewEngine(accounts.NewPool(repo), registry))
-	server := NewServer(control, gatewayService, "data/state.db")
+	server := NewServer(control, gatewayService, filepath.Join(t.TempDir(), "state.db"))
 	handler := authenticatedUserHandler(t, control, user, server.Handler())
 
 	body := `{"client_id":"client_image","prompt":"a quiet control room","ratio":"1:1","resolution":"standard","model":"gpt-image-2","count":2}`
@@ -665,7 +775,7 @@ func TestImageLabGenerateBackgroundPassesReferenceImagesToImageEditsEndpoint(t *
 	defer upstream.Close()
 
 	control, gatewayService, user := newImageLabGatewayFixture(t, upstream.URL)
-	server := NewServer(control, gatewayService, "data/state.db")
+	server := NewServer(control, gatewayService, filepath.Join(t.TempDir(), "state.db"))
 	handler := authenticatedUserHandler(t, control, user, server.Handler())
 
 	body := `{"client_id":"client_image","prompt":"redraw this","ratio":"auto","resolution":"auto","model":"gpt-image-2","count":1,"input_images":[{"name":"input.jpg","type":"image/jpg","data_url":"data:image/jpg;base64,aW1hZ2U=","size":5}]}`
