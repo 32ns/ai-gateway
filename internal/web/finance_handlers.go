@@ -437,9 +437,12 @@ func financeCSVTime(value *time.Time) string {
 }
 
 func normalizeFinanceTab(raw string) string {
-	switch strings.TrimSpace(raw) {
-	case "users", "ledger", "orders", "usage", "tokens", "reconcile":
-		return strings.TrimSpace(raw)
+	tab := strings.TrimSpace(raw)
+	switch tab {
+	case "":
+		return "orders"
+	case "overview", "users", "ledger", "orders", "usage", "tokens", "reconcile":
+		return tab
 	default:
 		return "overview"
 	}

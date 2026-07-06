@@ -2341,7 +2341,7 @@ func TestPaymentCreateReturnsRechargeLimitError(t *testing.T) {
 	}
 }
 
-func TestFinancePageRendersOverview(t *testing.T) {
+func TestFinancePageDefaultsToOrdersAndRendersOverview(t *testing.T) {
 	repo := storage.NewMemoryRepository()
 	control := controlplane.New(repo, providers.NewRegistry(&providers.OpenAIAdapter{}))
 	admin, _, err := control.EnsureAdminUser("admin", "admin-secret")
@@ -2423,14 +2423,14 @@ func TestFinancePageRendersOverview(t *testing.T) {
 	if strings.Contains(body, `data-deferred-url="/admin/finance?partial=finance-page"`) {
 		t.Fatalf("finance page should not render an empty deferred shell: %s", body)
 	}
-	for _, want := range []string{"Total Balance", "Balance Spend", "Plan Spend", "Today&#39;s Token Usage", "12,345", "Daily Report", "Model Usage", "Payment Orders", "Usage Charges", "Reconciliation"} {
+	for _, want := range []string{"Total Balance", "Balance Spend", "Plan Spend", "Today&#39;s Token Usage", "12,345", "Payment Orders", "Usage Charges", "Reconciliation", `href="/admin/finance?tab=overview"`, `class="is-active" href="/admin/finance?tab=orders"`, "trade_finance", `value="paid" selected`} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("finance page missing %q: %s", want, body)
 		}
 	}
-	for _, unexpected := range []string{"trade_finance"} {
+	for _, unexpected := range []string{"Daily Report", "Model Usage", "trade_finance_closed"} {
 		if strings.Contains(body, unexpected) {
-			t.Fatalf("overview tab should not render %q: %s", unexpected, body)
+			t.Fatalf("default orders tab should not render %q: %s", unexpected, body)
 		}
 	}
 
@@ -2441,13 +2441,45 @@ func TestFinancePageRendersOverview(t *testing.T) {
 		t.Fatalf("partial status = %d, want %d body=%s", rec.Code, http.StatusOK, rec.Body.String())
 	}
 	body = rec.Body.String()
-	for _, want := range []string{"Total Balance", "Today&#39;s Token Usage", "12,345", "Daily Report", "Model Usage", "Payment Orders", "Usage Charges", "Reconciliation"} {
+	for _, want := range []string{"Total Balance", "Today&#39;s Token Usage", "12,345", "Payment Orders", "Usage Charges", "Reconciliation", "trade_finance", `value="paid" selected`} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("finance partial missing %q: %s", want, body)
 		}
 	}
+	if strings.Contains(body, "trade_finance_closed") || strings.Contains(body, "Daily Report") {
+		t.Fatalf("default orders partial should render paid orders only: %s", body)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/admin/finance?tab=overview", nil)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("overview status = %d, want %d body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	body = rec.Body.String()
+	for _, want := range []string{"Total Balance", "Balance Spend", "Plan Spend", "Today&#39;s Token Usage", "12,345", "Daily Report", "Model Usage", "Payment Orders", "Usage Charges", "Reconciliation", `class="is-active" href="/admin/finance?tab=overview"`} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("overview page missing %q: %s", want, body)
+		}
+	}
 	if strings.Contains(body, "trade_finance") {
 		t.Fatalf("overview tab should not render payment order rows: %s", body)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/admin/finance?tab=overview&partial=finance-page", nil)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("overview partial status = %d, want %d body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	body = rec.Body.String()
+	for _, want := range []string{"Total Balance", "Today&#39;s Token Usage", "12,345", "Daily Report", "Model Usage", "Payment Orders", "Usage Charges", "Reconciliation"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("overview partial missing %q: %s", want, body)
+		}
+	}
+	if strings.Contains(body, "trade_finance") {
+		t.Fatalf("overview partial should not render payment order rows: %s", body)
 	}
 
 	req = httptest.NewRequest(http.MethodGet, "/admin/finance?tab=orders", nil)

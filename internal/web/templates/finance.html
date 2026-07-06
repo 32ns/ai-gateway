@@ -40,7 +40,7 @@
 
 <section class="finance-workspace" data-partial="finance-workspace">
   <div class="finance-tabs" role="tablist" aria-label="{{t "finance_navigation"}}">
-    <a class="{{if eq .FinanceTab "overview"}}is-active{{end}}" href="/admin/finance" data-ajax-link data-ajax-target='[data-partial="finance-page"]' data-ajax-partial="finance-page">{{t "finance_tab_overview"}}</a>
+    <a class="{{if eq .FinanceTab "overview"}}is-active{{end}}" href="/admin/finance?tab=overview" data-ajax-link data-ajax-target='[data-partial="finance-page"]' data-ajax-partial="finance-page">{{t "finance_tab_overview"}}</a>
     <a class="{{if eq .FinanceTab "users"}}is-active{{end}}" href="/admin/finance?tab=users" data-ajax-link data-ajax-target='[data-partial="finance-page"]' data-ajax-partial="finance-page">{{t "finance_user_accounts"}}</a>
     <a class="{{if eq .FinanceTab "ledger"}}is-active{{end}}" href="/admin/finance?tab=ledger" data-ajax-link data-ajax-target='[data-partial="finance-page"]' data-ajax-partial="finance-page">{{t "finance_ledger"}}</a>
     <a class="{{if eq .FinanceTab "orders"}}is-active{{end}}" href="/admin/finance?tab=orders" data-ajax-link data-ajax-target='[data-partial="finance-page"]' data-ajax-partial="finance-page">{{t "finance_orders"}}</a>
