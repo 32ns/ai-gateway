@@ -63,7 +63,7 @@ func TestStaticAssetEntryPointsReferenceEmbeddedChildren(t *testing.T) {
 	if !strings.Contains(string(js), `./js/app.bundle.js`) {
 		t.Fatalf("app.js does not import the bundled application script")
 	}
-	if !strings.Contains(string(js), `./js/app.bundle.js?v=2026070401`) {
+	if !strings.Contains(string(js), `./js/app.bundle.js?v=2026070601`) {
 		t.Fatalf("app.js must cache-bust the site message popup date script")
 	}
 	if !strings.Contains(string(js), `./js/events.js?v=2026061512`) {
@@ -100,7 +100,7 @@ func TestStaticAssetEntryPointsReferenceEmbeddedChildren(t *testing.T) {
 	if !strings.Contains(layoutBody, `/static/app.css?v=2026062501`) {
 		t.Fatalf("layout.html must cache-bust the app stylesheet entrypoint")
 	}
-	if !strings.Contains(layoutBody, `/static/app.js?v=2026070401`) {
+	if !strings.Contains(layoutBody, `/static/app.js?v=2026070601`) {
 		t.Fatalf("layout.html must cache-bust the app module entrypoint")
 	}
 }
@@ -666,7 +666,7 @@ func TestAppBundleInitializesDeferredPartials(t *testing.T) {
 		t.Fatalf("read app.bundle.js: %v", err)
 	}
 	body := string(js)
-	if !strings.Contains(body, `./image_lab.js?v=2026061001`) {
+	if !strings.Contains(body, `./image_lab.js?v=2026070601`) {
 		t.Fatalf("app.bundle.js must cache-bust image_lab.js")
 	}
 	if !strings.Contains(body, `const initDeferredPartials =`) ||
@@ -1102,6 +1102,19 @@ func TestImageLabScriptPreservesRunningTaskStatus(t *testing.T) {
 	}
 	if !strings.Contains(body, `tasksLoading`) || !strings.Contains(body, `visibilitychange`) || !strings.Contains(body, `正在同步后台任务`) {
 		t.Fatalf("image_lab.js must show task loading state when returning to the page")
+	}
+}
+
+func TestImageLabScriptFiltersForeignJobSnapshots(t *testing.T) {
+	js, err := assets.ReadFile("static/js/image_lab.js")
+	if err != nil {
+		t.Fatalf("read image_lab.js: %v", err)
+	}
+	body := string(js)
+	for _, want := range []string{`currentUserID`, `snapshotBelongsToCurrentUser`, `snapshot.userId`, `snapshot.user_id`} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("image_lab.js must ignore foreign job snapshots; missing %q", want)
+		}
 	}
 }
 

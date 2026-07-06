@@ -86,6 +86,8 @@ function initImageLab(toastUI, confirmUI) {
     tasksLoading: false,
   };
 
+  const currentUserID = String(root.dataset.currentUserId || "").trim();
+
   let previewClose = null;
   let renderTicker = 0;
   let submissionRenderFrame = 0;
@@ -154,8 +156,19 @@ function initImageLab(toastUI, confirmUI) {
   const runningRun = () => state.runs.find((run) => run.status === "running") || null;
   const activeLoadingRun = () => state.submission || runningRun();
 
+  const snapshotBelongsToCurrentUser = (snapshot) => {
+    if (!currentUserID || !snapshot || typeof snapshot !== "object") {
+      return true;
+    }
+    const snapshotUserID = String(snapshot.userId || snapshot.user_id || "").trim();
+    return !snapshotUserID || snapshotUserID.toLowerCase() === currentUserID.toLowerCase();
+  };
+
   const snapshotToRun = (snapshot) => {
     if (!snapshot || typeof snapshot !== "object") {
+      return null;
+    }
+    if (!snapshotBelongsToCurrentUser(snapshot)) {
       return null;
     }
     const count = clampNumber(Number(snapshot.count || 1), 1, state.limits.max_count || DEFAULT_LIMITS.max_count);
@@ -754,6 +767,9 @@ function initImageLab(toastUI, confirmUI) {
   document.addEventListener("ag:image-job-updated", (event) => {
     const snapshot = event.detail || {};
     if (!snapshot || !snapshot.id) {
+      return;
+    }
+    if (!snapshotBelongsToCurrentUser(snapshot)) {
       return;
     }
     if (snapshot.dismissed === true) {

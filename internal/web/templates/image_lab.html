@@ -2,6 +2,7 @@
 <section
   class="image-lab"
   data-image-lab
+  data-current-user-id="{{with .CurrentUser}}{{.ID}}{{end}}"
   data-csrf-token="{{.CSRFToken}}"
   data-confirm-remove-run="确认移除这条生成结果？"
   data-confirm-cancel-run="确认停止当前生成？"

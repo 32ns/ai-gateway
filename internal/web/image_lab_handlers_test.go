@@ -245,6 +245,9 @@ func TestImageLabPageIsBackgroundImageTaskUI(t *testing.T) {
 		t.Fatalf("status = %d, want %d body=%s", rec.Code, http.StatusOK, rec.Body.String())
 	}
 	body := rec.Body.String()
+	if !strings.Contains(body, `data-current-user-id="`+user.ID+`"`) {
+		t.Fatalf("image lab page missing current user id: %s", body)
+	}
 	for _, want := range []string{"OpenAI 兼容图片接口", "刷新页面后可继续查看当前进度", "参考图（可选）", "张数", "正在加载后台任务"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("image lab page missing %q: %s", want, body)
@@ -258,6 +261,67 @@ func TestImageLabPageIsBackgroundImageTaskUI(t *testing.T) {
 	for _, forbidden := range []string{`data-image-lab-concurrency`, `name="concurrency"`, `name="timeout_sec"`, `data-image-lab-mode=`} {
 		if strings.Contains(body, forbidden) {
 			t.Fatalf("image lab page still contains %q: %s", forbidden, body)
+		}
+	}
+}
+
+func TestImageLabJobsAreScopedToCurrentUser(t *testing.T) {
+	repo := storage.NewMemoryRepository()
+	control := controlplane.New(repo, providers.NewRegistry(&providers.OpenAIAdapter{}))
+	alice, bob := mustCreateImageLabUsers(t, control)
+	admin, _, err := control.EnsureAdminUser("admin", "admin-secret")
+	if err != nil {
+		t.Fatalf("EnsureAdminUser returned error: %v", err)
+	}
+	server := NewServer(control, nil, "data/state.db")
+	job, err := newImageLabJob(alice.ID, imageLabGenerateOptions{
+		Client:      core.APIClient{ID: "client_alice", OwnerUserID: alice.ID},
+		Prompt:      "alice secret prompt",
+		Ratio:       "1:1",
+		Resolution:  "standard",
+		DisplaySize: "1024x1024",
+		Model:       "gpt-image-2",
+		Count:       1,
+	})
+	if err != nil {
+		t.Fatalf("newImageLabJob returned error: %v", err)
+	}
+	job.snapshot.Status = imageLabTaskStatusCompleted
+	job.snapshot.Results[0] = &imageLabResultEvent{OK: true, Image: "data:image/png;base64,alice_secret", MIME: "image/png"}
+	server.imageLabJobs.mu.Lock()
+	server.imageLabJobs.jobs[job.snapshot.ID] = job
+	server.imageLabJobs.mu.Unlock()
+
+	aliceHandler := authenticatedUserHandler(t, control, alice, server.Handler())
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/images/api/jobs", nil)
+	aliceHandler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "alice_secret") {
+		t.Fatalf("owner jobs status=%d body=%s", rec.Code, rec.Body.String())
+	}
+
+	for name, handler := range map[string]http.Handler{
+		"bob":   authenticatedUserHandler(t, control, bob, server.Handler()),
+		"admin": authenticatedUserHandler(t, control, admin, server.Handler()),
+	} {
+		rec = httptest.NewRecorder()
+		req = httptest.NewRequest(http.MethodGet, "/images/api/jobs", nil)
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s jobs list status=%d body=%s", name, rec.Code, rec.Body.String())
+		}
+		if strings.Contains(rec.Body.String(), job.snapshot.ID) || strings.Contains(rec.Body.String(), "alice_secret") {
+			t.Fatalf("%s jobs list leaked alice job: %s", name, rec.Body.String())
+		}
+
+		rec = httptest.NewRecorder()
+		req = httptest.NewRequest(http.MethodGet, "/images/api/jobs/"+job.snapshot.ID, nil)
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("%s foreign job status=%d body=%s", name, rec.Code, rec.Body.String())
+		}
+		if strings.Contains(rec.Body.String(), "alice_secret") {
+			t.Fatalf("%s foreign job response leaked image: %s", name, rec.Body.String())
 		}
 	}
 }

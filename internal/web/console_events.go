@@ -119,8 +119,9 @@ func (b *consoleEventBus) publish(event consoleEvent) {
 
 func consoleEventVisibleToSubscriber(event consoleEvent, sub consoleEventSubscriber) bool {
 	if sub.admin {
-		if supportConsoleEvent(event) && strings.TrimSpace(event.Scope) == "user" {
-			return false
+		if userOnlyConsoleEvent(event) && strings.TrimSpace(event.Scope) == "user" {
+			userID := strings.TrimSpace(event.UserID)
+			return userID != "" && strings.EqualFold(userID, sub.userID)
 		}
 		return true
 	}
@@ -132,9 +133,9 @@ func consoleEventVisibleToSubscriber(event consoleEvent, sub consoleEventSubscri
 	return userID == "" || strings.EqualFold(userID, sub.userID)
 }
 
-func supportConsoleEvent(event consoleEvent) bool {
+func userOnlyConsoleEvent(event consoleEvent) bool {
 	switch strings.TrimSpace(event.Type) {
-	case consoleEventSupportMessage, consoleEventSupportUnread:
+	case consoleEventSupportMessage, consoleEventSupportUnread, consoleEventImageJobUpdated:
 		return true
 	default:
 		return false

@@ -79,6 +79,56 @@ func TestConsoleEventBusDoesNotMirrorUserSupportEventsToAdmins(t *testing.T) {
 	assertNoConsoleEventForTest(t, adminEvents)
 }
 
+func TestConsoleEventBusDoesNotMirrorImageJobEventsToAdmins(t *testing.T) {
+	bus := newConsoleEventBus()
+	_, ownerEvents, unsubscribeOwner := bus.subscribe(core.User{ID: "image-owner", Username: "owner", Enabled: true})
+	defer unsubscribeOwner()
+	_, otherEvents, unsubscribeOther := bus.subscribe(core.User{ID: "image-other", Username: "other", Enabled: true})
+	defer unsubscribeOther()
+	_, adminEvents, unsubscribeAdmin := bus.subscribe(core.User{ID: "admin", Username: "admin", Role: core.UserRoleAdmin, Enabled: true})
+	defer unsubscribeAdmin()
+
+	bus.publish(consoleEvent{
+		Type:   consoleEventImageJobUpdated,
+		Scope:  "user",
+		UserID: "image-owner",
+		Payload: map[string]any{
+			"job": imageLabTaskSnapshot{
+				ID:     "imglab_secret",
+				UserID: "image-owner",
+				Results: []*imageLabResultEvent{{
+					OK:    true,
+					Image: "data:image/png;base64,secret",
+				}},
+			},
+		},
+	})
+
+	if got := readConsoleEventForTest(t, ownerEvents); got.Type != consoleEventImageJobUpdated || got.UserID != "image-owner" {
+		t.Fatalf("owner image event = %#v", got)
+	}
+	assertNoConsoleEventForTest(t, otherEvents)
+	assertNoConsoleEventForTest(t, adminEvents)
+
+	bus.publish(consoleEvent{
+		Type:   consoleEventImageJobUpdated,
+		Scope:  "user",
+		UserID: "admin",
+		Payload: map[string]any{
+			"job": imageLabTaskSnapshot{
+				ID:     "imglab_admin",
+				UserID: "admin",
+			},
+		},
+	})
+
+	if got := readConsoleEventForTest(t, adminEvents); got.Type != consoleEventImageJobUpdated || got.UserID != "admin" {
+		t.Fatalf("admin owner image event = %#v", got)
+	}
+	assertNoConsoleEventForTest(t, ownerEvents)
+	assertNoConsoleEventForTest(t, otherEvents)
+}
+
 func TestConsoleEventStateReturnsCurrentUserState(t *testing.T) {
 	repo := storage.NewMemoryRepository()
 	control := controlplane.New(repo, providers.NewRegistry(&providers.OpenAIAdapter{}))
