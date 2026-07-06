@@ -1,0 +1,136 @@
+{{define "content"}}
+<section class="hero compact">
+  <div>
+    <h1>{{t "image_reviews_heading"}}</h1>
+    <p>{{t "image_reviews_summary"}}</p>
+  </div>
+</section>
+
+{{template "image_reviews_page" .}}
+{{end}}
+
+{{define "image_reviews_page"}}
+<div data-partial="image-reviews-page">
+<section class="panel">
+  <div class="panel-head">
+    <h2>{{t "image_reviews_filters"}}</h2>
+    <span class="panel-note">{{tf "image_reviews_total_count" .ImageReviews.Total}}</span>
+  </div>
+  <form class="stack-form" method="get" action="/admin/image-reviews">
+    <div class="filter-grid has-actions">
+      <label>
+        <span>{{t "image_review_search"}}</span>
+        <input name="q" value="{{.ImageReviews.Filter.Query}}">
+      </label>
+      <label>
+        <span>{{t "image_review_user_id"}}</span>
+        <input name="user_id" value="{{.ImageReviews.Filter.UserID}}">
+      </label>
+      <label>
+        <span>{{t "image_review_status"}}</span>
+        <select name="status">
+          <option value="">{{t "image_reviews_status_all"}}</option>
+          {{range .ImageReviews.StatusList}}
+          <option value="{{.}}" {{if eq $.ImageReviews.Filter.Status .}}selected{{end}}>{{imageReviewStatusText .}}</option>
+          {{end}}
+        </select>
+      </label>
+      <div class="form-actions filter-actions">
+        <button type="submit">{{t "filter_apply"}}</button>
+        <a class="button-link ghost-link" href="/admin/image-reviews">{{t "clear_filters"}}</a>
+      </div>
+    </div>
+  </form>
+</section>
+
+<section class="panel">
+  <div class="panel-head">
+    <h2>{{t "image_reviews_heading"}}</h2>
+    <div class="action-row compact">
+      <span class="pill {{imageReviewStatusClass "pending"}}">{{imageReviewStatusText "pending"}} {{.ImageReviews.Stats.Pending}}</span>
+      <span class="pill {{imageReviewStatusClass "reviewed"}}">{{imageReviewStatusText "reviewed"}} {{.ImageReviews.Stats.Reviewed}}</span>
+      <span class="pill {{imageReviewStatusClass "flagged"}}">{{imageReviewStatusText "flagged"}} {{.ImageReviews.Stats.Flagged}}</span>
+      <span class="pill {{imageReviewStatusClass "resolved"}}">{{imageReviewStatusText "resolved"}} {{.ImageReviews.Stats.Resolved}}</span>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>{{t "image_review_preview"}}</th>
+          <th>{{t "image_review_prompt"}}</th>
+          <th>{{t "image_review_metadata"}}</th>
+          <th>{{t "image_review_status"}}</th>
+          <th>{{t "action"}}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .ImageReviews.Items}}
+        <tr>
+          <td>
+            <a class="button-link ghost-link" href="/admin/image-reviews/{{pathEscape .ID}}/asset" target="_blank" rel="noopener">
+              <img src="/admin/image-reviews/{{pathEscape .ID}}/asset" width="128" height="128" loading="lazy" alt="{{t "image_review_preview"}}" style="display:block;width:128px;height:128px;object-fit:contain;border-radius:8px;background:rgba(255,255,255,.04);">
+            </a>
+          </td>
+          <td>
+            <div class="cell-stack">
+              <strong>{{.Prompt}}</strong>
+              {{if .RevisedPrompt}}<span class="muted">{{t "image_review_revised_prompt"}}: {{.RevisedPrompt}}</span>{{end}}
+              <span class="muted">{{t "image_review_job"}}: <code>{{.JobID}}</code> #{{.ResultIndex}}</span>
+            </div>
+          </td>
+          <td>
+            <div class="cell-stack">
+              <span>{{t "filter_user"}}: {{with userIdentity .UserID}}{{if .Known}}<a href="{{userSearchPageURL .ID}}"><strong>{{.Username}}</strong></a>{{else}}<code>{{.ID}}</code>{{end}}{{else}}-{{end}}</span>
+              <span>{{t "client"}}: <code>{{.ClientID}}</code></span>
+              <span>{{t "model"}}: <code>{{.Model}}</code></span>
+              <span>{{t "image_review_size"}}: {{if .Size}}{{.Size}}{{else}}{{.APISize}}{{end}} / {{.MIME}} / {{imageReviewFileSize .FileSize}}</span>
+              <span>{{t "image_review_generated_at"}}: {{imageReviewTime .CreatedAt}}</span>
+            </div>
+          </td>
+          <td>
+            <div class="cell-stack">
+              <span class="pill {{imageReviewStatusClass .Status}}">{{imageReviewStatusText .Status}}</span>
+              {{if .ReviewedBy}}<span class="muted">{{.ReviewedBy}} / {{imageReviewTime .ReviewedAt}}</span>{{end}}
+              {{if .Note}}<span>{{.Note}}</span>{{end}}
+            </div>
+          </td>
+          <td>
+            <form class="stack-form" method="post" action="/admin/image-reviews/{{pathEscape .ID}}/status">
+              <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+              <input type="hidden" name="return_to" value="{{$.ImageReviews.ReturnTo}}">
+              <label>
+                <span>{{t "image_review_note"}}</span>
+                <input name="note" value="{{.Note}}" maxlength="1000">
+              </label>
+              <div class="action-row compact">
+                <button type="submit" name="status" value="reviewed">{{t "image_review_mark_reviewed"}}</button>
+                <button class="danger" type="submit" name="status" value="flagged">{{t "image_review_mark_flagged"}}</button>
+                <button class="ghost" type="submit" name="status" value="resolved">{{t "image_review_mark_resolved"}}</button>
+              </div>
+            </form>
+          </td>
+        </tr>
+        {{else}}
+        <tr>
+          <td colspan="5" class="empty">{{t "image_review_no_items"}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{{if or .ImageReviews.HasPrev .ImageReviews.HasNext}}
+<section class="panel">
+  <div class="pager">
+    <div class="panel-note">{{tf "image_reviews_total_count" .ImageReviews.Total}}</div>
+    <div class="action-row">
+      {{if .ImageReviews.HasPrev}}<a class="button-link ghost-link" href="{{imageReviewPageURL .ImageReviews.Filter .ImageReviews.PrevPage}}">{{t "previous"}}</a>{{end}}
+      {{if .ImageReviews.HasNext}}<a class="button-link ghost-link" href="{{imageReviewPageURL .ImageReviews.Filter .ImageReviews.NextPage}}">{{t "next"}}</a>{{end}}
+    </div>
+  </div>
+</section>
+{{end}}
+</div>
+{{end}}

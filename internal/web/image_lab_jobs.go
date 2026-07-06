@@ -264,7 +264,7 @@ func (j *imageLabJob) run(s *Server) {
 				}
 				result := s.runImageLabItem(ctx, j.options, index)
 				if s != nil {
-					result = s.storeImageLabResult(j.snapshotID(), result)
+					result = s.storeImageLabResult(j.snapshotCopy(), result)
 				}
 				results <- result
 			}

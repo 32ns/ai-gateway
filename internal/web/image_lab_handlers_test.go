@@ -287,7 +287,7 @@ func TestImageLabJobsAreScopedToCurrentUser(t *testing.T) {
 		t.Fatalf("newImageLabJob returned error: %v", err)
 	}
 	job.snapshot.Status = imageLabTaskStatusCompleted
-	storedResult := server.storeImageLabResult(job.snapshot.ID, imageLabResultEvent{
+	storedResult := server.storeImageLabResult(job.snapshot, imageLabResultEvent{
 		Index:   0,
 		OK:      true,
 		B64JSON: "YWxpY2Vfc2VjcmV0",
@@ -296,6 +296,7 @@ func TestImageLabJobsAreScopedToCurrentUser(t *testing.T) {
 	if !storedResult.OK || storedResult.Image != imageLabResultFileURL(job.snapshot.ID, 0) || storedResult.FilePath == "" {
 		t.Fatalf("stored result = %#v", storedResult)
 	}
+	server.waitImageReviewWrites()
 	job.snapshot.Results[0] = &storedResult
 	server.imageLabJobs.mu.Lock()
 	server.imageLabJobs.jobs[job.snapshot.ID] = job
@@ -352,6 +353,213 @@ func TestImageLabJobsAreScopedToCurrentUser(t *testing.T) {
 		if strings.Contains(rec.Body.String(), "alice_secret") {
 			t.Fatalf("%s foreign result response leaked image: %s", name, rec.Body.String())
 		}
+	}
+}
+
+func TestImageReviewRecordsAdminOnlyCopyAndPreservesUserResult(t *testing.T) {
+	repo := storage.NewMemoryRepository()
+	control := controlplane.New(repo, providers.NewRegistry(&providers.OpenAIAdapter{}))
+	alice, err := control.CreateUser(controlplane.UserInput{Username: "alice", Password: "alice-secret", Role: core.UserRoleUser, Enabled: true})
+	if err != nil {
+		t.Fatalf("CreateUser returned error: %v", err)
+	}
+	server := NewServer(control, nil, filepath.Join(t.TempDir(), "state.db"))
+	job, err := newImageLabJob(alice.ID, imageLabGenerateOptions{
+		Client:      core.APIClient{ID: "client_alice", OwnerUserID: alice.ID},
+		Prompt:      "alice moderation prompt",
+		Ratio:       "1:1",
+		Resolution:  "standard",
+		DisplaySize: "1024x1024",
+		Model:       "gpt-image-2",
+		Count:       1,
+	})
+	if err != nil {
+		t.Fatalf("newImageLabJob returned error: %v", err)
+	}
+	job.snapshot.Status = imageLabTaskStatusCompleted
+	storedResult := server.storeImageLabResult(job.snapshot, imageLabResultEvent{
+		Index:   0,
+		OK:      true,
+		B64JSON: "YWxpY2Vfc2VjcmV0",
+		MIME:    "image/png",
+	})
+	if !storedResult.OK || storedResult.Image != imageLabResultFileURL(job.snapshot.ID, 0) || storedResult.FilePath == "" {
+		t.Fatalf("stored result = %#v", storedResult)
+	}
+	server.waitImageReviewWrites()
+	job.snapshot.Results[0] = &storedResult
+	server.imageLabJobs.mu.Lock()
+	server.imageLabJobs.jobs[job.snapshot.ID] = job
+	server.imageLabJobs.mu.Unlock()
+
+	reviewID := imageReviewItemID(job.snapshot.ID, 0)
+	if reviewID == "" {
+		t.Fatal("empty review ID")
+	}
+	adminHandler := authenticatedAdminHandler(t, control, server.Handler())
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/admin/image-reviews", nil)
+	adminHandler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("admin image reviews status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	for _, want := range []string{"alice moderation prompt", reviewID, "gpt-image-2", "client_alice"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("admin image reviews missing %q: %s", want, body)
+		}
+	}
+	for _, forbidden := range []string{"alice_secret", "data:image"} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("admin image reviews leaked raw image bytes %q: %s", forbidden, body)
+		}
+	}
+
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/admin/image-reviews/"+reviewID+"/asset", nil)
+	adminHandler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || rec.Body.String() != "alice_secret" || !strings.HasPrefix(rec.Header().Get("Content-Type"), "image/png") {
+		t.Fatalf("admin asset status=%d content-type=%q body=%q", rec.Code, rec.Header().Get("Content-Type"), rec.Body.String())
+	}
+
+	aliceHandler := authenticatedUserHandler(t, control, alice, server.Handler())
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/admin/image-reviews", nil)
+	aliceHandler.ServeHTTP(rec, req)
+	if rec.Code == http.StatusOK || strings.Contains(rec.Body.String(), "alice moderation prompt") || strings.Contains(rec.Body.String(), "alice_secret") {
+		t.Fatalf("non-admin image reviews status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/admin/image-reviews/"+reviewID+"/asset", nil)
+	aliceHandler.ServeHTTP(rec, req)
+	if rec.Code == http.StatusOK || strings.Contains(rec.Body.String(), "alice_secret") {
+		t.Fatalf("non-admin review asset status=%d body=%s", rec.Code, rec.Body.String())
+	}
+
+	form := strings.NewReader("status=flagged&note=violation&return_to=%2Fadmin%2Fimage-reviews")
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/admin/image-reviews/"+reviewID+"/status", form)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	adminHandler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status update status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	item, ok := server.imageReviews.get(reviewID)
+	if !ok || item.Status != imageReviewStatusFlagged || item.Note != "violation" {
+		t.Fatalf("updated review item = %#v ok=%t", item, ok)
+	}
+
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, imageLabResultFileURL(job.snapshot.ID, 0), nil)
+	aliceHandler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || rec.Body.String() != "alice_secret" {
+		t.Fatalf("owner result after review status=%d body=%q", rec.Code, rec.Body.String())
+	}
+}
+
+func TestImageReviewStorageFailureDoesNotFailUserResult(t *testing.T) {
+	repo := storage.NewMemoryRepository()
+	control := controlplane.New(repo, providers.NewRegistry(&providers.OpenAIAdapter{}))
+	user, err := control.CreateUser(controlplane.UserInput{Username: "image-user", Password: "image-secret", Role: core.UserRoleUser, Enabled: true})
+	if err != nil {
+		t.Fatalf("CreateUser returned error: %v", err)
+	}
+	server := NewServer(control, nil, filepath.Join(t.TempDir(), "state.db"))
+	if err := os.MkdirAll(filepath.Dir(server.imageReviewRootDir()), 0700); err != nil {
+		t.Fatalf("mkdir state dir: %v", err)
+	}
+	if err := os.WriteFile(server.imageReviewRootDir(), []byte("not a directory"), 0600); err != nil {
+		t.Fatalf("block image review root: %v", err)
+	}
+	job, err := newImageLabJob(user.ID, imageLabGenerateOptions{
+		Client:      core.APIClient{ID: "client_image", OwnerUserID: user.ID},
+		Prompt:      "best effort prompt",
+		Ratio:       "1:1",
+		Resolution:  "standard",
+		DisplaySize: "1024x1024",
+		Model:       "gpt-image-2",
+		Count:       1,
+	})
+	if err != nil {
+		t.Fatalf("newImageLabJob returned error: %v", err)
+	}
+
+	result := server.storeImageLabResult(job.snapshot, imageLabResultEvent{
+		Index:   0,
+		OK:      true,
+		B64JSON: "YWxpY2Vfc2VjcmV0",
+		MIME:    "image/png",
+	})
+	server.waitImageReviewWrites()
+	if !result.OK || result.Image != imageLabResultFileURL(job.snapshot.ID, 0) || result.FilePath == "" {
+		t.Fatalf("stored result should survive review failure: %#v", result)
+	}
+	if _, ok := server.imageReviews.get(imageReviewItemID(job.snapshot.ID, 0)); ok {
+		t.Fatalf("review item should not be recorded when review storage is blocked")
+	}
+	if got, err := os.ReadFile(result.FilePath); err != nil || string(got) != "alice_secret" {
+		t.Fatalf("user result file = %q err=%v", string(got), err)
+	}
+}
+
+func TestImageReviewPersistsAcrossStartupWhileImageLabTempClears(t *testing.T) {
+	repo := storage.NewMemoryRepository()
+	control := controlplane.New(repo, providers.NewRegistry(&providers.OpenAIAdapter{}))
+	user, err := control.CreateUser(controlplane.UserInput{Username: "image-user", Password: "image-secret", Role: core.UserRoleUser, Enabled: true})
+	if err != nil {
+		t.Fatalf("CreateUser returned error: %v", err)
+	}
+	statePath := filepath.Join(t.TempDir(), "state.db")
+	server := NewServer(control, nil, statePath)
+	job, err := newImageLabJob(user.ID, imageLabGenerateOptions{
+		Client:      core.APIClient{ID: "client_image", OwnerUserID: user.ID},
+		Prompt:      "persistent review prompt",
+		Ratio:       "1:1",
+		Resolution:  "standard",
+		DisplaySize: "1024x1024",
+		Model:       "gpt-image-2",
+		Count:       1,
+	})
+	if err != nil {
+		t.Fatalf("newImageLabJob returned error: %v", err)
+	}
+	result := server.storeImageLabResult(job.snapshot, imageLabResultEvent{
+		Index:   0,
+		OK:      true,
+		B64JSON: "YWxpY2Vfc2VjcmV0",
+		MIME:    "image/png",
+	})
+	server.waitImageReviewWrites()
+	if !result.OK || result.FilePath == "" {
+		t.Fatalf("stored result = %#v", result)
+	}
+	reviewID := imageReviewItemID(job.snapshot.ID, 0)
+	if _, ok := server.imageReviews.get(reviewID); !ok {
+		t.Fatalf("review item was not recorded")
+	}
+	if _, err := os.Stat(result.FilePath); err != nil {
+		t.Fatalf("user result file missing before restart: %v", err)
+	}
+
+	restarted := NewServer(control, nil, statePath)
+	if _, err := os.Stat(result.FilePath); !os.IsNotExist(err) {
+		t.Fatalf("image-lab temp result should be cleared on startup, stat err=%v", err)
+	}
+	if _, ok := restarted.imageReviews.get(reviewID); !ok {
+		t.Fatalf("review item was not reloaded")
+	}
+	adminHandler := authenticatedAdminHandler(t, control, restarted.Handler())
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/admin/image-reviews", nil)
+	adminHandler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "persistent review prompt") {
+		t.Fatalf("reloaded review page status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/admin/image-reviews/"+reviewID+"/asset", nil)
+	adminHandler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || rec.Body.String() != "alice_secret" {
+		t.Fatalf("reloaded review asset status=%d body=%q", rec.Code, rec.Body.String())
 	}
 }
 
@@ -439,12 +647,13 @@ func TestImageLabCleanupRemovesExpiredStoredFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newImageLabJob returned error: %v", err)
 	}
-	result := server.storeImageLabResult(job.snapshot.ID, imageLabResultEvent{
+	result := server.storeImageLabResult(job.snapshot, imageLabResultEvent{
 		Index:   0,
 		OK:      true,
 		B64JSON: "ZXhwaXJlZA==",
 		MIME:    "image/png",
 	})
+	server.waitImageReviewWrites()
 	if !result.OK || result.FilePath == "" {
 		t.Fatalf("stored result = %#v", result)
 	}
@@ -618,6 +827,7 @@ func TestImageLabGenerateCreatesBackgroundTaskUsingImageGenerationsEndpoint(t *t
 	if len(restored.ActiveTasks) != 0 {
 		t.Fatalf("restored dismissed tasks = %#v, want none", restored.ActiveTasks)
 	}
+	server.waitImageReviewWrites()
 	if upstreamBody["model"] != "gpt-image-2" || upstreamBody["prompt"] != "a quiet control room" || upstreamBody["response_format"] != "b64_json" || upstreamBody["size"] != "1024x1024" {
 		t.Fatalf("upstream body = %#v", upstreamBody)
 	}
@@ -734,6 +944,7 @@ func TestImageLabGenerateRunsMultipleImagesAcrossAvailableAccounts(t *testing.T)
 	if len(snapshot.Results) != 2 || snapshot.Results[0] == nil || snapshot.Results[1] == nil || !snapshot.Results[0].OK || !snapshot.Results[1].OK {
 		t.Fatalf("snapshot results = %#v", snapshot.Results)
 	}
+	server.waitImageReviewWrites()
 	mu.Lock()
 	defer mu.Unlock()
 	if maxActive < 2 {
@@ -809,6 +1020,26 @@ func TestImageLabGenerateBackgroundPassesReferenceImagesToImageEditsEndpoint(t *
 	if capture.imageFileCount != 1 {
 		t.Fatalf("upstream image file count = %d, want 1", capture.imageFileCount)
 	}
+	var snapshot imageLabTaskSnapshot
+	for attempt := 0; attempt < 50; attempt++ {
+		rec = httptest.NewRecorder()
+		req = httptest.NewRequest(http.MethodGet, "/images/api/jobs/"+created.ID, nil)
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("job status = %d body=%s", rec.Code, rec.Body.String())
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &snapshot); err != nil {
+			t.Fatalf("decode task: %v", err)
+		}
+		if snapshot.Status != "running" {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if snapshot.Status != "completed" {
+		t.Fatalf("snapshot status = %q body=%#v", snapshot.Status, snapshot)
+	}
+	server.waitImageReviewWrites()
 }
 
 func cloneStringValues(values map[string][]string) map[string][]string {

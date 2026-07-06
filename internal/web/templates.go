@@ -782,6 +782,13 @@ func renderFuncMap(s *Server, locale string, data any) template.FuncMap {
 		"auditPageURL": func(filter controlplane.AuditFilter, page int) string {
 			return auditPageURL(filter, page)
 		},
+		"imageReviewStatusText": func(status string) string {
+			return imageReviewStatusText(locale, status)
+		},
+		"imageReviewStatusClass": imageReviewStatusClass,
+		"imageReviewPageURL":     imageReviewPageURL,
+		"imageReviewTime":        imageReviewTime,
+		"imageReviewFileSize":    imageReviewFileSize,
 		"usageStatusText": func(status core.BillingRequestStatus) string {
 			return usageStatusText(locale, status)
 		},

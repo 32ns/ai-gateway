@@ -349,11 +349,12 @@ func (s *Server) handleImageLabResultFile(w http.ResponseWriter, r *http.Request
 	http.ServeContent(w, r, filepath.Base(cleanPath), modTime, file)
 }
 
-func (s *Server) storeImageLabResult(jobID string, result imageLabResultEvent) imageLabResultEvent {
+func (s *Server) storeImageLabResult(snapshot imageLabTaskSnapshot, result imageLabResultEvent) imageLabResultEvent {
 	if !result.OK {
 		result.B64JSON = ""
 		return result
 	}
+	jobID := strings.TrimSpace(snapshot.ID)
 	var (
 		data     []byte
 		mimeType string
@@ -391,6 +392,7 @@ func (s *Server) storeImageLabResult(jobID string, result imageLabResultEvent) i
 	result.MIME = mimeType
 	result.FilePath = filePath
 	result.B64JSON = ""
+	s.recordImageReviewItem(snapshot, result, data)
 	return result
 }
 

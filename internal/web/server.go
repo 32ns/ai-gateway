@@ -32,6 +32,7 @@ type Server struct {
 	control                  *controlplane.Service
 	gateway                  *gateway.Service
 	imageLabJobs             *imageLabJobManager
+	imageReviews             *imageReviewStore
 	configPath               string
 	statePath                string
 	databaseBackend          string
@@ -121,6 +122,7 @@ func NewServerWithOptions(control *controlplane.Service, gatewayService *gateway
 		control:         control,
 		gateway:         gatewayService,
 		imageLabJobs:    newImageLabJobManager(),
+		imageReviews:    newImageReviewStore(),
 		configPath:      strings.TrimSpace(options.ConfigPath),
 		statePath:       strings.TrimSpace(options.StatePath),
 		databaseBackend: strings.TrimSpace(options.DatabaseBackend),
@@ -145,6 +147,7 @@ func NewServerWithOptions(control *controlplane.Service, gatewayService *gateway
 		loginLimiter:            newIPRateLimiter(),
 		oauthMergeStates:        make(map[string]profileOAuthMergeState),
 	}
+	_ = server.loadImageReviewIndex()
 	server.clearImageLabStoredResults()
 	if gatewayService != nil {
 		gatewayService.WithBillingEvents(func(event gateway.BillingEvent) {
