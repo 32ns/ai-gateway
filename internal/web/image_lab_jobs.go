@@ -30,7 +30,6 @@ type imageLabResultEvent struct {
 	Status    int    `json:"status,omitempty"`
 	ElapsedMS int64  `json:"elapsedMs,omitempty"`
 	RemoteURL string `json:"remoteUrl,omitempty"`
-	FilePath  string `json:"-"`
 	B64JSON   string `json:"-"`
 }
 
@@ -152,9 +151,6 @@ func (m *imageLabJobManager) Delete(s *Server, userID, jobID string) (imageLabTa
 	m.mu.Unlock()
 
 	snapshot, ok := job.dismiss()
-	if ok && s != nil {
-		s.removeImageLabJobFiles(job)
-	}
 	return snapshot, ok
 }
 
@@ -173,41 +169,17 @@ func (m *imageLabJobManager) Cancel(userID, jobID string) (imageLabTaskSnapshot,
 	return job.snapshotCopy(), true
 }
 
-func (m *imageLabJobManager) ResultFile(userID, jobID string, index int) (string, string, int64, bool) {
-	if m == nil {
-		return "", "", 0, false
-	}
-	userID = strings.TrimSpace(userID)
-	jobID = strings.TrimSpace(jobID)
-	m.mu.Lock()
-	job := m.jobs[jobID]
-	m.mu.Unlock()
-	if job == nil || job.snapshotUserID() != userID {
-		return "", "", 0, false
-	}
-	return job.resultFile(index)
-}
-
 func (m *imageLabJobManager) cleanup(s *Server, now time.Time) {
 	if m == nil {
 		return
 	}
-	expiredJobs := make([]*imageLabJob, 0)
 	m.mu.Lock()
 	for id, job := range m.jobs {
 		if job == nil || job.expired(now) {
 			delete(m.jobs, id)
-			if job != nil {
-				expiredJobs = append(expiredJobs, job)
-			}
 		}
 	}
 	m.mu.Unlock()
-	if s != nil {
-		for _, job := range expiredJobs {
-			s.removeImageLabJobFiles(job)
-		}
-	}
 }
 
 func newImageLabJob(userID string, options imageLabGenerateOptions) (*imageLabJob, error) {
@@ -448,50 +420,6 @@ func (j *imageLabJob) snapshotUserID() string {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	return strings.TrimSpace(j.snapshot.UserID)
-}
-
-func (j *imageLabJob) snapshotID() string {
-	j.mu.Lock()
-	defer j.mu.Unlock()
-	return strings.TrimSpace(j.snapshot.ID)
-}
-
-func (j *imageLabJob) resultFilePaths() []string {
-	if j == nil {
-		return nil
-	}
-	j.mu.Lock()
-	defer j.mu.Unlock()
-	paths := make([]string, 0, len(j.snapshot.Results))
-	for _, result := range j.snapshot.Results {
-		if result == nil {
-			continue
-		}
-		if path := strings.TrimSpace(result.FilePath); path != "" {
-			paths = append(paths, path)
-		}
-	}
-	return paths
-}
-
-func (j *imageLabJob) resultFile(index int) (string, string, int64, bool) {
-	if j == nil {
-		return "", "", 0, false
-	}
-	j.mu.Lock()
-	defer j.mu.Unlock()
-	if index < 0 || index >= len(j.snapshot.Results) {
-		return "", "", 0, false
-	}
-	result := j.snapshot.Results[index]
-	if result == nil || !result.OK {
-		return "", "", 0, false
-	}
-	path := strings.TrimSpace(result.FilePath)
-	if path == "" {
-		return "", "", 0, false
-	}
-	return path, strings.TrimSpace(result.MIME), j.snapshot.UpdatedAt, true
 }
 
 func (j *imageLabJob) isTerminal() bool {

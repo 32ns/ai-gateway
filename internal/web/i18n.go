@@ -419,11 +419,6 @@ func auditActionText(locale, action string) string {
 			return "调整余额"
 		}
 		return "adjust balance"
-	case "image_review.update":
-		if locale == localeZH {
-			return "\u66f4\u65b0\u751f\u56fe\u5ba1\u67e5\u72b6\u6001"
-		}
-		return "update image review status"
 	case "support.delete":
 		if locale == localeZH {
 			return "删除客服会话"

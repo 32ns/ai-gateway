@@ -37,6 +37,11 @@ const DEFAULT_LIMITS = {
   max_total_bytes: 50 * 1024 * 1024,
 };
 
+const IMAGE_LAB_HISTORY_DB = "ai-gateway-image-lab";
+const IMAGE_LAB_HISTORY_STORE = "history";
+const IMAGE_LAB_HISTORY_DB_VERSION = 1;
+const IMAGE_LAB_HISTORY_LIMIT = 100;
+
 function initImageLab(toastUI, confirmUI) {
   const root = document.querySelector("[data-image-lab]");
   if (!(root instanceof HTMLElement)) {
@@ -60,7 +65,6 @@ function initImageLab(toastUI, confirmUI) {
     size: root.querySelector("[data-image-lab-size]"),
     submit: root.querySelector("[data-image-lab-submit]"),
     error: root.querySelector("[data-image-lab-error]"),
-    note: root.querySelector("[data-image-lab-run-note]"),
     empty: root.querySelector("[data-image-lab-empty]"),
     runs: root.querySelector("[data-image-lab-tasks]"),
     clearResults: root.querySelector("[data-image-lab-clear-finished]"),
@@ -82,11 +86,13 @@ function initImageLab(toastUI, confirmUI) {
     submission: null,
     history: [],
     historyCollapsed: false,
+    serverCleanupRunIds: new Set(),
     bootstrapping: true,
     tasksLoading: false,
   };
 
   const currentUserID = String(root.dataset.currentUserId || "").trim();
+  const historyOwnerKey = currentUserID || "browser";
 
   let previewClose = null;
   let renderTicker = 0;
@@ -119,15 +125,6 @@ function initImageLab(toastUI, confirmUI) {
     }
     refs.error.textContent = message || "";
     refs.error.hidden = !message;
-  };
-
-  const setRunNote = (message, tone = "ok") => {
-    if (!(refs.note instanceof HTMLElement)) {
-      return;
-    }
-    refs.note.textContent = message || "";
-    refs.note.classList.toggle("is-working", tone === "working");
-    refs.note.classList.toggle("is-error", tone === "error");
   };
 
   const refreshSelect = (select) => {
@@ -659,7 +656,6 @@ function initImageLab(toastUI, confirmUI) {
       return;
     }
     state.submission = { ...state.submission, ...patch };
-    setRunNote(submissionStageText(state.submission), "working");
     requestSubmissionRender();
   };
 
@@ -670,7 +666,6 @@ function initImageLab(toastUI, confirmUI) {
     }
     setError("");
     state.submission = submissionRunFromForm();
-    setRunNote("正在提交后台任务，请不要重复点击", "working");
     renderRuns();
     updateRenderTicker();
     await nextFrame();
@@ -683,22 +678,15 @@ function initImageLab(toastUI, confirmUI) {
       await nextFrame();
       const snapshot = await createImageLabJob(root.dataset.csrfToken || "", body, updateSubmission);
       state.submission = null;
-      const run = upsertRunFromSnapshot(snapshot, { prepend: true });
+      upsertRunFromSnapshot(snapshot, { prepend: true });
       trimRuns();
       renderRuns();
       updateRenderTicker();
-      if (run) {
-        setRunNote(Number(run.count || 1) > 1 ? `已提交后台任务，生成 ${run.count} 张图片。` : "已提交后台任务。", "ok");
-      } else {
-        setRunNote("已提交后台任务。", "ok");
-      }
       showToast("后台任务已开始", "ok");
     } catch (error) {
       state.submission = null;
       renderRuns();
       updateRenderTicker();
-      const message = error instanceof Error ? error.message : "提交失败";
-      setRunNote(`提交失败：${message}`, "error");
       throw error;
     }
   };
@@ -773,8 +761,12 @@ function initImageLab(toastUI, confirmUI) {
       return;
     }
     if (snapshot.dismissed === true) {
-      state.runs = state.runs.filter((run) => run.id !== snapshot.id);
       stopJobPoller(snapshot.id);
+      if (state.serverCleanupRunIds.delete(String(snapshot.id))) {
+        updateRenderTicker();
+        return;
+      }
+      state.runs = state.runs.filter((run) => run.id !== snapshot.id);
       renderRuns();
       updateRenderTicker();
       return;
@@ -799,27 +791,66 @@ function initImageLab(toastUI, confirmUI) {
   });
 
   const saveRunHistory = async (run) => {
-    const okResults = run.results.filter((result) => result?.ok && (result.image || result.remoteUrl));
+    const okResults = (Array.isArray(run?.results) ? run.results : [])
+      .filter((result) => result?.ok && (result.image || result.remoteUrl));
     if (!okResults.length) {
       return;
     }
-    const item = {
-      id: run.id,
-      createdAt: run.createdAt,
-      prompt: run.prompt,
-      ratio: run.ratio,
-      resolution: run.resolution,
-      size: run.size,
-      model: run.model,
-      images: okResults.map((result) => result.image || result.remoteUrl),
-      remoteUrls: okResults.map((result) => result.remoteUrl || (/^https?:\/\//i.test(result.image || "") ? result.image : "")),
-      mimes: okResults.map((result) => result.mime || dataURLMIME(result.image || result.remoteUrl) || "image/png"),
-      text: okResults.map((result) => result.text || "").filter(Boolean).join("\n"),
-      failedCount: Math.max(0, Number(run.count || 0) - okResults.length),
-      elapsedMs: run.elapsedMs,
-    };
-    state.history = [item, ...state.history.filter((existing) => existing.id !== item.id)].slice(0, 30);
-    renderHistory();
+    try {
+      const images = await Promise.all(okResults.map((result) => historyImageForResult(result)));
+      const item = {
+        id: run.id,
+        createdAt: run.createdAt,
+        prompt: run.prompt,
+        ratio: run.ratio,
+        resolution: run.resolution,
+        size: run.size,
+        model: run.model,
+        images,
+        remoteUrls: okResults.map((result) => result.remoteUrl || (/^https?:\/\//i.test(result.image || "") ? result.image : "")),
+        mimes: okResults.map((result) => result.mime || dataURLMIME(result.image || result.remoteUrl) || "image/png"),
+        text: okResults.map((result) => result.text || "").filter(Boolean).join("\n"),
+        failedCount: Math.max(0, Number(run.count || 0) - okResults.length),
+        elapsedMs: run.elapsedMs,
+      };
+      await saveImageLabHistoryItem(historyOwnerKey, item, IMAGE_LAB_HISTORY_LIMIT);
+      state.history = limitHistoryByImageCount([item, ...state.history.filter((existing) => existing.id !== item.id)], IMAGE_LAB_HISTORY_LIMIT);
+      renderHistory();
+    } catch {
+      showToast("浏览器历史保存失败，当前页面仍可下载本次图片", "error");
+    } finally {
+      await cleanupSavedServerRun(run);
+    }
+  };
+
+  const historyImageForResult = async (result) => {
+    const src = String(result?.image || result?.remoteUrl || "");
+    if (!src || src.startsWith("data:")) {
+      return src;
+    }
+    try {
+      const input = await imageSourceToInput(src, {
+        id: createId("history-image"),
+        name: `history${extensionFromMIME(result?.mime || "image/png")}`,
+        type: result?.mime || "image/png",
+      });
+      return input.dataUrl || src;
+    } catch {
+      return src;
+    }
+  };
+
+  const cleanupSavedServerRun = async (run) => {
+    const id = String(run?.id || "").trim();
+    if (!id || run?.status === "running" || run?.status === "submitting" || state.serverCleanupRunIds.has(id)) {
+      return;
+    }
+    state.serverCleanupRunIds.add(id);
+    try {
+      await deleteServerRun(root.dataset.csrfToken || "", id);
+    } catch {
+      state.serverCleanupRunIds.delete(id);
+    }
   };
 
   const firstRunError = (run) => {
@@ -1261,6 +1292,11 @@ function initImageLab(toastUI, confirmUI) {
   };
 
   const loadHistory = async () => {
+    try {
+      state.history = await readImageLabHistory(historyOwnerKey, IMAGE_LAB_HISTORY_LIMIT);
+    } catch {
+      showToast("浏览器历史读取失败", "error");
+    }
     renderHistory();
   };
 
@@ -1336,6 +1372,9 @@ function initImageLab(toastUI, confirmUI) {
         if (!(await confirmAction(root.dataset.confirmDeleteHistoryItem || "确认删除这条历史记录？"))) {
           return;
         }
+        await deleteImageLabHistoryItem(historyOwnerKey, item.id).catch(() => {
+          showToast("浏览器历史删除失败", "error");
+        });
         state.history = state.history.filter((existing) => existing.id !== item.id);
         renderHistory();
       }),
@@ -1646,6 +1685,9 @@ function initImageLab(toastUI, confirmUI) {
     if (state.history.length && !(await confirmAction(root.dataset.confirmClearHistory || "确认清空本次历史记录？"))) {
       return;
     }
+    await clearImageLabHistory(historyOwnerKey).catch(() => {
+      showToast("浏览器历史清空失败", "error");
+    });
     state.history = [];
     renderHistory();
   });
@@ -1660,6 +1702,7 @@ function initImageLab(toastUI, confirmUI) {
   renderRuns();
   renderHistory();
   updateSize();
+  loadHistory().catch(() => undefined);
   loadServerTasks({ showLoading: true }).catch(() => undefined);
   loadBootstrap().catch(() => undefined);
 }
@@ -1749,6 +1792,151 @@ async function deleteServerRun(csrfToken, id) {
     const data = await response.json().catch(() => ({}));
     throw new Error(data.message || data.error?.message || response.statusText);
   }
+}
+
+function openImageLabHistoryDB() {
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) {
+      reject(new Error("IndexedDB unavailable"));
+      return;
+    }
+    const request = window.indexedDB.open(IMAGE_LAB_HISTORY_DB, IMAGE_LAB_HISTORY_DB_VERSION);
+    request.onerror = () => reject(request.error || new Error("IndexedDB open failed"));
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      const store = db.objectStoreNames.contains(IMAGE_LAB_HISTORY_STORE)
+        ? request.transaction.objectStore(IMAGE_LAB_HISTORY_STORE)
+        : db.createObjectStore(IMAGE_LAB_HISTORY_STORE, { keyPath: "key" });
+      if (!store.indexNames.contains("ownerKey")) {
+        store.createIndex("ownerKey", "ownerKey", { unique: false });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+  });
+}
+
+async function readImageLabHistory(ownerKey, limit) {
+  const db = await openImageLabHistoryDB();
+  try {
+    const records = await readImageLabHistoryRecords(db, ownerKey);
+    return limitHistoryByImageCount(records.map(historyRecordToItem), limit);
+  } finally {
+    db.close();
+  }
+}
+
+async function saveImageLabHistoryItem(ownerKey, item, limit) {
+  const db = await openImageLabHistoryDB();
+  try {
+    const record = historyItemToRecord(ownerKey, item);
+    await imageLabHistoryRequest((store) => store.put(record), db, "readwrite");
+    await pruneImageLabHistory(db, ownerKey, limit);
+  } finally {
+    db.close();
+  }
+}
+
+async function deleteImageLabHistoryItem(ownerKey, id) {
+  const db = await openImageLabHistoryDB();
+  try {
+    await imageLabHistoryRequest((store) => store.delete(imageLabHistoryKey(ownerKey, id)), db, "readwrite");
+  } finally {
+    db.close();
+  }
+}
+
+async function clearImageLabHistory(ownerKey) {
+  const db = await openImageLabHistoryDB();
+  try {
+    const records = await readImageLabHistoryRecords(db, ownerKey);
+    await Promise.all(records.map((record) => imageLabHistoryRequest(
+      (store) => store.delete(record.key),
+      db,
+      "readwrite",
+    )));
+  } finally {
+    db.close();
+  }
+}
+
+async function pruneImageLabHistory(db, ownerKey, limit) {
+  const records = await readImageLabHistoryRecords(db, ownerKey);
+  const keep = new Set(limitHistoryByImageCount(records, limit).map((record) => record.key));
+  const stale = records.filter((record) => !keep.has(record.key));
+  await Promise.all(stale.map((record) => imageLabHistoryRequest(
+    (store) => store.delete(record.key),
+    db,
+    "readwrite",
+  )));
+}
+
+function readImageLabHistoryRecords(db, ownerKey) {
+  ownerKey = normalizeHistoryOwnerKey(ownerKey);
+  return imageLabHistoryRequest((store) => {
+    if (store.indexNames.contains("ownerKey") && typeof IDBKeyRange !== "undefined") {
+      return store.index("ownerKey").getAll(IDBKeyRange.only(ownerKey));
+    }
+    return store.getAll();
+  }, db).then((records) => (Array.isArray(records) ? records : [])
+    .filter((record) => normalizeHistoryOwnerKey(record?.ownerKey) === ownerKey)
+    .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0)));
+}
+
+function imageLabHistoryRequest(operation, db, mode = "readonly") {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(IMAGE_LAB_HISTORY_STORE, mode);
+    const store = transaction.objectStore(IMAGE_LAB_HISTORY_STORE);
+    const request = operation(store);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || transaction.error || new Error("IndexedDB request failed"));
+    transaction.onerror = () => reject(transaction.error || new Error("IndexedDB transaction failed"));
+  });
+}
+
+function historyItemToRecord(ownerKey, item) {
+  const id = String(item?.id || createId("history")).trim();
+  return {
+    ...item,
+    id,
+    key: imageLabHistoryKey(ownerKey, id),
+    ownerKey: normalizeHistoryOwnerKey(ownerKey),
+    createdAt: Number(item?.createdAt || Date.now()),
+    updatedAt: Date.now(),
+  };
+}
+
+function historyRecordToItem(record) {
+  const { key, ownerKey, updatedAt, ...item } = record || {};
+  return item;
+}
+
+function imageLabHistoryKey(ownerKey, id) {
+  return `${normalizeHistoryOwnerKey(ownerKey)}::${String(id || "").trim()}`;
+}
+
+function normalizeHistoryOwnerKey(ownerKey) {
+  return String(ownerKey || "browser").trim() || "browser";
+}
+
+function limitHistoryByImageCount(items, limit) {
+  const maxImages = Math.max(1, Number(limit || IMAGE_LAB_HISTORY_LIMIT));
+  const sorted = (Array.isArray(items) ? items : [])
+    .filter((item) => item && typeof item === "object")
+    .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+  const kept = [];
+  let imageCount = 0;
+  for (const item of sorted) {
+    const count = Math.max(1, Array.isArray(item.images) ? item.images.length : 0);
+    if (imageCount > 0 && imageCount + count > maxImages) {
+      continue;
+    }
+    kept.push(item);
+    imageCount += count;
+    if (imageCount >= maxImages) {
+      break;
+    }
+  }
+  return kept;
 }
 
 function fileToInputImage(file) {

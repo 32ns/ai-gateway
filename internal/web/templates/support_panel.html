@@ -35,11 +35,19 @@
     </div>
     <div class="support-ticket-list" data-support-ticket-list>
       {{range .SupportTickets}}
-      <div role="button" tabindex="0" class="support-ticket {{if eq $.SupportActive.ID .ID}}active{{end}}" data-support-ticket-id="{{.ID}}">
+      <div role="button" tabindex="0" class="support-ticket {{if eq $.SupportActive.ID .ID}}active{{end}}" data-support-ticket-id="{{.ID}}" {{if $.SupportAdmin}}data-support-user-id="{{.UserID}}"{{end}}>
         <span class="support-ticket-avatar">{{if $.SupportAdmin}}{{avatarInitial .Username}}{{else}}客{{end}}</span>
         <span class="support-ticket-main">
           <span class="support-ticket-row">
-            <span class="support-ticket-title">{{if $.SupportAdmin}}{{.Username}}{{else}}{{.Title}}{{end}}</span>
+            {{if $.SupportAdmin}}
+            {{if .UserID}}
+            <a class="support-ticket-title support-user-link" data-support-user-link href="{{userSearchPageURL .UserID}}">{{or .Username .UserID}}</a>
+            {{else}}
+            <span class="support-ticket-title">{{or .Username .ID}}</span>
+            {{end}}
+            {{else}}
+            <span class="support-ticket-title">{{.Title}}</span>
+            {{end}}
             <span class="support-ticket-time">{{formatTime .UpdatedAt}}{{if gt .UnreadCount 0}}<span class="support-ticket-unread">{{.UnreadCount}}</span>{{end}}</span>
           </span>
           <span class="support-ticket-preview">{{.LastMessage}}</span>
@@ -67,7 +75,7 @@
       <div class="support-chat-avatar" data-support-active-avatar>{{if .SupportActive.ID}}{{if .SupportAdmin}}{{avatarInitial .SupportActive.Username}}{{else}}客{{end}}{{else}}-{{end}}</div>
       <div>
         <h2 data-support-active-title>{{if .SupportActive.ID}}{{.SupportActive.Title}}{{else}}{{t "support_no_active"}}{{end}}</h2>
-        <span data-support-active-meta>{{if .SupportActive.ID}}{{if .SupportAdmin}}{{.SupportActive.Username}} · {{end}}{{supportStatusText .SupportActive.Status}}{{end}}</span>
+        <span data-support-active-meta>{{if .SupportActive.ID}}{{if .SupportAdmin}}{{if .SupportActive.UserID}}<a class="support-user-link support-active-user-link" data-support-user-link href="{{userSearchPageURL .SupportActive.UserID}}">{{or .SupportActive.Username .SupportActive.UserID}}</a> · {{else}}{{.SupportActive.Username}} · {{end}}{{end}}{{supportStatusText .SupportActive.Status}}{{end}}</span>
       </div>
     </div>
     <div class="support-messages" data-support-messages>

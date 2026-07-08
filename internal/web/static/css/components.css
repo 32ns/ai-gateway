@@ -9204,6 +9204,23 @@ body:has(.support-workspace) {
   font-weight: 650;
 }
 
+.support-user-link {
+  color: inherit;
+  text-decoration: none;
+  text-underline-offset: 2px;
+}
+
+.support-user-link:hover,
+.support-user-link:focus-visible {
+  color: var(--theme-accent-hover, #35d39d);
+  text-decoration: underline;
+}
+
+.support-ticket-title.support-user-link {
+  display: inline-block;
+  max-width: 100%;
+}
+
 .support-ticket-time {
   display: inline-flex;
   align-items: center;
@@ -10400,8 +10417,8 @@ body:has(.support-workspace) {
   .home-hero h1 {
     width: 100%;
     max-width: 760px;
-    overflow-wrap: anywhere;
-    word-break: break-all;
+    overflow-wrap: break-word;
+    word-break: normal;
     white-space: normal !important;
   }
 
@@ -10475,9 +10492,8 @@ body:has(.support-workspace) {
     max-width: min(100%, 320px);
     font-size: 32px;
     line-height: 1.08;
-    overflow-wrap: anywhere;
-    word-break: break-all;
-    line-break: anywhere;
+    overflow-wrap: break-word;
+    word-break: normal;
     white-space: normal !important;
   }
 
@@ -10490,9 +10506,8 @@ body:has(.support-workspace) {
     max-width: min(100%, 334px);
     font-size: 15px;
     line-height: 1.72;
-    overflow-wrap: anywhere;
-    word-break: break-all;
-    line-break: anywhere;
+    overflow-wrap: break-word;
+    word-break: normal;
   }
 
   .home-actions {

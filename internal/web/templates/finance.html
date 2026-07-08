@@ -350,21 +350,21 @@
           {{$canRefund := and $paidOrder (gt $refundSummary.AvailableRefundNanoUSD 0)}}
           {{$showRefundDialog := or $canRefund $hasRefunds}}
           <tr>
-            <td>{{formatTime .CreatedAt}}</td>
-            <td>
+            <td data-label="{{t "created_at"}}">{{formatTime .CreatedAt}}</td>
+            <td data-label="{{t "filter_user"}}">
               {{with userIdentity .UserID}}
               <a class="usage-user-link" href="{{userSearchPageURL .ID}}">{{if .Known}}<strong>{{.Username}}</strong>{{else}}<code>{{.ID}}</code>{{end}}</a>
               {{end}}
             </td>
-            <td><code>{{.OutTradeNo}}</code></td>
-            <td>{{paymentProviderText .Provider}}</td>
-            <td>{{paymentOrderTypeText .}}</td>
-            <td>
+            <td data-label="{{t "payment_order"}}"><code>{{.OutTradeNo}}</code></td>
+            <td data-label="{{t "provider"}}">{{paymentProviderText .Provider}}</td>
+            <td data-label="{{t "payment_type"}}">{{paymentOrderTypeText .}}</td>
+            <td data-label="{{t "amount"}}">
               <strong>{{formatUSD .AmountNanoUSD}}</strong>
               <div class="muted">{{t "payment_amount"}} {{formatCNYCents .ProviderAmountCents}}</div>
               <div class="muted">{{t "payment_exchange_rate"}} {{paymentExchangeRateText .}}</div>
             </td>
-            <td>
+            <td data-label="{{t "status"}}">
               <div class="cell-stack finance-payment-status-cell">
                 <span class="pill {{paymentStatusClass .Status}}">{{paymentStatusText .Status}}</span>
                 {{if $canConfirmPaid}}
@@ -376,7 +376,7 @@
                 {{end}}
               </div>
             </td>
-            <td class="finance-refund-cell">
+            <td class="finance-refund-cell" data-label="{{t "payment_refunds"}}">
               {{if $refundSummary}}
               <div class="finance-refund-summary">
                 {{if $paidOrder}}

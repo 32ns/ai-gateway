@@ -247,14 +247,6 @@ func (s *Server) handleImageLabJobActions(w http.ResponseWriter, r *http.Request
 		isCancel = true
 		jobPath = strings.TrimSuffix(jobPath, "/cancel")
 	}
-	if strings.Contains(jobPath, "/results/") {
-		if r.Method != http.MethodGet {
-			http.NotFound(w, r)
-			return
-		}
-		s.handleImageLabResultFile(w, r, jobPath)
-		return
-	}
 	jobID := strings.Trim(jobPath, "/")
 	if jobID == "" || strings.Contains(jobID, "/") {
 		http.NotFound(w, r)
@@ -297,64 +289,11 @@ func (s *Server) handleImageLabJobActions(w http.ResponseWriter, r *http.Request
 	}
 }
 
-func (s *Server) handleImageLabResultFile(w http.ResponseWriter, r *http.Request, jobPath string) {
-	jobID, rawIndex, ok := strings.Cut(strings.Trim(jobPath, "/"), "/results/")
-	if !ok || strings.TrimSpace(jobID) == "" || strings.Contains(rawIndex, "/") {
-		http.NotFound(w, r)
-		return
-	}
-	index, err := strconv.Atoi(strings.TrimSpace(rawIndex))
-	if err != nil || index < 0 {
-		http.NotFound(w, r)
-		return
-	}
-	user, _ := currentUserFromContext(r.Context())
-	if s.imageLabJobs != nil {
-		s.imageLabJobs.cleanup(s, time.Now())
-	}
-	path, mimeType, updatedAtMS, ok := s.imageLabJobs.ResultFile(user.ID, jobID, index)
-	if !ok {
-		http.NotFound(w, r)
-		return
-	}
-	cleanPath, ok := s.validateImageLabResultFilePath(path)
-	if !ok {
-		http.NotFound(w, r)
-		return
-	}
-	file, err := os.Open(cleanPath)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	defer file.Close()
-	info, err := file.Stat()
-	if err != nil || info.IsDir() {
-		http.NotFound(w, r)
-		return
-	}
-	if strings.TrimSpace(mimeType) == "" {
-		mimeType = mime.TypeByExtension(strings.ToLower(filepath.Ext(cleanPath)))
-	}
-	if strings.TrimSpace(mimeType) == "" {
-		mimeType = "application/octet-stream"
-	}
-	w.Header().Set("Content-Type", mimeType)
-	w.Header().Set("Cache-Control", "private, max-age=3600")
-	w.Header().Set("Content-Disposition", "inline")
-	modTime := info.ModTime()
-	if updatedAtMS > 0 {
-		modTime = time.UnixMilli(updatedAtMS)
-	}
-	http.ServeContent(w, r, filepath.Base(cleanPath), modTime, file)
-}
-
 func (s *Server) storeImageLabResult(snapshot imageLabTaskSnapshot, result imageLabResultEvent) imageLabResultEvent {
 	if !result.OK {
 		result.B64JSON = ""
 		return result
 	}
-	jobID := strings.TrimSpace(snapshot.ID)
 	var (
 		data     []byte
 		mimeType string
@@ -374,25 +313,10 @@ func (s *Server) storeImageLabResult(snapshot imageLabTaskSnapshot, result image
 	if len(data) == 0 {
 		return imageLabStoredResultError(result)
 	}
-	dir := s.imageLabJobResultDir(jobID)
-	if err := os.MkdirAll(dir, 0700); err != nil {
-		return imageLabStoredResultError(result)
-	}
-	filePath := filepath.Join(dir, imageLabResultFilename(result.Index, mimeType))
-	tempPath := filePath + ".tmp"
-	if err := os.WriteFile(tempPath, data, 0600); err != nil {
-		return imageLabStoredResultError(result)
-	}
-	if err := os.Rename(tempPath, filePath); err != nil {
-		_ = os.Remove(tempPath)
-		return imageLabStoredResultError(result)
-	}
-	result.Image = imageLabResultFileURL(jobID, result.Index)
+	result.Image = imageLabDataURL(mimeType, data)
 	result.RemoteURL = ""
 	result.MIME = mimeType
-	result.FilePath = filePath
 	result.B64JSON = ""
-	s.recordImageReviewItem(snapshot, result, data)
 	return result
 }
 
@@ -400,28 +324,10 @@ func imageLabStoredResultError(result imageLabResultEvent) imageLabResultEvent {
 	result.OK = false
 	result.Image = ""
 	result.RemoteURL = ""
-	result.FilePath = ""
 	result.B64JSON = ""
 	result.Status = http.StatusInternalServerError
-	result.Error = "图片保存失败"
+	result.Error = "图片处理失败"
 	return result
-}
-
-func (s *Server) removeImageLabJobFiles(job *imageLabJob) {
-	if s == nil || job == nil {
-		return
-	}
-	if jobID := job.snapshotID(); jobID != "" {
-		if cleanDir, ok := s.validateImageLabResultFilePath(s.imageLabJobResultDir(jobID)); ok {
-			_ = os.RemoveAll(cleanDir)
-			return
-		}
-	}
-	for _, path := range job.resultFilePaths() {
-		if cleanPath, ok := s.validateImageLabResultFilePath(path); ok {
-			_ = os.Remove(cleanPath)
-		}
-	}
 }
 
 func (s *Server) clearImageLabStoredResults() {
@@ -447,54 +353,8 @@ func (s *Server) imageLabResultRootDir() string {
 	return filepath.Join(dir, "image-lab")
 }
 
-func (s *Server) imageLabJobResultDir(jobID string) string {
-	jobID = sanitizeImageLabFileID(jobID)
-	if jobID == "" {
-		jobID = "unknown"
-	}
-	return filepath.Join(s.imageLabResultRootDir(), jobID)
-}
-
-func (s *Server) validateImageLabResultFilePath(path string) (string, bool) {
-	path = strings.TrimSpace(path)
-	if path == "" {
-		return "", false
-	}
-	root, err := filepath.Abs(s.imageLabResultRootDir())
-	if err != nil {
-		return "", false
-	}
-	cleanPath, err := filepath.Abs(filepath.Clean(path))
-	if err != nil {
-		return "", false
-	}
-	rel, err := filepath.Rel(root, cleanPath)
-	if err != nil || rel == "." || strings.HasPrefix(rel, "..") || filepath.IsAbs(rel) {
-		return "", false
-	}
-	return cleanPath, true
-}
-
-func imageLabResultFilename(index int, mimeType string) string {
-	if index < 0 {
-		index = 0
-	}
-	return fmt.Sprintf("%03d%s", index, imageLabExtensionForOutputMIME(mimeType))
-}
-
-func imageLabResultFileURL(jobID string, index int) string {
-	return "/images/api/jobs/" + url.PathEscape(strings.TrimSpace(jobID)) + "/results/" + strconv.Itoa(index)
-}
-
-func sanitizeImageLabFileID(value string) string {
-	value = strings.TrimSpace(value)
-	var b strings.Builder
-	for _, r := range value {
-		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '-' {
-			b.WriteRune(r)
-		}
-	}
-	return b.String()
+func imageLabDataURL(mimeType string, data []byte) string {
+	return "data:" + strings.ToLower(strings.TrimSpace(mimeType)) + ";base64," + base64.StdEncoding.EncodeToString(data)
 }
 
 func decodeImageLabOutputDataURL(dataURL string) ([]byte, string, error) {
@@ -551,21 +411,6 @@ func normalizeImageLabOutputMIME(mimeType string, data []byte) string {
 		return ""
 	}
 	return mimeType
-}
-
-func imageLabExtensionForOutputMIME(mimeType string) string {
-	switch strings.ToLower(strings.TrimSpace(mimeType)) {
-	case "image/jpeg", "image/jpg":
-		return ".jpg"
-	case "image/webp":
-		return ".webp"
-	case "image/gif":
-		return ".gif"
-	case "image/avif":
-		return ".avif"
-	default:
-		return ".png"
-	}
 }
 
 func (s *Server) handleImageLabProxy(w http.ResponseWriter, r *http.Request) {
@@ -1028,14 +873,6 @@ func imageLabResultFromImageBody(index int, body []byte) imageLabResultEvent {
 	result.Status = http.StatusBadGateway
 	result.Error = gatewayProtocolErrorMessage
 	return result
-}
-
-func imageLabResultDataURL(value string) string {
-	value = strings.TrimSpace(value)
-	if strings.HasPrefix(strings.ToLower(value), "data:") {
-		return value
-	}
-	return "data:image/png;base64," + value
 }
 
 func imageLabDataURLMIME(dataURL string) string {

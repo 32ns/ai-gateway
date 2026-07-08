@@ -68,23 +68,23 @@
         {{range .Payments.Orders}}
         <tr data-payment-order-row="{{.ID}}">
           {{$pending := eq (printf "%s" .Status) "pending"}}
-          <td>{{.CreatedAt.Local.Format "2006-01-02 15:04:05"}}</td>
+          <td data-label="{{t "created_at"}}">{{.CreatedAt.Local.Format "2006-01-02 15:04:05"}}</td>
           {{if isAdminUser $.CurrentUser}}
-          <td>
+          <td data-label="{{t "filter_user"}}">
             {{with userIdentity .UserID}}
             {{if .Known}}<strong>{{.Username}}</strong>{{else}}<code>{{.ID}}</code>{{end}}
             {{end}}
           </td>
           {{end}}
-          <td><code>{{.OutTradeNo}}</code></td>
-          <td>{{paymentOrderMethodText .}}</td>
-          <td>
+          <td data-label="{{t "payment_order"}}"><code>{{.OutTradeNo}}</code></td>
+          <td data-label="{{t "payment_method"}}">{{paymentOrderMethodText .}}</td>
+          <td data-label="{{t "payment_received_amount"}}">
             <strong>{{formatUSD .AmountNanoUSD}}</strong>
             <div class="muted">{{t "payment_amount"}} {{formatCNYCents .ProviderAmountCents}}</div>
             <div class="muted">{{t "payment_exchange_rate"}} {{paymentExchangeRateText .}}</div>
           </td>
-          <td><span class="pill {{paymentStatusClass .Status}}">{{paymentStatusText .Status}}</span></td>
-          <td>
+          <td data-label="{{t "status"}}"><span class="pill {{paymentStatusClass .Status}}">{{paymentStatusText .Status}}</span></td>
+          <td data-label="{{t "action"}}">
             <div class="action-row compact">
               {{if and $pending .PayURL}}<a class="button-link ghost-link" href="{{.PayURL}}" target="_blank" rel="noopener">{{t "open_payment_url"}}</a>{{end}}
               {{if and $pending .CodeURL}}<button type="button" class="ghost" data-group-settings-open="payment-qr-{{.ID}}">{{t "payment"}}</button>{{end}}

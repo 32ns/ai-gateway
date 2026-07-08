@@ -14,8 +14,8 @@
   <meta name="twitter:card" content="summary">
   {{if .StructuredDataJSON}}<script type="application/ld+json">{{.StructuredDataJSON}}</script>{{end}}
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
-  <link rel="stylesheet" href="/static/app.css?v=2026062501">
-  <script type="module" src="/static/app.js?v=2026070601"></script>
+  <link rel="stylesheet" href="/static/app.css?v=2026070805">
+  <script type="module" src="/static/app.js?v=2026070804"></script>
 </head>
 <body
   data-confirm-title="{{t "confirm_action_title"}}"
@@ -80,7 +80,6 @@
         <a class="nav-link {{if eq $.ActiveNav "finance"}}active{{end}}" href="/admin/finance">{{t "nav_finance"}}</a>
         <a class="nav-link {{if eq $.ActiveNav "users"}}active{{end}}" href="/admin/users">{{t "nav_users"}}</a>
         <a class="nav-link {{if eq $.ActiveNav "settings"}}active{{end}}" href="/admin/settings">{{t "nav_settings"}}</a>
-        <a class="nav-link {{if eq $.ActiveNav "image-reviews"}}active{{end}}" href="/admin/image-reviews">{{t "nav_image_reviews"}}</a>
         <a class="nav-link {{if eq $.ActiveNav "audit"}}active{{end}}" href="/admin/audit">{{t "nav_audit"}}</a>
         {{end}}
         <a class="nav-link source-link" href="https://github.com/32ns/ai-gateway" target="_blank" rel="noopener noreferrer" aria-label="GitHub" title="GitHub">

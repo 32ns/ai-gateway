@@ -26,10 +26,10 @@ func TestStaticAssetEntryPointsReferenceEmbeddedChildren(t *testing.T) {
 		!(foundationIndex < componentsIndex && componentsIndex < themeIndex && themeIndex < maintenanceIndex) {
 		t.Fatalf("app.css must import stylesheets as foundation, components, theme, maintenance")
 	}
-	if !strings.Contains(cssBody, `./css/components.css?v=2026062501`) {
+	if !strings.Contains(cssBody, `./css/components.css?v=2026070802`) {
 		t.Fatalf("app.css must cache-bust component styles")
 	}
-	if !strings.Contains(cssBody, `./css/maintenance.css?v=2026062402`) {
+	if !strings.Contains(cssBody, `./css/maintenance.css?v=2026070804`) {
 		t.Fatalf("app.css must cache-bust table stability styles")
 	}
 
@@ -63,13 +63,13 @@ func TestStaticAssetEntryPointsReferenceEmbeddedChildren(t *testing.T) {
 	if !strings.Contains(string(js), `./js/app.bundle.js`) {
 		t.Fatalf("app.js does not import the bundled application script")
 	}
-	if !strings.Contains(string(js), `./js/app.bundle.js?v=2026070601`) {
+	if !strings.Contains(string(js), `./js/app.bundle.js?v=2026070802`) {
 		t.Fatalf("app.js must cache-bust the site message popup date script")
 	}
 	if !strings.Contains(string(js), `./js/events.js?v=2026061512`) {
 		t.Fatalf("app.js must cache-bust the console event script")
 	}
-	if !strings.Contains(string(js), `./js/support.js?v=2026061516`) {
+	if !strings.Contains(string(js), `./js/support.js?v=2026070803`) {
 		t.Fatalf("app.js must cache-bust the support chat script")
 	}
 	bundle, err := assets.ReadFile("static/js/app.bundle.js")
@@ -97,10 +97,10 @@ func TestStaticAssetEntryPointsReferenceEmbeddedChildren(t *testing.T) {
 		t.Fatalf("read layout.html: %v", err)
 	}
 	layoutBody := string(layout)
-	if !strings.Contains(layoutBody, `/static/app.css?v=2026062501`) {
+	if !strings.Contains(layoutBody, `/static/app.css?v=2026070805`) {
 		t.Fatalf("layout.html must cache-bust the app stylesheet entrypoint")
 	}
-	if !strings.Contains(layoutBody, `/static/app.js?v=2026070601`) {
+	if !strings.Contains(layoutBody, `/static/app.js?v=2026070804`) {
 		t.Fatalf("layout.html must cache-bust the app module entrypoint")
 	}
 }
@@ -255,6 +255,51 @@ func TestSupportChatHasMobileLayoutGuards(t *testing.T) {
 	}
 }
 
+func TestAdminSupportUsernamesLinkToFilteredUsersPage(t *testing.T) {
+	templateBody, err := assets.ReadFile("templates/support_panel.html")
+	if err != nil {
+		t.Fatalf("read support panel template: %v", err)
+	}
+	template := string(templateBody)
+	for _, want := range []string{
+		`data-support-user-id="{{.UserID}}"`,
+		`class="support-ticket-title support-user-link"`,
+		`data-support-user-link href="{{userSearchPageURL .UserID}}"`,
+		`data-support-user-link href="{{userSearchPageURL .SupportActive.UserID}}"`,
+	} {
+		if !strings.Contains(template, want) {
+			t.Fatalf("support panel template missing admin user link marker %q", want)
+		}
+	}
+
+	support, err := assets.ReadFile("static/js/support.js")
+	if err != nil {
+		t.Fatalf("read support.js: %v", err)
+	}
+	supportBody := string(support)
+	for _, want := range []string{
+		`createSupportUserLink(ticket, "support-ticket-title")`,
+		`renderActiveMeta(activeMeta, ticket, admin, single, labels);`,
+		`user_id: item.dataset.supportUserId || "",`,
+		`event.target.closest("[data-support-user-link]")`,
+		`event.stopPropagation();`,
+		`/admin/users?q=${encodeURIComponent(userID)}`,
+	} {
+		if !strings.Contains(supportBody, want) {
+			t.Fatalf("support.js missing admin user link behavior %q", want)
+		}
+	}
+
+	css, err := assets.ReadFile("static/css/components.css")
+	if err != nil {
+		t.Fatalf("read components.css: %v", err)
+	}
+	if !strings.Contains(string(css), `.support-user-link {`) ||
+		!strings.Contains(string(css), `.support-ticket-title.support-user-link {`) {
+		t.Fatal("components.css missing support user link styling")
+	}
+}
+
 func TestSupportNotificationDiagnosticsAreNotRendered(t *testing.T) {
 	templateBody, err := assets.ReadFile("templates/support_panel.html")
 	if err != nil {
@@ -313,8 +358,9 @@ func TestDefaultDataTablesUseNaturalLayout(t *testing.T) {
 		`.table-wrap {`,
 		`overflow-x: auto;`,
 		`.data-table {`,
-		`min-width: 0;`,
+		`min-width: 640px;`,
 		`table-layout: auto;`,
+		`overflow-wrap: normal;`,
 		`.data-table code {`,
 		`overflow-wrap: anywhere;`,
 	} {
@@ -323,13 +369,47 @@ func TestDefaultDataTablesUseNaturalLayout(t *testing.T) {
 		}
 	}
 
+	users, err := assets.ReadFile("templates/users.html")
+	if err != nil {
+		t.Fatalf("read users.html: %v", err)
+	}
+	if !strings.Contains(string(users), `class="table-wrap users-table-wrap"`) ||
+		!strings.Contains(string(users), `class="data-table users-table"`) {
+		t.Fatal("users table must use dedicated stable table classes")
+	}
+	for _, want := range []string{
+		`.users-table-wrap {`,
+		`.users-table {`,
+		`min-width: 1160px;`,
+		`.users-table th,`,
+		`white-space: nowrap;`,
+		`.users-table .action-row.compact {`,
+		`flex-wrap: nowrap;`,
+	} {
+		if !strings.Contains(cssBody, want) {
+			t.Fatalf("maintenance.css missing users table mobile guard %q", want)
+		}
+	}
+
 	payments, err := assets.ReadFile("templates/payments.html")
 	if err != nil {
 		t.Fatalf("read payments.html: %v", err)
 	}
-	if !strings.Contains(string(payments), `class="table-wrap payment-orders-table-wrap"`) ||
-		!strings.Contains(string(payments), `class="data-table payment-orders-table"`) {
+	paymentsBody := string(payments)
+	if !strings.Contains(paymentsBody, `class="table-wrap payment-orders-table-wrap"`) ||
+		!strings.Contains(paymentsBody, `class="data-table payment-orders-table"`) {
 		t.Fatal("payments table must use dedicated order table classes")
+	}
+	for _, want := range []string{
+		`data-label="{{t "created_at"}}"`,
+		`data-label="{{t "payment_order"}}"`,
+		`data-label="{{t "payment_received_amount"}}"`,
+		`data-label="{{t "status"}}"`,
+		`data-label="{{t "action"}}"`,
+	} {
+		if !strings.Contains(paymentsBody, want) {
+			t.Fatalf("payments table missing mobile card label %q", want)
+		}
 	}
 
 	finance, err := assets.ReadFile("templates/finance.html")
@@ -343,12 +423,50 @@ func TestDefaultDataTablesUseNaturalLayout(t *testing.T) {
 		!strings.Contains(financeBody, `class="data-table finance-orders-table"`) {
 		t.Fatal("finance order table must use dedicated order table classes")
 	}
+	for _, want := range []string{
+		`data-label="{{t "created_at"}}"`,
+		`data-label="{{t "filter_user"}}"`,
+		`data-label="{{t "payment_order"}}"`,
+		`data-label="{{t "provider"}}"`,
+		`data-label="{{t "payment_type"}}"`,
+		`data-label="{{t "amount"}}"`,
+		`data-label="{{t "payment_refunds"}}"`,
+	} {
+		if !strings.Contains(financeBody[ordersTabIndex:], want) {
+			t.Fatalf("finance order table missing mobile card label %q", want)
+		}
+	}
 	if !strings.Contains(financeBody, `{{$canConfirmPaid := or (eq (printf "%s" .Status) "closed") (eq (printf "%s" .Status) "failed")}}`) ||
 		!strings.Contains(financeBody, `{{if $canConfirmPaid}}`) {
 		t.Fatal("finance payment confirmation button must only be shown for closed or failed orders")
 	}
 	if strings.Contains(financeBody, `{{if not $paidOrder}}`) {
 		t.Fatal("finance payment confirmation button must not be shown for every non-paid order")
+	}
+	for _, want := range []string{
+		`.payment-orders-table-wrap,`,
+		`.finance-orders-table-wrap {`,
+		`.payment-orders-table {`,
+		`min-width: 900px;`,
+		`.finance-orders-table {`,
+		`min-width: 1120px;`,
+		`@media (max-width: 640px) {`,
+		`.payment-orders-table thead,`,
+		`.finance-orders-table thead {`,
+		`display: none;`,
+		`.payment-orders-table td::before,`,
+		`.finance-orders-table td::before {`,
+		`content: attr(data-label);`,
+		`.payment-orders-table code,`,
+		`.finance-orders-table code {`,
+		`line-height: 1.45;`,
+		`.table-wrap .payment-orders-table code,`,
+		`.table-wrap .finance-orders-table code {`,
+		`white-space: nowrap;`,
+	} {
+		if !strings.Contains(cssBody, want) {
+			t.Fatalf("maintenance.css missing payment order mobile table rule %q", want)
+		}
 	}
 }
 
@@ -601,9 +719,13 @@ func TestUsageLogsUseMobileCardTableLayout(t *testing.T) {
 		`@media (max-width: 640px) {`,
 		`.usage-log-table thead {`,
 		`display: none;`,
+		`width: 100%;`,
+		`box-sizing: border-box;`,
 		`.usage-log-table td::before {`,
 		`content: attr(data-label);`,
-		`grid-template-columns: minmax(86px, 32%) minmax(0, 1fr);`,
+		`grid-template-columns: minmax(96px, 34%) minmax(0, 1fr);`,
+		`.usage-log-table .usage-col-input .cell-stack {`,
+		`justify-content: flex-start;`,
 	} {
 		if !strings.Contains(cssBody, want) {
 			t.Fatalf("maintenance.css missing usage logs mobile table rule %q", want)
@@ -666,13 +788,46 @@ func TestAppBundleInitializesDeferredPartials(t *testing.T) {
 		t.Fatalf("read app.bundle.js: %v", err)
 	}
 	body := string(js)
-	if !strings.Contains(body, `./image_lab.js?v=2026070601`) {
+	if !strings.Contains(body, `./image_lab.js?v=2026070802`) {
 		t.Fatalf("app.bundle.js must cache-bust image_lab.js")
 	}
 	if !strings.Contains(body, `const initDeferredPartials =`) ||
 		!strings.Contains(body, `initDeferredPartials();`) ||
 		!strings.Contains(body, `initAjaxLinks();`) {
 		t.Fatalf("app.bundle.js must initialize deferred partials and ajax links on first page load")
+	}
+}
+
+func TestImageLabResultHeaderDoesNotRenderRunNote(t *testing.T) {
+	template, err := assets.ReadFile("templates/image_lab.html")
+	if err != nil {
+		t.Fatalf("read image_lab.html: %v", err)
+	}
+	js, err := assets.ReadFile("static/js/image_lab.js")
+	if err != nil {
+		t.Fatalf("read image_lab.js: %v", err)
+	}
+	css, err := assets.ReadFile("static/css/maintenance.css")
+	if err != nil {
+		t.Fatalf("read maintenance.css: %v", err)
+	}
+	for _, item := range []struct {
+		name string
+		body string
+	}{
+		{name: "template", body: string(template)},
+		{name: "script", body: string(js)},
+		{name: "styles", body: string(css)},
+	} {
+		for _, unwanted := range []string{
+			`data-image-lab-run-note`,
+			`image-lab-run-note`,
+			`setRunNote`,
+		} {
+			if strings.Contains(item.body, unwanted) {
+				t.Fatalf("%s must not render image lab result header run note marker %q", item.name, unwanted)
+			}
+		}
 	}
 }
 

@@ -146,8 +146,6 @@ func (s *Server) registerAdminRoutes(mux *http.ServeMux) {
 	mux.Handle("/admin/backup/restore", adminOnly(s.handleBackupRestore))
 	mux.Handle("/admin/backup", adminOnly(s.handleBackupPage))
 	mux.Handle("/admin/audit", adminOnly(s.handleAuditPage))
-	mux.Handle("/admin/image-reviews", adminOnly(s.handleImageReviewsPage))
-	mux.Handle("/admin/image-reviews/", adminOnly(s.handleImageReviewActions))
 	mux.Handle("/admin/users", adminOnly(s.handleUsersPage))
 	mux.Handle("/admin/users/", adminOnly(s.handleUserActions))
 	mux.Handle("/admin/connect/openai/oauth", adminOnly(s.handleOpenAIOAuthStart))

@@ -1947,38 +1947,6 @@ button.confirm-primary:focus-visible {
   line-height: 1.2;
 }
 
-.image-lab-run-note {
-  display: inline-flex;
-  align-items: center;
-  min-height: 20px;
-  padding: 0 7px;
-  border: 1px solid var(--theme-good-line);
-  border-radius: var(--theme-radius-xs);
-  background: var(--theme-good-bg);
-  color: var(--theme-good);
-  font-family: var(--font-ui-mono);
-  font-size: var(--font-badge);
-  font-weight: 400;
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
-.image-lab-run-note:empty {
-  display: none;
-}
-
-.image-lab-run-note.is-working {
-  border-color: var(--theme-warn-line);
-  background: var(--theme-warn-bg);
-  color: var(--theme-warn);
-}
-
-.image-lab-run-note.is-error {
-  border-color: var(--theme-bad-line);
-  background: var(--theme-bad-bg);
-  color: var(--theme-bad);
-}
-
 .image-lab-results .ghost {
   border-color: var(--theme-line);
   background: transparent;
@@ -4760,14 +4728,14 @@ button.is-loading::before {
 
 .data-table {
   width: 100%;
-  min-width: 0;
+  min-width: 640px;
   table-layout: auto;
 }
 
 .data-table th,
 .data-table td {
-  min-width: 0;
-  overflow-wrap: anywhere;
+  min-width: max-content;
+  overflow-wrap: normal;
   word-break: normal;
 }
 
@@ -4786,6 +4754,84 @@ button.is-loading::before {
 }
 
 .data-table .pill {
+  white-space: nowrap;
+}
+
+.users-table-wrap {
+  overflow-x: auto;
+}
+
+.users-table {
+  min-width: 1160px;
+  table-layout: auto;
+}
+
+.users-table th,
+.users-table td {
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
+.users-table th:nth-child(1),
+.users-table td:nth-child(1) {
+  min-width: 150px;
+}
+
+.users-table th:nth-child(4),
+.users-table td:nth-child(4),
+.users-table th:nth-child(7),
+.users-table td:nth-child(7),
+.users-table th:nth-child(8),
+.users-table td:nth-child(8) {
+  min-width: 126px;
+}
+
+.users-table th:nth-child(9),
+.users-table td:nth-child(9) {
+  min-width: 320px;
+}
+
+.users-table .action-row.compact {
+  flex-wrap: nowrap;
+}
+
+.payment-orders-table-wrap,
+.finance-orders-table-wrap {
+  overflow-x: auto;
+}
+
+.payment-orders-table,
+.finance-orders-table {
+  width: max-content;
+  min-width: 100%;
+  table-layout: auto;
+}
+
+.payment-orders-table {
+  min-width: 900px;
+}
+
+.finance-orders-table {
+  min-width: 1120px;
+}
+
+.payment-orders-table th,
+.payment-orders-table td,
+.finance-orders-table th,
+.finance-orders-table td {
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.payment-orders-table code,
+.finance-orders-table code {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.payment-orders-table .muted,
+.finance-orders-table .muted {
   white-space: nowrap;
 }
 
@@ -5355,9 +5401,11 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   }
 
   .usage-log-table {
+    display: block;
+    width: 100%;
     min-width: 0;
     border-collapse: separate;
-    border-spacing: 0 10px;
+    border-spacing: 0;
   }
 
   .usage-log-table thead {
@@ -5373,10 +5421,12 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 
   .usage-log-table tbody {
     display: grid;
+    width: 100%;
     gap: 10px;
   }
 
   .usage-log-table tr {
+    box-sizing: border-box;
     padding: 10px 0;
     border: 1px solid var(--theme-line-soft);
     border-radius: var(--theme-radius-sm);
@@ -5386,13 +5436,14 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   .usage-log-table td {
     min-height: 30px;
     display: grid;
-    grid-template-columns: minmax(86px, 32%) minmax(0, 1fr);
+    grid-template-columns: minmax(96px, 34%) minmax(0, 1fr);
     align-items: start;
     gap: 10px;
     padding: 7px 10px;
     border: 0;
     color: var(--theme-text-soft);
-    overflow-wrap: anywhere;
+    overflow-wrap: normal;
+    word-break: normal;
     white-space: normal;
   }
 
@@ -5419,12 +5470,154 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   .usage-log-table code,
   .usage-log-table strong,
   .usage-log-table .usage-account-cell,
-  .usage-log-table .cell-stack {
+  .usage-log-table .cell-stack,
+  .usage-log-table .usage-user-link {
     min-width: 0;
+    line-height: 1.45;
+  }
+
+  .usage-log-table .usage-col-first-token,
+  .usage-log-table .usage-col-input,
+  .usage-log-table .usage-col-output,
+  .usage-log-table .usage-col-cost {
+    text-align: left;
+  }
+
+  .usage-log-table .usage-col-input .cell-stack {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 4px 8px;
+    white-space: normal;
   }
 
   .usage-log-table .pill {
     justify-self: start;
+  }
+}
+
+@media (max-width: 640px) {
+  .payment-orders-table-wrap,
+  .finance-orders-table-wrap {
+    overflow: visible;
+  }
+
+  .payment-orders-table,
+  .finance-orders-table {
+    width: 100%;
+    min-width: 0;
+    border-collapse: separate;
+    border-spacing: 0 10px;
+  }
+
+  .payment-orders-table thead,
+  .finance-orders-table thead {
+    display: none;
+  }
+
+  .payment-orders-table tbody,
+  .payment-orders-table tr,
+  .payment-orders-table td,
+  .finance-orders-table tbody,
+  .finance-orders-table tr,
+  .finance-orders-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .payment-orders-table tbody,
+  .finance-orders-table tbody {
+    display: grid;
+    gap: 10px;
+  }
+
+  .payment-orders-table tr,
+  .finance-orders-table tr {
+    padding: 10px 0;
+    border: 1px solid var(--theme-line-soft);
+    border-radius: var(--theme-radius-sm);
+    background: var(--theme-surface-soft);
+  }
+
+  .payment-orders-table td,
+  .finance-orders-table td {
+    min-width: 0;
+    min-height: 30px;
+    display: grid;
+    grid-template-columns: minmax(88px, 30%) minmax(0, 1fr);
+    align-items: start;
+    gap: 10px;
+    padding: 7px 10px;
+    border: 0;
+    color: var(--theme-text-soft);
+    white-space: normal;
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+
+  .payment-orders-table td::before,
+  .finance-orders-table td::before {
+    content: attr(data-label);
+    min-width: 0;
+    color: var(--theme-text-muted);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .payment-orders-table td.empty,
+  .finance-orders-table td.empty {
+    display: block;
+  }
+
+  .payment-orders-table td.empty::before,
+  .finance-orders-table td.empty::before {
+    content: none;
+  }
+
+  .payment-orders-table td > *,
+  .finance-orders-table td > * {
+    min-width: 0;
+  }
+
+  .payment-orders-table code,
+  .finance-orders-table code {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: normal;
+    line-height: 1.45;
+  }
+
+  .payment-orders-table .muted,
+  .finance-orders-table .muted {
+    white-space: normal;
+    overflow-wrap: break-word;
+  }
+
+  .payment-orders-table .pill,
+  .finance-orders-table .pill {
+    justify-self: start;
+  }
+
+  .payment-orders-table .action-row.compact,
+  .finance-payment-status-cell,
+  .finance-refund-summary {
+    align-items: flex-start;
+  }
+
+  .payment-orders-table .action-row.compact,
+  .finance-refund-summary {
+    gap: 6px;
+  }
+
+  .finance-refund-cell,
+  .finance-refund-summary {
+    min-width: 0;
+  }
+
+  .finance-refund-summary-line {
+    justify-content: flex-start;
+    gap: 8px;
   }
 }
 
@@ -6073,8 +6266,8 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 
   .table-wrap .data-table th,
   .table-wrap .data-table td {
-    max-width: min(280px, 78vw);
-    overflow-wrap: anywhere;
+    max-width: none;
+    overflow-wrap: normal;
     word-break: normal;
   }
 
@@ -6094,6 +6287,13 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 
   .table-wrap .data-table .pill {
     white-space: nowrap;
+  }
+
+  .table-wrap .payment-orders-table code,
+  .table-wrap .finance-orders-table code {
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: normal;
   }
 
   .settings-overlay,

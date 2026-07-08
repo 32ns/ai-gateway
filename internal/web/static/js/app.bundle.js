@@ -5,7 +5,7 @@ import { initModelGroupPopovers } from "./model_groups.js?v=2026052003";
 import { initCopySecrets } from "./clipboard.js?v=2026051501";
 import { initEnhancedSelects } from "./selects.js?v=2026061702";
 import { initAccountLoginForms, initEmailCodeSenders, initEmailProviderFields, initPasswordToggles, initRegistrationEmailDomains, initSettingsTabs } from "./forms.js?v=2026052801";
-import { initImageLab } from "./image_lab.js?v=2026070601";
+import { initImageLab } from "./image_lab.js?v=2026070802";
 
 document.addEventListener("DOMContentLoaded", () => {
   const confirmUI = createConfirmUI();

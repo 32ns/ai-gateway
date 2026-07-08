@@ -85,7 +85,8 @@ function createSupportClient(root) {
       tickets.set(id, {
         id,
         title: text(item.querySelector(".support-ticket-title")),
-        username: "",
+        user_id: item.dataset.supportUserId || "",
+        username: admin ? text(item.querySelector("[data-support-user-link], .support-ticket-title")) : "",
         status: "",
         last_message: text(item.querySelector(".support-ticket-preview")),
         updated_at: "",
@@ -384,7 +385,7 @@ function createSupportClient(root) {
         time.append(unread);
       }
       row.append(
-        element("span", "support-ticket-title", admin ? ticket.username || ticket.user_id || ticket.title || ticket.id : ticket.title || ticket.id),
+        admin ? createSupportUserLink(ticket, "support-ticket-title") : element("span", "support-ticket-title", ticket.title || ticket.id),
         time
       );
       main.append(
@@ -461,7 +462,7 @@ function createSupportClient(root) {
       activeTitle.textContent = single ? "在线客服" : ticket?.title || labels.noActive;
     }
     if (activeMeta instanceof HTMLElement) {
-      activeMeta.textContent = single ? statusLabel(ticket?.status || "pending_admin", labels) : ticket ? ticketMeta(ticket, admin, labels) : "";
+      renderActiveMeta(activeMeta, ticket, admin, single, labels);
     }
     if (activeAvatar instanceof HTMLElement) {
       activeAvatar.textContent = single ? "客" : ticket ? (admin ? avatarInitial(ticket.username || ticket.user_id || ticket.title) : "客") : "-";
@@ -519,6 +520,11 @@ function createSupportClient(root) {
   };
 
   list?.addEventListener("click", (event) => {
+    const userLink = event.target instanceof Element ? event.target.closest("[data-support-user-link]") : null;
+    if (userLink instanceof HTMLElement) {
+      event.stopPropagation();
+      return;
+    }
     const deleteButton = event.target instanceof Element ? event.target.closest("[data-support-ticket-delete]") : null;
     if (deleteButton instanceof HTMLElement) {
       event.preventDefault();
@@ -541,6 +547,10 @@ function createSupportClient(root) {
       return;
     }
     if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+    const userLink = event.target instanceof Element ? event.target.closest("[data-support-user-link]") : null;
+    if (userLink instanceof HTMLElement) {
       return;
     }
     const deleteButton = event.target instanceof Element ? event.target.closest("[data-support-ticket-delete]") : null;
@@ -756,6 +766,52 @@ function ticketMeta(ticket, admin, labels) {
     parts.push(when);
   }
   return parts.filter(Boolean).join(" · ");
+}
+
+function renderActiveMeta(node, ticket, admin, single, labels) {
+  if (single) {
+    node.textContent = statusLabel(ticket?.status || "pending_admin", labels);
+    return;
+  }
+  if (!ticket) {
+    node.textContent = "";
+    return;
+  }
+  if (!admin) {
+    node.textContent = ticketMeta(ticket, admin, labels);
+    return;
+  }
+  node.replaceChildren(createSupportUserLink(ticket, "support-active-user-link"));
+  const meta = [
+    statusLabel(ticket.status, labels),
+    formatTime(ticket.updated_at),
+  ].filter(Boolean).join(" · ");
+  if (meta) {
+    node.append(document.createTextNode(` · ${meta}`));
+  }
+}
+
+function createSupportUserLink(ticket, className = "") {
+  const label = supportUserLabel(ticket);
+  const href = supportUserURL(ticket);
+  if (!href) {
+    return element("span", className, label);
+  }
+  const link = document.createElement("a");
+  link.className = className ? `${className} support-user-link` : "support-user-link";
+  link.dataset.supportUserLink = "";
+  link.href = href;
+  link.textContent = label;
+  return link;
+}
+
+function supportUserLabel(ticket) {
+  return ticket?.username || ticket?.user_id || ticket?.title || ticket?.id || "";
+}
+
+function supportUserURL(ticket) {
+  const userID = String(ticket?.user_id || "").trim();
+  return userID ? `/admin/users?q=${encodeURIComponent(userID)}` : "";
 }
 
 function ticketMatches(ticket, query) {
