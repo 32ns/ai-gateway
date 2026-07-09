@@ -17,6 +17,8 @@ type Config struct {
 	APIKey                      string   `json:"api_key"`
 	AuditLimit                  int      `json:"audit_limit"`
 	GatewayAudit                bool     `json:"gateway_audit"`
+	GatewayAuditErrors          bool     `json:"gateway_audit_errors"`
+	GatewayAuditRetentionDays   int      `json:"gateway_audit_retention_days"`
 	MaxInFlight                 int      `json:"max_in_flight"`
 	UpstreamMaxIdleConns        int      `json:"upstream_max_idle_conns"`
 	UpstreamMaxIdleConnsPerHost int      `json:"upstream_max_idle_conns_per_host"`
@@ -33,6 +35,7 @@ type Config struct {
 const (
 	DefaultPath                        = "config.json"
 	defaultAuditLimit                  = 512
+	defaultGatewayAuditRetentionDays   = 1
 	defaultMaxInFlight                 = 1024
 	defaultUpstreamMaxIdleConns        = 512
 	defaultUpstreamMaxIdleConnsPerHost = 128
@@ -91,6 +94,7 @@ func Default() Config {
 		Host:                        defaultHost,
 		Port:                        defaultPort,
 		AuditLimit:                  defaultAuditLimit,
+		GatewayAuditRetentionDays:   defaultGatewayAuditRetentionDays,
 		MaxInFlight:                 defaultMaxInFlight,
 		UpstreamMaxIdleConns:        defaultUpstreamMaxIdleConns,
 		UpstreamMaxIdleConnsPerHost: defaultUpstreamMaxIdleConnsPerHost,
@@ -126,6 +130,9 @@ func (cfg *Config) Normalize() error {
 
 	if cfg.AuditLimit <= 0 {
 		cfg.AuditLimit = defaultAuditLimit
+	}
+	if cfg.GatewayAuditRetentionDays <= 0 {
+		cfg.GatewayAuditRetentionDays = defaultGatewayAuditRetentionDays
 	}
 	if cfg.MaxInFlight < 0 {
 		cfg.MaxInFlight = defaultMaxInFlight

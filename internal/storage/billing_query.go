@@ -33,6 +33,16 @@ func normalizeBillingLedgerRetentionAge(days int) time.Duration {
 	return time.Duration(days) * 24 * time.Hour
 }
 
+func normalizeGatewayAuditRetentionAge(days int) time.Duration {
+	if days <= 0 {
+		return 0
+	}
+	if days > core.MaximumGatewayAuditRetentionDays {
+		days = core.MaximumGatewayAuditRetentionDays
+	}
+	return time.Duration(days) * 24 * time.Hour
+}
+
 type BillingRequestQuery struct {
 	UserID    string
 	ClientID  string

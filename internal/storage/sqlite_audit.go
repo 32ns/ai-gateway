@@ -27,6 +27,10 @@ func (r *SQLiteRepository) AppendAudit(event core.AuditEvent) error {
 		_ = tx.Rollback()
 		return err
 	}
+	if err := r.maybeTrimGatewayAuditTx(tx, time.Now().UTC(), 1); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
 	return tx.Commit()
 }
 
@@ -58,6 +62,10 @@ func (r *SQLiteRepository) AppendAuditBatch(events []core.AuditEvent) error {
 		return err
 	}
 	if err := r.maybeTrimAuditTx(tx, time.Now().UTC(), len(events)); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if err := r.maybeTrimGatewayAuditTx(tx, time.Now().UTC(), len(events)); err != nil {
 		_ = tx.Rollback()
 		return err
 	}

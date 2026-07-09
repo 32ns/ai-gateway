@@ -27,6 +27,8 @@ func TestSystemSettingsFromFormParsesUserConcurrentRequestLimit(t *testing.T) {
 	form.Set("registration_username_min_length", "5")
 	form.Set("usage_log_max_age_days", "5")
 	form.Set("billing_ledger_retention_days", "14")
+	form.Set("gateway_audit_errors", "on")
+	form.Set("gateway_audit_retention_days", "3")
 	form.Set("image_user_console_enabled", "on")
 	form.Set("email_template_subject", "\u6ce8\u518c\u9a8c\u8bc1\u7801")
 	form.Set("email_template_text", "\u9a8c\u8bc1\u7801\uff1a{{code}}")
@@ -56,6 +58,12 @@ func TestSystemSettingsFromFormParsesUserConcurrentRequestLimit(t *testing.T) {
 	}
 	if settings.Retention.BillingLedgerRetentionDays != 14 {
 		t.Fatalf("BillingLedgerRetentionDays = %d, want 14", settings.Retention.BillingLedgerRetentionDays)
+	}
+	if !settings.Retention.GatewayAuditErrors {
+		t.Fatal("GatewayAuditErrors = false, want true")
+	}
+	if settings.Retention.GatewayAuditRetentionDays != 3 {
+		t.Fatalf("GatewayAuditRetentionDays = %d, want 3", settings.Retention.GatewayAuditRetentionDays)
 	}
 	if !core.ImageUserConsoleEnabled(settings.Image) {
 		t.Fatalf("ImageUserConsoleEnabled = false, want true")
@@ -260,6 +268,9 @@ func TestSettingsPageRendersUserConcurrentRequestLimitField(t *testing.T) {
 		`name="usage_log_max_age_days"`,
 		`name="billing_ledger_retention_days"`,
 		`min="3" max="365" name="billing_ledger_retention_days"`,
+		`name="gateway_audit_errors"`,
+		`name="gateway_audit_retention_days"`,
+		`min="1" max="365" name="gateway_audit_retention_days"`,
 		`data-group-settings-open="email-template-editor"`,
 		`name="email_template_subject"`,
 		`name="payment_recharge_input_mode"`,
@@ -270,6 +281,8 @@ func TestSettingsPageRendersUserConcurrentRequestLimitField(t *testing.T) {
 		"\u7528\u6237\u8bf7\u6c42\u901f\u7387\u4e0a\u9650\uff08\u6b21/\u5206\u949f\uff09",
 		"\u4f7f\u7528\u65e5\u5fd7\u4fdd\u7559\u5929\u6570",
 		"\u8d22\u52a1\u6d41\u6c34\u4fdd\u7559\u5929\u6570",
+		"\u53ea\u8bb0\u5f55\u51fa\u9519\u7684\u7f51\u5173\u8bf7\u6c42",
+		"\u51fa\u9519\u7f51\u5173\u5ba1\u8ba1\u4fdd\u7559\u5929\u6570",
 		"\u5145\u503c\u8f93\u5165\u53e3\u5f84",
 		"\u6309\u4eba\u6c11\u5e01\u652f\u4ed8\u91d1\u989d\u8f93\u5165",
 		`href="#settings-image"`,

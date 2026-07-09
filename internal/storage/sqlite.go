@@ -15,19 +15,22 @@ import (
 )
 
 type SQLiteRepository struct {
-	mu            sync.RWMutex
-	db            *sql.DB
-	path          string
-	codec         *credentialCodec
-	limit         int
-	auditTrimAt   time.Time
-	auditTrimOps  int
-	usageMaxAge   time.Duration
-	usageTrimAt   time.Time
-	usageTrimOps  int
-	ledgerMaxAge  time.Duration
-	ledgerTrimAt  time.Time
-	ledgerTrimOps int
+	mu                  sync.RWMutex
+	db                  *sql.DB
+	path                string
+	codec               *credentialCodec
+	limit               int
+	auditTrimAt         time.Time
+	auditTrimOps        int
+	gatewayAuditMaxAge  time.Duration
+	gatewayAuditTrimAt  time.Time
+	gatewayAuditTrimOps int
+	usageMaxAge         time.Duration
+	usageTrimAt         time.Time
+	usageTrimOps        int
+	ledgerMaxAge        time.Duration
+	ledgerTrimAt        time.Time
+	ledgerTrimOps       int
 }
 
 const retentionTrimInterval = time.Minute
@@ -136,6 +139,28 @@ func (r *SQLiteRepository) ConfigureAuditLimit(limit int) error {
 	}
 	r.auditTrimAt = now
 	r.auditTrimOps = 0
+	return nil
+}
+
+func (r *SQLiteRepository) ConfigureGatewayAuditRetention(maxAgeDays int) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	now := time.Now().UTC()
+	r.gatewayAuditMaxAge = normalizeGatewayAuditRetentionAge(maxAgeDays)
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	if err := trimGatewayAuditTx(tx, now, r.gatewayAuditMaxAge); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	r.gatewayAuditTrimAt = now
+	r.gatewayAuditTrimOps = 0
 	return nil
 }
 

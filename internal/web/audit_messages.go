@@ -290,6 +290,8 @@ func auditSystemSettingsChangeMessage(before, after core.SystemSettings, hasBefo
 			{Key: "audit_limit", Value: strconv.Itoa(after.Retention.AuditLimit)},
 			{Key: "usage_log_max_age_days", Value: strconv.Itoa(after.Retention.UsageLogMaxAgeDays)},
 			{Key: "billing_ledger_retention_days", Value: strconv.Itoa(after.Retention.BillingLedgerRetentionDays)},
+			{Key: "gateway_audit_errors", Value: strconv.FormatBool(after.Retention.GatewayAuditErrors)},
+			{Key: "gateway_audit_retention_days", Value: strconv.Itoa(after.Retention.GatewayAuditRetentionDays)},
 		}
 		if after.Runtime.UserConcurrentRequestLimit > 0 {
 			fields = append(fields, auditMessageField{Key: "user_concurrent_request_limit", Value: strconv.Itoa(after.Runtime.UserConcurrentRequestLimit)})
@@ -404,6 +406,8 @@ func auditSystemSettingsChangeMessage(before, after core.SystemSettings, hasBefo
 		auditIntChange("audit_limit", before.Retention.AuditLimit, after.Retention.AuditLimit),
 		auditIntChange("usage_log_max_age_days", before.Retention.UsageLogMaxAgeDays, after.Retention.UsageLogMaxAgeDays),
 		auditIntChange("billing_ledger_retention_days", before.Retention.BillingLedgerRetentionDays, after.Retention.BillingLedgerRetentionDays),
+		auditBoolChange("gateway_audit_errors", before.Retention.GatewayAuditErrors, after.Retention.GatewayAuditErrors),
+		auditIntChange("gateway_audit_retention_days", before.Retention.GatewayAuditRetentionDays, after.Retention.GatewayAuditRetentionDays),
 	)
 }
 

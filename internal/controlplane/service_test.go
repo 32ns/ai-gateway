@@ -4034,6 +4034,61 @@ func TestApplySystemSettingsBootstrapsAuditLimitFallback(t *testing.T) {
 	}
 }
 
+func TestApplySystemSettingsBootstrapsGatewayAuditFallback(t *testing.T) {
+	repo := storage.NewMemoryRepository()
+	service := New(repo, providers.NewRegistry(&providers.OpenAIAdapter{}))
+
+	if err := service.ApplySystemSettingsWithFallbacks(17, SystemSettingsFallbacks{
+		GatewayAuditErrors:        true,
+		GatewayAuditRetentionDays: 3,
+	}); err != nil {
+		t.Fatalf("ApplySystemSettingsWithFallbacks returned error: %v", err)
+	}
+	settings, err := service.GetSystemSettings()
+	if err != nil {
+		t.Fatalf("GetSystemSettings returned error: %v", err)
+	}
+	if !settings.Retention.GatewayAuditErrors {
+		t.Fatal("GatewayAuditErrors = false, want true")
+	}
+	if settings.Retention.GatewayAuditRetentionDays != 3 {
+		t.Fatalf("GatewayAuditRetentionDays = %d, want 3", settings.Retention.GatewayAuditRetentionDays)
+	}
+}
+
+func TestUpdateSystemSettingsAppliesGatewayAuditRetention(t *testing.T) {
+	repo := storage.NewMemoryRepository()
+	service := New(repo, providers.NewRegistry(&providers.OpenAIAdapter{}))
+	now := time.Now().UTC()
+
+	if err := repo.AppendAudit(core.AuditEvent{ID: "old_gateway_error", Kind: core.AuditKindGateway, Status: "error", CreatedAt: now.Add(-48 * time.Hour)}); err != nil {
+		t.Fatalf("AppendAudit old_gateway_error returned error: %v", err)
+	}
+	if err := repo.AppendAudit(core.AuditEvent{ID: "old_gateway_ok", Kind: core.AuditKindGateway, Status: "ok", CreatedAt: now.Add(-48*time.Hour + time.Second)}); err != nil {
+		t.Fatalf("AppendAudit old_gateway_ok returned error: %v", err)
+	}
+	settings := core.DefaultSystemSettings()
+	settings.Retention.GatewayAuditErrors = true
+	settings.Retention.GatewayAuditRetentionDays = 1
+	if _, err := service.UpdateSystemSettings(settings); err != nil {
+		t.Fatalf("UpdateSystemSettings enable returned error: %v", err)
+	}
+	if got := storageAuditEventIDs(repo.ListAudit(10)); got != "old_gateway_ok" {
+		t.Fatalf("audits = %s, want old_gateway_ok", got)
+	}
+
+	settings.Retention.GatewayAuditErrors = false
+	if _, err := service.UpdateSystemSettings(settings); err != nil {
+		t.Fatalf("UpdateSystemSettings disable returned error: %v", err)
+	}
+	if err := repo.AppendAudit(core.AuditEvent{ID: "disabled_old_gateway_error", Kind: core.AuditKindGateway, Status: "error", CreatedAt: now.Add(-72 * time.Hour)}); err != nil {
+		t.Fatalf("AppendAudit disabled_old_gateway_error returned error: %v", err)
+	}
+	if got := storageAuditEventIDs(repo.ListAudit(10)); got != "disabled_old_gateway_error,old_gateway_ok" {
+		t.Fatalf("audits = %s, want disabled_old_gateway_error,old_gateway_ok", got)
+	}
+}
+
 func TestUpdateSystemSettingsAppliesUsageLogRetentionDisable(t *testing.T) {
 	repo := storage.NewMemoryRepository()
 	service := New(repo, providers.NewRegistry(&providers.OpenAIAdapter{}))
@@ -6418,4 +6473,12 @@ func (s *testStream) Close() error {
 
 func ptrTime(value time.Time) *time.Time {
 	return &value
+}
+
+func storageAuditEventIDs(events []core.AuditEvent) string {
+	ids := make([]string, 0, len(events))
+	for _, event := range events {
+		ids = append(ids, event.ID)
+	}
+	return strings.Join(ids, ",")
 }

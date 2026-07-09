@@ -32,6 +32,7 @@ type Service struct {
 	systemSettings          atomic.Value
 	settingsMu              sync.RWMutex
 	settingsHook            func(core.SystemSettings)
+	gatewayAuditRetention   atomic.Bool
 	openAIPending           map[string]openAIOAuthPending
 	openAIImports           map[string]oauthConnectImport
 	claudePending           map[string]claudeOAuthPending
@@ -116,13 +117,15 @@ var editableAccountStatuses = []core.AccountStatus{
 }
 
 func New(repo storage.Repository, registry *providers.Registry) *Service {
-	return &Service{
+	service := &Service{
 		repo:             repo,
 		providers:        registry,
 		payments:         payments.NewClient(nil),
 		accountBatchJobs: make(map[string]*accountBatchJob),
 		monitorRunning:   make(map[string]time.Time),
 	}
+	service.gatewayAuditRetention.Store(true)
+	return service
 }
 
 func (s *Service) SetPaymentClient(client paymentClient) {
@@ -136,6 +139,13 @@ func (s *Service) SetSystemSettingsHook(hook func(core.SystemSettings)) {
 	s.settingsMu.Lock()
 	s.settingsHook = hook
 	s.settingsMu.Unlock()
+}
+
+func (s *Service) SetGatewayAuditRetentionEnabled(enabled bool) {
+	if s == nil {
+		return
+	}
+	s.gatewayAuditRetention.Store(enabled)
 }
 
 func (s *Service) notifySystemSettingsHook(settings core.SystemSettings) {

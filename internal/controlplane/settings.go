@@ -65,13 +65,7 @@ func (s *Service) UpdateSystemSettings(settings core.SystemSettings) (core.Syste
 	if err := s.repo.UpsertSystemSettings(settings); err != nil {
 		return core.SystemSettings{}, err
 	}
-	if err := s.repo.ConfigureAuditLimit(settings.Retention.AuditLimit); err != nil {
-		return core.SystemSettings{}, err
-	}
-	if err := s.repo.ConfigureUsageLogRetention(settings.Retention.UsageLogMaxAgeDays); err != nil {
-		return core.SystemSettings{}, err
-	}
-	if err := s.repo.ConfigureBillingLedgerRetention(settings.Retention.BillingLedgerRetentionDays); err != nil {
+	if err := s.applyRetentionSettings(settings); err != nil {
 		return core.SystemSettings{}, err
 	}
 	updated, err := s.loadSystemSettings()
@@ -82,7 +76,21 @@ func (s *Service) UpdateSystemSettings(settings core.SystemSettings) (core.Syste
 	return updated, nil
 }
 
+type SystemSettingsFallbacks struct {
+	PublicBaseURL             string
+	GatewayAuditErrors        bool
+	GatewayAuditRetentionDays int
+}
+
 func (s *Service) ApplySystemSettings(auditLimitFallback int, publicBaseURLFallback ...string) error {
+	fallbacks := SystemSettingsFallbacks{}
+	if len(publicBaseURLFallback) > 0 {
+		fallbacks.PublicBaseURL = publicBaseURLFallback[0]
+	}
+	return s.ApplySystemSettingsWithFallbacks(auditLimitFallback, fallbacks)
+}
+
+func (s *Service) ApplySystemSettingsWithFallbacks(auditLimitFallback int, fallbacks SystemSettingsFallbacks) error {
 	settings, err := s.GetStartupSystemSettings()
 	if err != nil {
 		return err
@@ -92,8 +100,15 @@ func (s *Service) ApplySystemSettings(auditLimitFallback int, publicBaseURLFallb
 		settings.Retention.AuditLimit = auditLimitFallback
 		changed = true
 	}
-	if len(publicBaseURLFallback) > 0 {
-		publicBaseURL := strings.TrimSpace(publicBaseURLFallback[0])
+	if settings.UpdatedAt.IsZero() {
+		settings.Retention.GatewayAuditErrors = fallbacks.GatewayAuditErrors
+		if fallbacks.GatewayAuditRetentionDays > 0 {
+			settings.Retention.GatewayAuditRetentionDays = fallbacks.GatewayAuditRetentionDays
+		}
+		changed = true
+	}
+	if fallbacks.PublicBaseURL != "" {
+		publicBaseURL := strings.TrimSpace(fallbacks.PublicBaseURL)
 		if publicBaseURL != "" && settings.Runtime.PublicBaseURL != publicBaseURL {
 			settings.Runtime.PublicBaseURL = publicBaseURL
 			changed = true
@@ -107,8 +122,14 @@ func (s *Service) ApplySystemSettings(auditLimitFallback int, publicBaseURLFallb
 		if fullSettings.UpdatedAt.IsZero() && auditLimitFallback > 0 {
 			fullSettings.Retention.AuditLimit = auditLimitFallback
 		}
-		if len(publicBaseURLFallback) > 0 {
-			publicBaseURL := strings.TrimSpace(publicBaseURLFallback[0])
+		if fullSettings.UpdatedAt.IsZero() {
+			fullSettings.Retention.GatewayAuditErrors = fallbacks.GatewayAuditErrors
+			if fallbacks.GatewayAuditRetentionDays > 0 {
+				fullSettings.Retention.GatewayAuditRetentionDays = fallbacks.GatewayAuditRetentionDays
+			}
+		}
+		if fallbacks.PublicBaseURL != "" {
+			publicBaseURL := strings.TrimSpace(fallbacks.PublicBaseURL)
 			if publicBaseURL != "" {
 				fullSettings.Runtime.PublicBaseURL = publicBaseURL
 			}
@@ -122,6 +143,15 @@ func (s *Service) ApplySystemSettings(auditLimitFallback int, publicBaseURLFallb
 			return err
 		}
 	}
+	if err := s.applyRetentionSettings(settings); err != nil {
+		return err
+	}
+	s.notifySystemSettingsHook(settings)
+	return nil
+}
+
+func (s *Service) applyRetentionSettings(settings core.SystemSettings) error {
+	settings = core.NormalizeSystemSettings(settings)
 	if err := s.repo.ConfigureAuditLimit(settings.Retention.AuditLimit); err != nil {
 		return err
 	}
@@ -131,7 +161,15 @@ func (s *Service) ApplySystemSettings(auditLimitFallback int, publicBaseURLFallb
 	if err := s.repo.ConfigureBillingLedgerRetention(settings.Retention.BillingLedgerRetentionDays); err != nil {
 		return err
 	}
-	s.notifySystemSettingsHook(settings)
+	if s.gatewayAuditRetention.Load() {
+		retentionDays := 0
+		if settings.Retention.GatewayAuditErrors {
+			retentionDays = settings.Retention.GatewayAuditRetentionDays
+		}
+		if err := s.repo.ConfigureGatewayAuditRetention(retentionDays); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

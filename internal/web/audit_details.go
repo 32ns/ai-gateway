@@ -175,6 +175,12 @@ func auditActionSummaryLines(locale string, event core.AuditEvent, fields []audi
 		if ledgerDays := strings.TrimSpace(values["billing_ledger_retention_days"]); ledgerDays != "" {
 			parts = append(parts, auditStaticLabel(locale, "财务流水保留天数：", "Billing ledger days: ")+ledgerDays)
 		}
+		if enabled := strings.TrimSpace(values["gateway_audit_errors"]); enabled != "" {
+			parts = append(parts, auditStaticLabel(locale, "出错网关审计：", "Failed gateway audit: ")+auditChangeValueText(locale, "enabled", enabled))
+		}
+		if days := strings.TrimSpace(values["gateway_audit_retention_days"]); days != "" {
+			parts = append(parts, auditStaticLabel(locale, "出错网关审计保留天数：", "Failed gateway audit days: ")+days)
+		}
 		if limit := strings.TrimSpace(values["user_concurrent_request_limit"]); limit != "" {
 			parts = append(parts, auditStaticLabel(locale, "用户并发请求上限：", "Per-user concurrent request limit: ")+limit)
 		}
@@ -405,6 +411,10 @@ func auditMessageFieldLabel(locale, key string) string {
 		return auditStaticLabel(locale, "使用日志保留天数", "Usage log days")
 	case "billing_ledger_retention_days":
 		return auditStaticLabel(locale, "财务流水保留天数", "Billing ledger days")
+	case "gateway_audit_errors":
+		return auditStaticLabel(locale, "出错网关审计", "Failed gateway audit")
+	case "gateway_audit_retention_days":
+		return auditStaticLabel(locale, "出错网关审计保留天数", "Failed gateway audit days")
 	case "cached_input":
 		return auditStaticLabel(locale, "缓存输入价", "Cached input price")
 	case "billing_source":

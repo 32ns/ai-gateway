@@ -2292,6 +2292,79 @@ func TestSQLiteRepositoryStoresAuditSummaryOnlyWhenDifferent(t *testing.T) {
 	}
 }
 
+func TestSQLiteRepositoryGatewayAuditRetentionTrimsOnlyOldGatewayAudit(t *testing.T) {
+	tempDir := t.TempDir()
+	statePath := filepath.Join(tempDir, "state.db")
+
+	repo, err := NewSQLiteRepository(statePath, "")
+	if err != nil {
+		t.Fatalf("NewSQLiteRepository returned error: %v", err)
+	}
+	t.Cleanup(func() { _ = repo.Close() })
+
+	now := time.Now().UTC()
+	events := []core.AuditEvent{
+		{
+			ID:         "old_gateway",
+			Kind:       core.AuditKindGateway,
+			ClientName: "Gateway Client",
+			Status:     "error",
+			CreatedAt:  now.Add(-48 * time.Hour),
+		},
+		{
+			ID:           "old_admin",
+			Kind:         core.AuditKindAdmin,
+			Actor:        "Admin User",
+			ResourceName: "Settings",
+			Status:       "ok",
+			CreatedAt:    now.Add(-48 * time.Hour),
+		},
+		{
+			ID:         "old_gateway_ok",
+			Kind:       core.AuditKindGateway,
+			ClientName: "Gateway Client",
+			Status:     "ok",
+			CreatedAt:  now.Add(-48 * time.Hour),
+		},
+		{
+			ID:         "old_gateway_spaced_error",
+			Kind:       core.AuditKindGateway,
+			ClientName: "Gateway Client",
+			Status:     " ERROR ",
+			CreatedAt:  now.Add(-48 * time.Hour),
+		},
+		{
+			ID:         "recent_gateway",
+			Kind:       core.AuditKindGateway,
+			ClientName: "Gateway Client",
+			Status:     "error",
+			CreatedAt:  now.Add(-time.Hour),
+		},
+	}
+	for _, event := range events {
+		if err := repo.AppendAudit(event); err != nil {
+			t.Fatalf("AppendAudit(%s) returned error: %v", event.ID, err)
+		}
+	}
+
+	if err := repo.ConfigureGatewayAuditRetention(1); err != nil {
+		t.Fatalf("ConfigureGatewayAuditRetention returned error: %v", err)
+	}
+
+	audits := repo.ListAudit(10)
+	if got := auditEventIDs(audits); got != "recent_gateway,old_gateway_ok,old_admin" {
+		t.Fatalf("audits = %s, want recent_gateway,old_gateway_ok,old_admin", got)
+	}
+
+	var orphanTerms int
+	if err := repo.db.QueryRow(`SELECT COUNT(*) FROM audit_terms WHERE seq NOT IN (SELECT seq FROM audit)`).Scan(&orphanTerms); err != nil {
+		t.Fatalf("count orphan audit terms: %v", err)
+	}
+	if orphanTerms != 0 {
+		t.Fatalf("orphan audit terms = %d, want 0", orphanTerms)
+	}
+}
+
 func TestSQLiteRepositoryFiltersAuditWithTermIndex(t *testing.T) {
 	tempDir := t.TempDir()
 	statePath := filepath.Join(tempDir, "state.db")

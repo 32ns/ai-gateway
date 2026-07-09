@@ -798,6 +798,8 @@ type SystemRetentionSettings struct {
 	AuditLimit                 int
 	UsageLogMaxAgeDays         int
 	BillingLedgerRetentionDays int
+	GatewayAuditErrors         bool
+	GatewayAuditRetentionDays  int
 }
 
 type SystemBackupSettings struct {
@@ -816,6 +818,9 @@ const (
 	DefaultBillingLedgerRetentionDays = 30
 	MinimumBillingLedgerRetentionDays = 3
 	MaximumBillingLedgerRetentionDays = 365
+	DefaultGatewayAuditRetentionDays  = 1
+	MinimumGatewayAuditRetentionDays  = 1
+	MaximumGatewayAuditRetentionDays  = 365
 	DefaultPersonalPayExpireAfterSec  = 180
 	EmailProviderSMTP                 = "smtp"
 	EmailProviderCloudMail            = "cloudmail"
@@ -932,6 +937,7 @@ func DefaultSystemSettings() SystemSettings {
 			AuditLimit:                 DefaultAuditRetentionLimit,
 			UsageLogMaxAgeDays:         DefaultUsageLogMaxAgeDays,
 			BillingLedgerRetentionDays: DefaultBillingLedgerRetentionDays,
+			GatewayAuditRetentionDays:  DefaultGatewayAuditRetentionDays,
 		},
 		Image: SystemImageSettings{
 			Backend:            ImageBackendAuto,
@@ -1085,6 +1091,7 @@ func NormalizeSystemSettings(settings SystemSettings) SystemSettings {
 	settings.Retention.AuditLimit = clampInt(settings.Retention.AuditLimit, MinimumAuditRetentionLimit, MaximumAuditRetentionLimit, DefaultAuditRetentionLimit)
 	settings.Retention.UsageLogMaxAgeDays = clampDisableableInt(settings.Retention.UsageLogMaxAgeDays, MaximumUsageLogMaxAgeDays, DefaultUsageLogMaxAgeDays)
 	settings.Retention.BillingLedgerRetentionDays = clampInt(settings.Retention.BillingLedgerRetentionDays, MinimumBillingLedgerRetentionDays, MaximumBillingLedgerRetentionDays, DefaultBillingLedgerRetentionDays)
+	settings.Retention.GatewayAuditRetentionDays = clampInt(settings.Retention.GatewayAuditRetentionDays, MinimumGatewayAuditRetentionDays, MaximumGatewayAuditRetentionDays, DefaultGatewayAuditRetentionDays)
 	return settings
 }
 

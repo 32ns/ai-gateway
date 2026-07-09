@@ -97,6 +97,8 @@ type StartupInfo struct {
 	ProtocolClient                core.APIClient
 	ProtocolClientSeeded          bool
 	AuditLimit                    int
+	GatewayAuditErrors            bool
+	GatewayAuditRetentionDays     int
 	AbandonedReservationsReleased int
 	AbandonedReservationsNanoUSD  int64
 }
@@ -217,6 +219,12 @@ func (b *Builder) buildRuntime(cfg config.Config, owner *Service) (_ runtimeStat
 	if retentionSettings.UpdatedAt.IsZero() && cfg.AuditLimit > 0 {
 		auditLimit = cfg.AuditLimit
 	}
+	gatewayAuditErrors := retentionSettings.Retention.GatewayAuditErrors
+	gatewayAuditRetentionDays := retentionSettings.Retention.GatewayAuditRetentionDays
+	if retentionSettings.UpdatedAt.IsZero() {
+		gatewayAuditErrors = cfg.GatewayAuditErrors
+		gatewayAuditRetentionDays = cfg.GatewayAuditRetentionDays
+	}
 	if err = repo.ConfigureAuditLimit(auditLimit); err != nil {
 		return runtimeState{}, fmt.Errorf("configure audit limit: %w", err)
 	}
@@ -225,6 +233,13 @@ func (b *Builder) buildRuntime(cfg config.Config, owner *Service) (_ runtimeStat
 	}
 	if err = repo.ConfigureBillingLedgerRetention(retentionSettings.Retention.BillingLedgerRetentionDays); err != nil {
 		return runtimeState{}, fmt.Errorf("configure billing ledger retention: %w", err)
+	}
+	gatewayAuditRetentionConfig := 0
+	if !cfg.GatewayAudit && gatewayAuditErrors {
+		gatewayAuditRetentionConfig = gatewayAuditRetentionDays
+	}
+	if err = repo.ConfigureGatewayAuditRetention(gatewayAuditRetentionConfig); err != nil {
+		return runtimeState{}, fmt.Errorf("configure gateway audit retention: %w", err)
 	}
 	logStartupDuration("configure retention", stageStarted, false)
 
@@ -241,6 +256,7 @@ func (b *Builder) buildRuntime(cfg config.Config, owner *Service) (_ runtimeStat
 	providers.ConfigureHTTPTransport()
 
 	control := controlplane.New(repo, registry)
+	control.SetGatewayAuditRetentionEnabled(!cfg.GatewayAudit)
 	personalPaySDK, err := personalpay.Open(personalpay.Options{
 		DefaultExpireAfter: personalPayExpireAfter(retentionSettings.Payment.PersonalPay),
 		AndroidToken:       personalPayAndroidToken(retentionSettings),
@@ -294,7 +310,10 @@ func (b *Builder) buildRuntime(cfg config.Config, owner *Service) (_ runtimeStat
 	accountPool := accounts.NewPool(repo)
 	failoverEngine := failover.NewEngine(accountPool, registry)
 	router := routing.NewRouter()
-	gatewayRepo := storage.NewGatewayAuditFilterRepository(repo, cfg.GatewayAudit)
+	gatewayRepo := storage.NewGatewayAuditFilterRepositoryWithOptions(repo, storage.GatewayAuditFilterOptions{
+		Enabled:    cfg.GatewayAudit,
+		ErrorsOnly: cfg.GatewayAuditErrors,
+	})
 	gatewayService := gateway.New(gatewayRepo, router, failoverEngine).WithQuotaRegistry(registry)
 
 	webServer := web.NewServerWithOptions(control, gatewayService, web.ServerOptions{
@@ -310,7 +329,11 @@ func (b *Builder) buildRuntime(cfg config.Config, owner *Service) (_ runtimeStat
 	})
 	logStartupDuration("initialize web server", stageStarted, false)
 	stageStarted = time.Now()
-	if err = control.ApplySystemSettings(cfg.AuditLimit, cfg.PublicBaseURL); err != nil {
+	if err = control.ApplySystemSettingsWithFallbacks(cfg.AuditLimit, controlplane.SystemSettingsFallbacks{
+		PublicBaseURL:             cfg.PublicBaseURL,
+		GatewayAuditErrors:        cfg.GatewayAuditErrors,
+		GatewayAuditRetentionDays: cfg.GatewayAuditRetentionDays,
+	}); err != nil {
 		return runtimeState{}, fmt.Errorf("apply system settings: %w", err)
 	}
 	logStartupDuration("apply system settings", stageStarted, false)
@@ -330,6 +353,9 @@ func (b *Builder) buildRuntime(cfg config.Config, owner *Service) (_ runtimeStat
 	if waitForMonitorScheduler := startMonitorScheduler(runtimeCtx, control, gatewayService); waitForMonitorScheduler != nil {
 		closers = append(closers, waitForMonitorScheduler)
 	}
+	if waitForGatewayAuditRetention := startGatewayAuditRetentionScheduler(runtimeCtx, control, repo, cfg.GatewayAudit); waitForGatewayAuditRetention != nil {
+		closers = append(closers, waitForGatewayAuditRetention)
+	}
 	if waitForAndroidBackup := startAndroidBackupScheduler(runtimeCtx, control, personalPaySDK, backupOptionsForConfig(cfg, b.options.ConfigPath)); waitForAndroidBackup != nil {
 		closers = append(closers, waitForAndroidBackup)
 	}
@@ -342,6 +368,12 @@ func (b *Builder) buildRuntime(cfg config.Config, owner *Service) (_ runtimeStat
 	startupAuditLimit := systemSettings.Retention.AuditLimit
 	if systemSettings.UpdatedAt.IsZero() && cfg.AuditLimit > 0 {
 		startupAuditLimit = cfg.AuditLimit
+	}
+	startupGatewayAuditErrors := systemSettings.Retention.GatewayAuditErrors
+	startupGatewayAuditRetentionDays := systemSettings.Retention.GatewayAuditRetentionDays
+	if systemSettings.UpdatedAt.IsZero() {
+		startupGatewayAuditErrors = cfg.GatewayAuditErrors
+		startupGatewayAuditRetentionDays = cfg.GatewayAuditRetentionDays
 	}
 	logStartupDuration("load startup settings", stageStarted, false)
 	// closeRuntime runs closers in reverse order; keep cancellation last so
@@ -357,6 +389,8 @@ func (b *Builder) buildRuntime(cfg config.Config, owner *Service) (_ runtimeStat
 		ProtocolClient:                seededClient,
 		ProtocolClientSeeded:          clientSeeded,
 		AuditLimit:                    startupAuditLimit,
+		GatewayAuditErrors:            startupGatewayAuditErrors,
+		GatewayAuditRetentionDays:     startupGatewayAuditRetentionDays,
 		AbandonedReservationsReleased: abandonedReservations.Count,
 		AbandonedReservationsNanoUSD:  abandonedReservations.AmountNanoUSD,
 	}
@@ -667,7 +701,14 @@ func (s *Service) LogStartup(logf Logger) {
 	} else {
 		logf("State database: %s", cfg.StatePath)
 	}
-	logf("Gateway request audit: %t", cfg.GatewayAudit)
+	switch {
+	case cfg.GatewayAudit:
+		logf("Gateway request audit: full")
+	case info.GatewayAuditErrors:
+		logf("Gateway request audit: errors only, retention=%dd", info.GatewayAuditRetentionDays)
+	default:
+		logf("Gateway request audit: false")
+	}
 	logf("Max in-flight requests: %d", cfg.MaxInFlight)
 	logf("Upstream transport: max_idle=%d max_idle_per_host=%d max_conns_per_host=%d", cfg.UpstreamMaxIdleConns, cfg.UpstreamMaxIdleConnsPerHost, cfg.UpstreamMaxConnsPerHost)
 	logf("State secret encryption: %t", cfg.MasterKey != "")
@@ -749,6 +790,7 @@ func applyPersonalPayNotification(ctx context.Context, control *controlplane.Ser
 
 const (
 	androidBackupSchedulerPollInterval = time.Minute
+	gatewayAuditRetentionPollInterval  = time.Hour
 	startupBackgroundWorkerDelay       = time.Minute
 	startupQuotaRefreshDelay           = startupBackgroundWorkerDelay
 	startupStageLogThreshold           = 250 * time.Millisecond
@@ -769,6 +811,38 @@ func backupOptionsForConfig(cfg config.Config, configPath string) backup.Options
 		DatabaseBackend: cfg.DatabaseBackend,
 		PostgresDSN:     cfg.PostgresDSN,
 		TargetMasterKey: cfg.MasterKey,
+	}
+}
+
+func startGatewayAuditRetentionScheduler(ctx context.Context, control *controlplane.Service, repo storage.Repository, gatewayAuditFull bool) func() error {
+	if control == nil || repo == nil || gatewayAuditFull {
+		return nil
+	}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for {
+			if !sleepContext(ctx, gatewayAuditRetentionPollInterval) {
+				return
+			}
+			settings, err := control.GetSystemSettings()
+			if err != nil {
+				log.Printf("gateway audit retention settings load failed: %v", err)
+				continue
+			}
+			settings = core.NormalizeSystemSettings(settings)
+			retentionDays := 0
+			if settings.Retention.GatewayAuditErrors {
+				retentionDays = settings.Retention.GatewayAuditRetentionDays
+			}
+			if err := repo.ConfigureGatewayAuditRetention(retentionDays); err != nil {
+				log.Printf("gateway audit retention trim failed: %v", err)
+			}
+		}
+	}()
+	return func() error {
+		<-done
+		return nil
 	}
 }
 

@@ -1,27 +1,86 @@
 package storage
 
 import (
+	"strings"
 	"time"
 
 	"github.com/32ns/ai-gateway/internal/core"
 )
 
+type GatewayAuditFilterOptions struct {
+	Enabled    bool
+	ErrorsOnly bool
+}
+
 type GatewayAuditFilterRepository struct {
 	Repository
+	defaultErrorsOnly bool
 }
 
 func NewGatewayAuditFilterRepository(base Repository, gatewayEnabled bool) Repository {
-	if base == nil || gatewayEnabled {
+	return NewGatewayAuditFilterRepositoryWithOptions(base, GatewayAuditFilterOptions{Enabled: gatewayEnabled})
+}
+
+func NewGatewayAuditFilterRepositoryWithOptions(base Repository, options GatewayAuditFilterOptions) Repository {
+	if base == nil || options.Enabled {
 		return base
 	}
-	return &GatewayAuditFilterRepository{Repository: base}
+	return &GatewayAuditFilterRepository{Repository: base, defaultErrorsOnly: options.ErrorsOnly}
 }
 
 func (r *GatewayAuditFilterRepository) AppendAudit(event core.AuditEvent) error {
-	if event.EffectiveKind() == core.AuditKindGateway {
+	if !r.keepAuditEvent(event, r.gatewayAuditErrorsEnabled()) {
 		return nil
 	}
 	return r.Repository.AppendAudit(event)
+}
+
+func (r *GatewayAuditFilterRepository) AppendAuditBatch(events []core.AuditEvent) error {
+	if len(events) == 0 {
+		return nil
+	}
+	errorsOnly := r.gatewayAuditErrorsEnabled()
+	filtered := make([]core.AuditEvent, 0, len(events))
+	for _, event := range events {
+		if r.keepAuditEvent(event, errorsOnly) {
+			filtered = append(filtered, event)
+		}
+	}
+	if len(filtered) == 0 {
+		return nil
+	}
+	if batcher, ok := r.Repository.(auditBatchAppender); ok {
+		return batcher.AppendAuditBatch(filtered)
+	}
+	for _, event := range filtered {
+		if err := r.Repository.AppendAudit(event); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *GatewayAuditFilterRepository) keepAuditEvent(event core.AuditEvent, errorsOnly bool) bool {
+	if event.EffectiveKind() != core.AuditKindGateway {
+		return true
+	}
+	return errorsOnly && gatewayAuditEventIsError(event)
+}
+
+func (r *GatewayAuditFilterRepository) gatewayAuditErrorsEnabled() bool {
+	settings, err := r.Repository.GetSystemSettings()
+	if err != nil {
+		return r.defaultErrorsOnly
+	}
+	settings = core.NormalizeSystemSettings(settings)
+	if settings.UpdatedAt.IsZero() {
+		return r.defaultErrorsOnly
+	}
+	return settings.Retention.GatewayAuditErrors
+}
+
+func gatewayAuditEventIsError(event core.AuditEvent) bool {
+	return strings.EqualFold(strings.TrimSpace(event.Status), "error")
 }
 
 func (r *GatewayAuditFilterRepository) GetStartupSystemSettings() (core.SystemSettings, error) {

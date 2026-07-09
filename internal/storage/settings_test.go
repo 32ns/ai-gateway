@@ -33,6 +33,9 @@ func TestMemoryRepositorySystemSettings(t *testing.T) {
 	if defaults.Retention.BillingLedgerRetentionDays != core.DefaultBillingLedgerRetentionDays {
 		t.Fatalf("default billing ledger retention = %#v", defaults.Retention)
 	}
+	if defaults.Retention.GatewayAuditRetentionDays != core.DefaultGatewayAuditRetentionDays {
+		t.Fatalf("default gateway audit retention = %#v", defaults.Retention)
+	}
 	if defaults.Payment.PersonalPay.ExpireAfterSec != core.DefaultPersonalPayExpireAfterSec {
 		t.Fatalf("default personalpay expiry = %d, want %d", defaults.Payment.PersonalPay.ExpireAfterSec, core.DefaultPersonalPayExpireAfterSec)
 	}
@@ -80,6 +83,8 @@ func TestMemoryRepositorySystemSettings(t *testing.T) {
 	settings.Retention.AuditLimit = 7
 	settings.Retention.UsageLogMaxAgeDays = 2
 	settings.Retention.BillingLedgerRetentionDays = 5
+	settings.Retention.GatewayAuditErrors = true
+	settings.Retention.GatewayAuditRetentionDays = 3
 	if err := repo.UpsertSystemSettings(settings); err != nil {
 		t.Fatalf("UpsertSystemSettings returned error: %v", err)
 	}
@@ -142,6 +147,12 @@ func TestMemoryRepositorySystemSettings(t *testing.T) {
 	if stored.Retention.BillingLedgerRetentionDays != 5 {
 		t.Fatalf("Billing ledger retention = %#v", stored.Retention)
 	}
+	if !stored.Retention.GatewayAuditErrors {
+		t.Fatal("GatewayAuditErrors = false, want true")
+	}
+	if stored.Retention.GatewayAuditRetentionDays != 3 {
+		t.Fatalf("GatewayAuditRetentionDays = %d, want 3", stored.Retention.GatewayAuditRetentionDays)
+	}
 	if stored.UpdatedAt.IsZero() {
 		t.Fatalf("UpdatedAt was not set")
 	}
@@ -193,6 +204,8 @@ func TestSQLiteRepositoryPersistsSystemSettings(t *testing.T) {
 	settings.OAuth.ClaudeEnabled = false
 	settings.Retention.UsageLogMaxAgeDays = 6
 	settings.Retention.BillingLedgerRetentionDays = 8
+	settings.Retention.GatewayAuditErrors = true
+	settings.Retention.GatewayAuditRetentionDays = 4
 	if err := repo.UpsertSystemSettings(settings); err != nil {
 		t.Fatalf("UpsertSystemSettings returned error: %v", err)
 	}
@@ -263,6 +276,12 @@ func TestSQLiteRepositoryPersistsSystemSettings(t *testing.T) {
 	}
 	if stored.Retention.BillingLedgerRetentionDays != 8 {
 		t.Fatalf("Billing ledger retention = %#v", stored.Retention)
+	}
+	if !stored.Retention.GatewayAuditErrors {
+		t.Fatal("GatewayAuditErrors = false, want true")
+	}
+	if stored.Retention.GatewayAuditRetentionDays != 4 {
+		t.Fatalf("GatewayAuditRetentionDays = %d, want 4", stored.Retention.GatewayAuditRetentionDays)
 	}
 	if stored.UpdatedAt.IsZero() {
 		t.Fatalf("UpdatedAt was not set")

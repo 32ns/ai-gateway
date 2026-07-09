@@ -415,6 +415,33 @@ func TestLogStartupOmitsDeploymentHardeningWarningsForHardenedLoopbackConfig(t *
 	}
 }
 
+func TestLogStartupUsesEffectiveGatewayAuditSettings(t *testing.T) {
+	t.Parallel()
+
+	svc := &Service{
+		Config: config.Config{
+			Host:      "127.0.0.1",
+			Address:   "127.0.0.1:8088",
+			StatePath: "state.db",
+			MasterKey: "configured",
+		},
+		Startup: StartupInfo{
+			AdminAccount:              core.User{Username: "admin"},
+			GatewayAuditErrors:        true,
+			GatewayAuditRetentionDays: 3,
+		},
+	}
+
+	var lines []string
+	svc.LogStartup(func(format string, v ...any) {
+		lines = append(lines, fmt.Sprintf(format, v...))
+	})
+	output := strings.Join(lines, "\n")
+	if !strings.Contains(output, "Gateway request audit: errors only, retention=3d") {
+		t.Fatalf("startup log missing effective gateway audit settings:\n%s", output)
+	}
+}
+
 func TestBuildAppliesPublicBaseURLFromConfig(t *testing.T) {
 	t.Parallel()
 

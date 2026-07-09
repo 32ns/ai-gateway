@@ -30,6 +30,7 @@ type Repository interface {
 	GetSystemSettings() (core.SystemSettings, error)
 	UpsertSystemSettings(settings core.SystemSettings) error
 	ConfigureAuditLimit(limit int) error
+	ConfigureGatewayAuditRetention(maxAgeDays int) error
 	ConfigureUsageLogRetention(maxAgeDays int) error
 	ConfigureBillingLedgerRetention(maxAgeDays int) error
 	ListUsers() []core.User
@@ -214,43 +215,44 @@ func LoadStartupSystemSettings(repo Repository) (core.SystemSettings, error) {
 }
 
 type MemoryRepository struct {
-	mu                sync.RWMutex
-	accounts          map[string]core.Account
-	users             map[string]core.User
-	sessions          map[string]core.UserSession
-	mcpTokens         map[string]core.MCPToken
-	mcpTokenHash      map[string]string
-	emailCodes        map[string]core.EmailVerificationCode
-	passwordResets    map[string]core.PasswordResetToken
-	passwordResetHash map[string]string
-	groups            map[string]core.AccountGroup
-	models            map[string]core.ModelConfig
-	clients           map[string]core.APIClient
-	responses         map[string]core.OpenAIResponseBinding
-	clientSpend       map[string]core.ClientSpend
-	billing           map[string]core.BillingReservation
-	planGroups        map[string]core.BillingPlanGroup
-	plans             map[string]core.BillingPlan
-	entitlements      map[string]core.UserPlanEntitlement
-	allocations       map[string]core.BillingFundingAllocation
-	planLedger        []core.PlanQuotaLedgerEntry
-	ledger            []core.BillingLedgerEntry
-	payments          map[string]core.PaymentOrder
-	refunds           map[string]core.PaymentRefund
-	messages          map[string]core.SiteMessage
-	messageRead       map[string]core.SiteMessageRead
-	supportTickets    map[string]core.SupportTicket
-	supportMessages   map[string][]core.SupportMessage
-	documents         map[string]core.Document
-	docRedirects      map[string]core.DocumentRedirect
-	monitorTargets    map[string]core.MonitorTarget
-	monitorResults    []core.MonitorResult
-	audit             []core.AuditEvent
-	limit             int
-	usageMaxAge       time.Duration
-	ledgerMaxAge      time.Duration
-	settings          core.SystemSettings
-	hasSettings       bool
+	mu                 sync.RWMutex
+	accounts           map[string]core.Account
+	users              map[string]core.User
+	sessions           map[string]core.UserSession
+	mcpTokens          map[string]core.MCPToken
+	mcpTokenHash       map[string]string
+	emailCodes         map[string]core.EmailVerificationCode
+	passwordResets     map[string]core.PasswordResetToken
+	passwordResetHash  map[string]string
+	groups             map[string]core.AccountGroup
+	models             map[string]core.ModelConfig
+	clients            map[string]core.APIClient
+	responses          map[string]core.OpenAIResponseBinding
+	clientSpend        map[string]core.ClientSpend
+	billing            map[string]core.BillingReservation
+	planGroups         map[string]core.BillingPlanGroup
+	plans              map[string]core.BillingPlan
+	entitlements       map[string]core.UserPlanEntitlement
+	allocations        map[string]core.BillingFundingAllocation
+	planLedger         []core.PlanQuotaLedgerEntry
+	ledger             []core.BillingLedgerEntry
+	payments           map[string]core.PaymentOrder
+	refunds            map[string]core.PaymentRefund
+	messages           map[string]core.SiteMessage
+	messageRead        map[string]core.SiteMessageRead
+	supportTickets     map[string]core.SupportTicket
+	supportMessages    map[string][]core.SupportMessage
+	documents          map[string]core.Document
+	docRedirects       map[string]core.DocumentRedirect
+	monitorTargets     map[string]core.MonitorTarget
+	monitorResults     []core.MonitorResult
+	audit              []core.AuditEvent
+	limit              int
+	usageMaxAge        time.Duration
+	ledgerMaxAge       time.Duration
+	gatewayAuditMaxAge time.Duration
+	settings           core.SystemSettings
+	hasSettings        bool
 }
 
 func NewMemoryRepository() *MemoryRepository {
@@ -298,6 +300,15 @@ func (r *MemoryRepository) ConfigureAuditLimit(limit int) error {
 
 	r.limit = normalizeAuditLimit(limit)
 	r.trimAuditLocked()
+	return nil
+}
+
+func (r *MemoryRepository) ConfigureGatewayAuditRetention(maxAgeDays int) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.gatewayAuditMaxAge = normalizeGatewayAuditRetentionAge(maxAgeDays)
+	r.trimGatewayAuditLocked(time.Now().UTC())
 	return nil
 }
 
@@ -4285,6 +4296,7 @@ func (r *MemoryRepository) AppendAudit(event core.AuditEvent) error {
 
 	r.audit = append([]core.AuditEvent{cloneAuditEvent(event)}, r.audit...)
 	r.trimAuditLocked()
+	r.trimGatewayAuditLocked(time.Now().UTC())
 	return nil
 }
 
@@ -4299,6 +4311,7 @@ func (r *MemoryRepository) AppendAuditBatch(events []core.AuditEvent) error {
 		r.audit = append([]core.AuditEvent{cloneAuditEvent(event)}, r.audit...)
 	}
 	r.trimAuditLocked()
+	r.trimGatewayAuditLocked(time.Now().UTC())
 	return nil
 }
 
@@ -4993,6 +5006,21 @@ func (r *MemoryRepository) trimAuditLocked() {
 	if r.limit > 0 && len(r.audit) > r.limit {
 		r.audit = r.audit[:r.limit]
 	}
+}
+
+func (r *MemoryRepository) trimGatewayAuditLocked(now time.Time) {
+	if r.gatewayAuditMaxAge <= 0 {
+		return
+	}
+	cutoff := now.UTC().Add(-r.gatewayAuditMaxAge)
+	retained := r.audit[:0]
+	for _, event := range r.audit {
+		if event.EffectiveKind() == core.AuditKindGateway && gatewayAuditEventIsError(event) && !event.CreatedAt.IsZero() && event.CreatedAt.UTC().Before(cutoff) {
+			continue
+		}
+		retained = append(retained, event)
+	}
+	r.audit = retained
 }
 
 func (r *MemoryRepository) trimMonitorResultsLocked(targetID string) {

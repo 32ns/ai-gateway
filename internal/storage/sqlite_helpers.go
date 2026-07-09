@@ -1080,6 +1080,37 @@ func (r *SQLiteRepository) maybeTrimAuditTx(tx *sql.Tx, now time.Time, writes in
 	return nil
 }
 
+func (r *SQLiteRepository) maybeTrimGatewayAuditTx(tx *sql.Tx, now time.Time, writes int) error {
+	if r.gatewayAuditMaxAge <= 0 {
+		return nil
+	}
+	if writes < 1 {
+		writes = 1
+	}
+	r.gatewayAuditTrimOps += writes
+	if !shouldRunAgeRetentionTrim(now, r.gatewayAuditTrimAt, r.gatewayAuditTrimOps) {
+		return nil
+	}
+	if err := trimGatewayAuditTx(tx, now, r.gatewayAuditMaxAge); err != nil {
+		return err
+	}
+	r.gatewayAuditTrimAt = now
+	r.gatewayAuditTrimOps = 0
+	return nil
+}
+
+func trimGatewayAuditTx(tx *sql.Tx, now time.Time, maxAge time.Duration) error {
+	if maxAge <= 0 {
+		return nil
+	}
+	cutoff := now.UTC().Add(-maxAge).Format(time.RFC3339Nano)
+	if _, err := tx.Exec(`DELETE FROM audit WHERE kind = ? AND lower(trim(status)) = ? AND created_at < ?`, string(core.AuditKindGateway), "error", cutoff); err != nil {
+		return err
+	}
+	_, err := tx.Exec(`DELETE FROM audit_terms WHERE seq NOT IN (SELECT seq FROM audit)`)
+	return err
+}
+
 func (r *SQLiteRepository) trimBillingRequestsTx(tx *sql.Tx, now time.Time) error {
 	return trimBillingRequestsTx(tx, now, r.usageMaxAge)
 }

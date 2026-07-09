@@ -559,6 +559,8 @@ func writeConfigIfMissing(cfg linuxInstallConfig) (bool, error) {
 		"api_key":                          "",
 		"audit_limit":                      512,
 		"gateway_audit":                    false,
+		"gateway_audit_errors":             false,
+		"gateway_audit_retention_days":     1,
 		"max_in_flight":                    100000,
 		"upstream_max_idle_conns":          100000,
 		"upstream_max_idle_conns_per_host": 100000,

@@ -719,6 +719,14 @@
         <span>{{t "billing_ledger_retention_days"}}</span>
         <input type="number" min="3" max="365" name="billing_ledger_retention_days" value="{{.Settings.Retention.BillingLedgerRetentionDays}}" form="system-settings-form">
       </label>
+      <label class="checkbox-row">
+        <input type="checkbox" name="gateway_audit_errors" {{if .Settings.Retention.GatewayAuditErrors}}checked{{end}} form="system-settings-form">
+        <span>{{t "gateway_audit_errors"}}</span>
+      </label>
+      <label>
+        <span>{{t "gateway_audit_retention_days"}}</span>
+        <input type="number" min="1" max="365" name="gateway_audit_retention_days" value="{{.Settings.Retention.GatewayAuditRetentionDays}}" form="system-settings-form">
+      </label>
       <div class="form-actions full-span">
         <button type="submit" form="system-settings-form">{{t "save_settings"}}</button>
       </div>

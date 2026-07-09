@@ -1124,6 +1124,8 @@ func systemSettingsFromForm(r *http.Request, existing core.SystemSettings) core.
 		AuditLimit:                 parseIntFormValue(r.FormValue("audit_limit")),
 		UsageLogMaxAgeDays:         parseIntFormValue(r.FormValue("usage_log_max_age_days")),
 		BillingLedgerRetentionDays: parseIntFormValue(r.FormValue("billing_ledger_retention_days")),
+		GatewayAuditErrors:         r.FormValue("gateway_audit_errors") != "",
+		GatewayAuditRetentionDays:  parseIntFormValue(r.FormValue("gateway_audit_retention_days")),
 	}
 	if input.Payment.PersonalPay.Enabled {
 		input.Backup = core.SystemBackupSettings{

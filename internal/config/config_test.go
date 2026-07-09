@@ -32,6 +32,9 @@ func TestLoadDefaultsWhenDefaultConfigIsMissing(t *testing.T) {
 	if cfg.ProtocolRequestBodyLimit != defaultProtocolRequestBodyLimit {
 		t.Fatalf("protocol request body limit = %d, want %d", cfg.ProtocolRequestBodyLimit, defaultProtocolRequestBodyLimit)
 	}
+	if cfg.GatewayAuditRetentionDays != defaultGatewayAuditRetentionDays {
+		t.Fatalf("gateway audit retention days = %d, want %d", cfg.GatewayAuditRetentionDays, defaultGatewayAuditRetentionDays)
+	}
 	if cfg.DatabaseBackend != "sqlite" {
 		t.Fatalf("database backend = %q, want sqlite", cfg.DatabaseBackend)
 	}
@@ -50,6 +53,8 @@ func TestLoadConfigFileOverridesDefaults(t *testing.T) {
 		"api_key": "seed-key",
 		"audit_limit": 128,
 		"gateway_audit": true,
+		"gateway_audit_errors": true,
+		"gateway_audit_retention_days": 3,
 		"max_in_flight": 123,
 		"upstream_max_idle_conns": 456,
 		"upstream_max_idle_conns_per_host": 789,
@@ -73,6 +78,9 @@ func TestLoadConfigFileOverridesDefaults(t *testing.T) {
 	}
 	if cfg.AuditLimit != 128 || !cfg.GatewayAudit || cfg.MaxInFlight != 123 {
 		t.Fatalf("loaded limits = audit:%d gateway:%t max:%d", cfg.AuditLimit, cfg.GatewayAudit, cfg.MaxInFlight)
+	}
+	if !cfg.GatewayAuditErrors || cfg.GatewayAuditRetentionDays != 3 {
+		t.Fatalf("gateway audit errors = %t retention = %d", cfg.GatewayAuditErrors, cfg.GatewayAuditRetentionDays)
 	}
 	if cfg.UpstreamMaxIdleConns != 456 || cfg.UpstreamMaxIdleConnsPerHost != 789 || cfg.UpstreamMaxConnsPerHost != 321 {
 		t.Fatalf("upstream limits = %d/%d/%d", cfg.UpstreamMaxIdleConns, cfg.UpstreamMaxIdleConnsPerHost, cfg.UpstreamMaxConnsPerHost)

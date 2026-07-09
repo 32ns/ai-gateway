@@ -98,6 +98,8 @@ http://127.0.0.1:8088
 | `api_key` | 初始协议客户端 Key |
 | `audit_limit` | 审计日志保留数量的初始值 |
 | `gateway_audit` | 是否记录网关请求审计 |
+| `gateway_audit_errors` | 是否只记录出错的网关请求审计的初始值，后台可动态开关，`gateway_audit=false` 时生效 |
+| `gateway_audit_retention_days` | 出错网关请求审计的初始保留天数，后台可动态调整，默认 1 天 |
 | `max_in_flight` | 服务最大并发请求数 |
 | `protocol_request_body_limit` | 协议请求体大小限制 |
 | `database_backend` | `sqlite` 或 `postgres` |
