@@ -1346,6 +1346,29 @@ type UserSession struct {
 	UpdatedAt time.Time
 }
 
+type BalanceMigrationStatus string
+
+const (
+	BalanceMigrationPending  BalanceMigrationStatus = "pending"
+	BalanceMigrationDraining BalanceMigrationStatus = "draining"
+	BalanceMigrationClaimed  BalanceMigrationStatus = "claimed"
+)
+
+// BalanceMigrationCode stores only a hash of the user-visible migration code.
+// The raw code is returned once when it is generated and is never persisted.
+type BalanceMigrationCode struct {
+	ID            string
+	UserID        string
+	CodeHash      string
+	TargetUserID  string
+	Status        BalanceMigrationStatus
+	AmountNanoUSD int64
+	ExpiresAt     time.Time
+	GeneratedAt   time.Time
+	ClaimedAt     *time.Time
+	UpdatedAt     time.Time
+}
+
 const (
 	MCPTokenScopeConnect     = "mcp:connect"
 	MCPTokenScopeDocsRead    = "docs:read"

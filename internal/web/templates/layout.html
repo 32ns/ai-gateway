@@ -90,6 +90,9 @@
           <div class="user-menu-panel">
             <button type="button" data-group-settings-open="password-modal">{{t "change_password"}}</button>
             <button type="button" data-group-settings-open="oauth-bind-modal">{{t "oauth_bind_title"}}</button>
+            {{if not (isAdminUser .)}}
+            <button type="button" data-group-settings-open="balance-migration-modal">{{t "balance_migration_generate"}}</button>
+            {{end}}
             <form class="logout-form" method="post" action="/logout">
               <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
               <button type="submit">{{t "logout"}}</button>
@@ -195,6 +198,39 @@
         </div>
       </div>
     </div>
+    {{if not (isAdminUser .)}}
+    <div class="settings-overlay" id="balance-migration-modal" role="dialog" aria-modal="true" aria-labelledby="balance-migration-modal-title" hidden>
+      <div class="settings-dialog">
+        <div class="settings-header">
+          <div>
+            <h3 id="balance-migration-modal-title">{{t "balance_migration_generate"}}</h3>
+            <p>{{t "balance_migration_generate_summary"}}</p>
+          </div>
+          <button type="button" class="icon-button settings-close" data-group-settings-close aria-label="{{t "cancel"}}" title="{{t "cancel"}}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+          </button>
+        </div>
+        <form class="settings-form" method="post" action="/profile/balance-migration/code" data-balance-migration-form>
+          <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+          <p class="form-error" data-balance-migration-message hidden></p>
+          <div class="settings-subhead" data-balance-migration-result hidden>
+            <div>
+              <strong>{{t "balance_migration_code"}}</strong>
+              <span data-balance-migration-expiry></span>
+            </div>
+            <div class="oauth-provider-actions">
+              <button class="ghost" type="button" data-balance-migration-copy>{{t "copy_code"}}</button>
+            </div>
+            <input type="text" readonly autocomplete="off" spellcheck="false" data-balance-migration-code>
+          </div>
+          <div class="settings-actions">
+            <button type="button" class="ghost" data-group-settings-close>{{t "cancel"}}</button>
+            <button type="submit" data-balance-migration-submit>{{t "balance_migration_create"}}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    {{end}}
     {{end}}
     {{end}}
     <main class="workspace">

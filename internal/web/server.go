@@ -49,6 +49,7 @@ type Server struct {
 	templateErr              error
 	registrationLimiter      *ipRateLimiter
 	loginLimiter             *ipRateLimiter
+	balanceMigrationLimiter  *ipRateLimiter
 	oauthMergeMu             sync.Mutex
 	oauthMergeStates         map[string]profileOAuthMergeState
 }
@@ -143,6 +144,7 @@ func NewServerWithOptions(control *controlplane.Service, gatewayService *gateway
 		templateErr:             err,
 		registrationLimiter:     newIPRateLimiter(),
 		loginLimiter:            newIPRateLimiter(),
+		balanceMigrationLimiter: newIPRateLimiter(),
 		oauthMergeStates:        make(map[string]profileOAuthMergeState),
 	}
 	server.clearImageLabStoredResults()

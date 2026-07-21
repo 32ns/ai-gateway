@@ -69,6 +69,20 @@ func (r *SQLiteRepository) initSchemaLocked() error {
 			FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_user_balances_balance ON user_balances(balance_nano_usd)`,
+		`CREATE TABLE IF NOT EXISTS user_balance_migration_codes (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL UNIQUE,
+			code_hash TEXT NOT NULL UNIQUE,
+			target_user_id TEXT NOT NULL DEFAULT '',
+			status TEXT NOT NULL CHECK (status IN ('pending', 'draining', 'claimed')),
+			amount_nano_usd INTEGER NOT NULL DEFAULT 0,
+			expires_at_ns INTEGER NOT NULL,
+			generated_at_ns INTEGER NOT NULL,
+			claimed_at_ns INTEGER NOT NULL DEFAULT 0,
+			updated_at_ns INTEGER NOT NULL,
+			FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_user_balance_migration_codes_status ON user_balance_migration_codes(status, expires_at_ns)`,
 		`CREATE TABLE IF NOT EXISTS user_oauth_identities (
 			user_id TEXT NOT NULL,
 			provider TEXT NOT NULL,

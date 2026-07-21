@@ -139,6 +139,16 @@ func (r *SQLiteRepository) ReserveBilling(input core.BillingReservationInput) (c
 	}
 
 	var balance int64
+	var enabled int
+	if err := tx.QueryRow(`SELECT enabled FROM users WHERE id = ?`, input.UserID).Scan(&enabled); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return core.BillingReservation{}, ErrNotFound
+		}
+		return core.BillingReservation{}, err
+	}
+	if enabled == 0 {
+		return core.BillingReservation{}, ErrNotFound
+	}
 	err = tx.QueryRow(`SELECT balance_nano_usd FROM user_balances WHERE user_id = ?`, input.UserID).Scan(&balance)
 	if errors.Is(err, sql.ErrNoRows) {
 		return core.BillingReservation{}, ErrNotFound
@@ -1505,6 +1515,13 @@ func (r *SQLiteRepository) CompletePaymentOrderWithCredits(outTradeNo, providerT
 			return core.PaymentOrder{}, false, ErrBillingRequestConflict
 		}
 		return order, false, nil
+	}
+	migrated, err := balanceMigrationClaimedTx(tx, order.UserID)
+	if err != nil {
+		return core.PaymentOrder{}, false, err
+	}
+	if migrated {
+		return core.PaymentOrder{}, false, ErrBalanceMigrationClaimed
 	}
 	if paidAmountNanoUSD != order.AmountNanoUSD {
 		return core.PaymentOrder{}, false, ErrBillingRequestConflict

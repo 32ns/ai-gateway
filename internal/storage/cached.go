@@ -496,6 +496,30 @@ func (r *CachedRepository) AdjustUserBalance(userID string, deltaNanoUSD int64, 
 	return previous, next, nil
 }
 
+func (r *CachedRepository) CreateBalanceMigrationCode(code core.BalanceMigrationCode) error {
+	store, ok := r.Repository.(BalanceMigrationStore)
+	if !ok {
+		return ErrBalanceMigrationUnsupported
+	}
+	if err := store.CreateBalanceMigrationCode(code); err != nil {
+		return err
+	}
+	r.reload()
+	return nil
+}
+
+func (r *CachedRepository) ClaimBalanceMigrationCode(codeHash, targetUserID string) (core.BalanceMigrationCode, error) {
+	store, ok := r.Repository.(BalanceMigrationStore)
+	if !ok {
+		return core.BalanceMigrationCode{}, ErrBalanceMigrationUnsupported
+	}
+	code, err := store.ClaimBalanceMigrationCode(codeHash, targetUserID)
+	if err == nil || err == ErrBalanceMigrationDraining {
+		r.reload()
+	}
+	return code, err
+}
+
 func (r *CachedRepository) cacheUser(user core.User) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

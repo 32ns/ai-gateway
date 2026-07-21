@@ -2,6 +2,7 @@ package providers
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -441,9 +442,18 @@ func responsesWebSocketDialer(proxyURL string) (*websocket.Dialer, error) {
 	return &websocket.Dialer{
 		Proxy:            transport.Proxy,
 		NetDialContext:   transport.DialContext,
-		TLSClientConfig:  transport.TLSClientConfig,
+		TLSClientConfig:  responsesWebSocketTLSConfig(transport.TLSClientConfig),
 		HandshakeTimeout: openAIResponsesWSDialTimeout,
 	}, nil
+}
+
+func responsesWebSocketTLSConfig(base *tls.Config) *tls.Config {
+	config := &tls.Config{}
+	if base != nil {
+		config = base.Clone()
+	}
+	config.NextProtos = []string{"http/1.1"}
+	return config
 }
 
 func websocketURL(endpoint string) (string, error) {

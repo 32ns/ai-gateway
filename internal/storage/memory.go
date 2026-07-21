@@ -218,6 +218,7 @@ type MemoryRepository struct {
 	mu                 sync.RWMutex
 	accounts           map[string]core.Account
 	users              map[string]core.User
+	balanceMigrations  map[string]core.BalanceMigrationCode
 	sessions           map[string]core.UserSession
 	mcpTokens          map[string]core.MCPToken
 	mcpTokenHash       map[string]string
@@ -259,6 +260,7 @@ func NewMemoryRepository() *MemoryRepository {
 	return &MemoryRepository{
 		accounts:          make(map[string]core.Account),
 		users:             make(map[string]core.User),
+		balanceMigrations: make(map[string]core.BalanceMigrationCode),
 		sessions:          make(map[string]core.UserSession),
 		mcpTokens:         make(map[string]core.MCPToken),
 		mcpTokenHash:      make(map[string]string),

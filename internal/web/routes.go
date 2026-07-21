@@ -69,6 +69,7 @@ func (s *Server) registerPublicRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/sitemap-docs.xml", s.handleSitemap)
 	mux.HandleFunc("/llms.txt", s.handleLLMSText)
 	mux.HandleFunc("/payments/notify/", s.handlePaymentNotify)
+	mux.HandleFunc("/api/internal/balance-migrations/claim", s.handleBalanceMigrationClaim)
 }
 
 func (s *Server) registerConsoleRoutes(mux *http.ServeMux) {
@@ -81,6 +82,7 @@ func (s *Server) registerConsoleRoutes(mux *http.ServeMux) {
 	mux.Handle("/profile/password", s.requireConsoleUser(http.HandlerFunc(s.handlePasswordPage)))
 	mux.Handle("/profile/oauth", s.requireConsoleUser(http.HandlerFunc(s.handleProfileOAuthPage)))
 	mux.Handle("/profile/oauth/", s.requireConsoleUser(http.HandlerFunc(s.handleProfileOAuth)))
+	mux.Handle("/profile/balance-migration/code", s.requireConsoleUser(http.HandlerFunc(s.handleBalanceMigrationCode)))
 	mux.Handle("/payments/create", s.requireConsoleUser(http.HandlerFunc(s.handlePaymentCreate)))
 	mux.Handle("/payments/cancel", s.requireConsoleUser(http.HandlerFunc(s.handlePaymentCancel)))
 	mux.Handle("/payments/qr", s.requireConsoleUser(http.HandlerFunc(s.handlePaymentQRCode)))

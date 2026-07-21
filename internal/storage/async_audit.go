@@ -91,6 +91,22 @@ func (r *AsyncAuditRepository) TouchUserLastUsedAt(userID string, usedAt time.Ti
 	return repo.TouchUserLastUsedAt(userID, usedAt)
 }
 
+func (r *AsyncAuditRepository) CreateBalanceMigrationCode(code core.BalanceMigrationCode) error {
+	store, ok := r.Repository.(BalanceMigrationStore)
+	if !ok {
+		return ErrBalanceMigrationUnsupported
+	}
+	return store.CreateBalanceMigrationCode(code)
+}
+
+func (r *AsyncAuditRepository) ClaimBalanceMigrationCode(codeHash, targetUserID string) (core.BalanceMigrationCode, error) {
+	store, ok := r.Repository.(BalanceMigrationStore)
+	if !ok {
+		return core.BalanceMigrationCode{}, ErrBalanceMigrationUnsupported
+	}
+	return store.ClaimBalanceMigrationCode(codeHash, targetUserID)
+}
+
 func (r *AsyncAuditRepository) GetStartupSystemSettings() (core.SystemSettings, error) {
 	return LoadStartupSystemSettings(r.Repository)
 }
